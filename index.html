@@ -1044,9 +1044,11 @@ function mdCot(){
           </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-          <div class="f" style="margin:0">
+          <div class="f" style="margin:0;position:relative">
             <label>Nome do Fornecedor *</label>
-            <input class="inp cf-nome" id="cf${n}-nome" placeholder="Nome do fornecedor">
+            <input class="inp cf-nome" id="cf${n}-nome" placeholder="Digite ou selecione..." autocomplete="off"
+              oninput="showFornSug(${n},this.value)" onfocus="showFornSug(${n},this.value)" onblur="setTimeout(()=>hideSug(${n}),200)">
+            <div id="cf${n}-sug" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #1565C0;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:999;max-height:200px;overflow-y:auto"></div>
           </div>
           <div class="f" style="margin:0">
             <label>CNPJ</label>
@@ -1278,6 +1280,39 @@ function prevFile(input,lblId){
 function prevArq(input,lblId){
   const lbl=document.getElementById(lblId);
   if(lbl&&input.files&&input.files[0])lbl.textContent=input.files[0].name;
+}
+
+function showFornSug(n,val){
+  const sug=document.getElementById('cf'+n+'-sug');
+  if(!sug)return;
+  const ativos=S.forn.filter(f=>f.ativo);
+  const filtrado=val.trim().length>0
+    ?ativos.filter(f=>f.nome.toLowerCase().includes(val.toLowerCase()))
+    :ativos;
+  if(!filtrado.length){sug.style.display='none';return;}
+  sug.innerHTML=filtrado.map(f=>`
+    <div onclick="selecionarForn(${n},'${f.nome.replace(/'/g,"\'")}','${(f.cnpj||'').replace(/'/g,"\'")}');hideSug(${n})"
+      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #F0F2F5;font-size:13px;display:flex;justify-content:space-between;align-items:center"
+      onmouseenter="this.style.background='#E3F2FD'" onmouseleave="this.style.background='#fff'">
+      <div>
+        <div style="font-weight:600;color:#0F2236">${f.nome}</div>
+        ${f.cnpj?`<div style="font-size:11px;color:#9E9E9E">${f.cnpj}</div>`:''}
+      </div>
+      ${'★'.repeat(f.avaliacao||0).slice(0,5)}
+    </div>`).join('');
+  sug.style.display='block';
+}
+
+function selecionarForn(n,nome,cnpj){
+  const nomeEl=document.getElementById('cf'+n+'-nome');
+  const cnpjEl=document.getElementById('cf'+n+'-cnpj');
+  if(nomeEl)nomeEl.value=nome;
+  if(cnpjEl&&cnpj)cnpjEl.value=cnpj;
+}
+
+function hideSug(n){
+  const sug=document.getElementById('cf'+n+'-sug');
+  if(sug)sug.style.display='none';
 }
 
 function fmtCNPJ(el){
