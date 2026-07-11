@@ -896,6 +896,9 @@ async function vSOL(id){
 }
 
 async function hExecutarCompra(solId,cotId,forn,val){
+  if(!isCompras())return alert('⛔ Apenas o time de Compras pode executar a compra.');
+  const sol=S.sol.find(s=>s.id===solId);
+  if(sol&&sol.status!=='Aprovada')return alert('⛔ Esta compra ainda não foi aprovada pelo Gerente.');
   if(!confirm(`Confirmar execução da compra com ${forn} por ${fmt(val)}?`))return;
   try{
     if(cotId)await sb.from('cotacoes').update({status:'Encerrada',vencedor:forn}).eq('id',cotId);
@@ -949,6 +952,7 @@ async function hSt(id,status){
 }
 
 async function hEscolherForn(cotId,solId,forn,val){
+  if(!isDiretoria())return alert('⛔ Apenas a Diretoria pode escolher o fornecedor.');
   if(!confirm('Confirma escolha de '+forn+' por '+fmt(val)+'?'))return;
   const obs=V('ov');
   const nome=`${S.user.nome} ${S.user.sobrenome}`;
@@ -1408,9 +1412,26 @@ function calcMelhor(){
 // hCot removido (duplicado)
 
 async function hEsc(cotId,solId,forn,val){
-  if(!confirm(`Confirmar compra com ${forn} por ${fmt(val)}?`))return;
-  try{await escolherVencedor(cotId,solId,forn,val);await loadCot();await loadSol();await loadPed();render();}
-  catch(e){alert(e.message);}
+  // Bloqueio de segurança — apenas Diretoria pode escolher fornecedor
+  if(!isDiretoria())return alert('⛔ Acesso negado. Apenas a Diretoria pode escolher o fornecedor.');
+  // Verifica se a solicitação está no status correto
+  const sol=S.sol.find(s=>s.id===solId);
+  if(sol&&sol.status!=='Aguardando Aprovação Diretoria')return alert('⛔ Esta solicitação não está aguardando aprovação da Diretoria.');
+  if(!confirm(`Confirmar escolha de ${forn} por ${fmt(val)}?
+
+Após confirmar, irá para aprovação do Gerente.`))return;
+  try{
+    await sb.from('cotacoes').update({vencedor:forn,status:'Encerrada'}).eq('id',cotId);
+    const nome=`${S.user.nome} ${S.user.sobrenome}`;
+    const agora=new Date().toISOString();
+    await sb.from('solicitacoes').update({
+      status:'Aguardando Aprovação Gerente',
+      fornecedor:forn,valor_final:val,
+      aprovado_dir_nome:nome,aprovado_dir_data:agora
+    }).eq('id',solId);
+    await loadCot();await loadSol();render();
+    alert('✅ Fornecedor escolhido! Enviado para aprovação do Gerente.');
+  }catch(e){alert(e.message);}
 }
 
 // ── PEDIDOS ───────────────────────────────────────────────────────────────
