@@ -395,7 +395,7 @@ function buildPage(){
 
 function buildTimeline(s){
   const status=typeof s==='string'?s:(s?.status||'');
-  const obj=typeof s==='object'?s:null;
+  const obj=typeof s==='object'&&s!==null?s:null;
   const ORDER=[
     'Aguardando Diretoria',
     'Aguardando Orçamento',
@@ -407,61 +407,67 @@ function buildTimeline(s){
   ];
   const steps=[
     {
+      key:'Aguardando Diretoria',
       label:'Solicitação Aberta',
-      status:'Aguardando Diretoria',
       icon:'📝',
       sub:obj?`${fmtD(obj.data_criacao)}${obj.solicitante_nome?'<br>'+obj.solicitante_nome.split(' ')[0]:''}`:''
     },
     {
+      key:'Aguardando Orçamento',
       label:'Aprovação Diretoria',
-      status:'Aguardando Orçamento',
       icon:'👔',
       sub:obj&&obj.aprovado_dir_nome?`${fmtD(obj.aprovado_dir_data)}<br>${obj.aprovado_dir_nome.split(' ')[0]}`:''
     },
     {
+      key:'Aguardando Aprovação Diretoria',
       label:'Cotação Compras',
-      status:'Aguardando Aprovação Diretoria',
       icon:'📋',
       sub:obj&&obj.cotacao_por?`${fmtD(obj.cotacao_data)}<br>${obj.cotacao_por.split(' ')[0]}`:''
     },
     {
+      key:'Aguardando Aprovação Gerente',
       label:'Aprovação Final',
-      status:'Aguardando Aprovação Gerente',
       icon:'✅',
-      sub:obj&&obj.aprovado_ger_nome?`${fmtD(obj.aprovado_ger_data)}<br>Dir: ${(obj.aprovado_dir_nome||'').split(' ')[0]}<br>Ger: ${obj.aprovado_ger_nome.split(' ')[0]}`:
-          obj&&obj.aprovado_dir_nome&&ORDER.indexOf(status)>=ORDER.indexOf('Aguardando Aprovação Gerente')?`Dir: ${obj.aprovado_dir_nome.split(' ')[0]}`:''
+      sub:obj&&obj.aprovado_ger_nome
+        ?`${fmtD(obj.aprovado_ger_data)}<br>Dir: ${(obj.aprovado_dir_nome||'').split(' ')[0]}<br>Ger: ${obj.aprovado_ger_nome.split(' ')[0]}`
+        :obj&&obj.aprovado_dir_nome&&ORDER.indexOf(status)>=ORDER.indexOf('Aguardando Aprovação Gerente')
+          ?`Dir: ${obj.aprovado_dir_nome.split(' ')[0]}`:''
     },
     {
+      key:'Comprada',
       label:'Compra Realizada',
-      status:'Comprada',
       icon:'🛒',
       sub:obj&&obj.comprado_por?`${fmtD(obj.comprado_em)}<br>${obj.comprado_por.split(' ')[0]}`:''
     },
     {
+      key:'Entregue',
       label:'Entregue',
-      status:'Entregue',
       icon:'📦',
       sub:obj&&obj.entregue_por?`${fmtD(obj.entregue_em)}<br>${obj.entregue_por.split(' ')[0]}`:''
     },
   ];
+
   const isReprovada=status==='Reprovada';
   const curIdx=ORDER.indexOf(status);
 
-  return `<div style="display:flex;align-items:flex-start;overflow-x:auto;padding:4px 0 8px">
+  return `<div style="display:flex;align-items:flex-start;overflow-x:auto;padding:6px 0 10px">
     ${steps.map((step,i)=>{
-      const stepIdx=ORDER.indexOf(step.status);
-      const done=!isReprovada&&curIdx>=stepIdx;
-      const active=status===step.status||(step.status==='Aguardando Aprovação Gerente'&&status==='Aprovada');
-      const color=done?'#1565C0':'#E0E0E0';
-      const bgCircle=active?'#1565C0':done?'#E3F2FD':'#fff';
+      const stepIdx=ORDER.indexOf(step.key);
+      const done=!isReprovada&&curIdx>stepIdx;
+      const active=!isReprovada&&curIdx===stepIdx;
+      const clr=done||active?'#1565C0':'#E0E0E0';
+      const bg=active?'#1565C0':done?'#E3F2FD':'#fff';
+      const txtColor=active?'#1565C0':done?'#333':'#9E9E9E';
       return `
-      ${i>0?`<div style="flex:1;height:2px;background:${color};margin-top:17px;min-width:10px"></div>`:''}
-      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:74px;max-width:90px">
-        <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid ${color};background:${bgCircle};flex-shrink:0">
-          ${active?`<span style="color:#fff">${step.icon}</span>`:done?`<span style="color:#1565C0;font-size:13px;font-weight:700">✓</span>`:`<span style="color:#ccc">${step.icon}</span>`}
+      ${i>0?`<div style="flex:1;height:2px;background:${clr};margin-top:17px;min-width:10px"></div>`:''}
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:76px;max-width:90px">
+        <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid ${clr};background:${bg}">
+          ${active?`<span style="color:#fff">${step.icon}</span>`
+            :done?`<span style="color:#1565C0;font-weight:700;font-size:13px">✓</span>`
+            :`<span style="color:#ccc">${step.icon}</span>`}
         </div>
-        <div style="font-size:10px;font-weight:${active?'700':'400'};color:${active?'#1565C0':done?'#424242':'#9E9E9E'};text-align:center;line-height:1.3">${step.label}</div>
-        ${(done||active)&&step.sub?`<div style="font-size:10px;color:#1565C0;text-align:center;line-height:1.5;font-weight:500">${step.sub}</div>`:''}
+        <div style="font-size:10px;font-weight:${active?'700':'400'};color:${txtColor};text-align:center;line-height:1.3">${step.label}</div>
+        ${(done||active)&&step.sub?`<div style="font-size:10px;color:#1565C0;text-align:center;line-height:1.5;font-weight:500;margin-top:1px">${step.sub}</div>`:''}
       </div>`;
     }).join('')}
     ${isReprovada?`
@@ -761,8 +767,8 @@ async function hCriarSOL(){
 async function vSOL(id){
   const s=S.sol.find(x=>x.id===id);if(!s)return;
   const pD=isDiretoria()&&s.status==='Aguardando Diretoria';
-  const pAD=isDiretoria()&&s.status==='Aguardando Aprovacao Diretoria';
-  const pG=isGerente()&&s.status==='Aguardando Aprovacao Gerente';
+  const pAD=isDiretoria()&&s.status==='Aguardando Aprovação Diretoria';
+  const pG=isGerente()&&s.status==='Aguardando Aprovação Gerente';
   if(pAD){
     const {data}=await sb.from('cotacoes').select('*').eq('solicitacao_id',id);
     if(data&&data.length)S.cot=[...S.cot.filter(c=>c.solicitacao_id!==id),...data];
