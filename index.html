@@ -571,11 +571,9 @@ async function vSOL(id){
   const pD=isDiretoria()&&s.status==='Aguardando Diretoria';
   const pAD=isDiretoria()&&s.status==='Aguardando Aprovação Diretoria';
   const pG=isGerente()&&s.status==='Aguardando Aprovação Gerente';
-  // Carrega cotações do banco se necessário
-  if(pAD||pG){
-    const {data}=await sb.from('cotacoes').select('*').eq('solicitacao_id',id);
-    if(data&&data.length)S.cot=[...S.cot.filter(c=>c.solicitacao_id!==id),...data];
-  }
+  // Sempre busca cotações do banco para esta solicitação
+  const {data:cotData}=await sb.from('cotacoes').select('*').eq('solicitacao_id',id);
+  const cotacoesSol=cotData||[];
   openModal(`<div class="modal" style="max-width:560px">
   <div class="mh"><span>${s.numero}</span><button class="xb" onclick="closeModal()">✕</button></div>
   <div class="mb">
@@ -597,7 +595,7 @@ async function vSOL(id){
     ${pAD?`<hr class="hdiv">
     <div style="font-size:13px;font-weight:600;color:#0F2236;margin-bottom:12px">📋 Orçamentos recebidos</div>
     ${(()=>{
-      const cot=S.cot.find(c=>c.solicitacao_id===s.id&&c.status==='Aberta');
+      const cot=cotacoesSol.find(c=>c.status==='Aberta')||cotacoesSol[0];
       if(!cot)return '<div style="color:#9E9E9E;font-size:13px;padding:12px;background:#F8F9FA;border-radius:8px">Nenhum orçamento encontrado.</div>';
       const it=typeof cot.itens==='string'?JSON.parse(cot.itens||'[]'):(cot.itens||[]);
       const best=it.length?it.reduce((a,b)=>a.val<b.val?a:b,it[0]):null;
@@ -628,7 +626,38 @@ async function vSOL(id){
     <div class="ib ibo">Aprove os orçamentos para seguir ao Gerente de Setor.</div>
     <div class="f"><label>Observação</label><textarea class="inp" id="ov" placeholder="Comentário sobre os orçamentos..."></textarea></div>
     <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aguardando Aprovação Gerente')">✓ Aprovar Orçamentos</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">✗ Reprovar</button></div>`:''}
-    ${pG?`<hr class="hdiv"><div class="ib ibl">Sua aprovação final libera a compra.</div>
+    ${pG?`<hr class="hdiv">
+    <div style="font-size:13px;font-weight:600;color:#0F2236;margin-bottom:12px">📋 Orçamentos para análise</div>
+    ${(()=>{
+      const cot=cotacoesSol.find(c=>c.status==='Encerrada')||cotacoesSol[0];
+      if(!cot)return '<div style="color:#9E9E9E;font-size:13px;padding:12px;background:#F8F9FA;border-radius:8px">Nenhum orçamento encontrado.</div>';
+      const it=typeof cot.itens==='string'?JSON.parse(cot.itens||'[]'):(cot.itens||[]);
+      const best=it.length?it.reduce((a,b)=>a.val<b.val?a:b,it[0]):null;
+      return `
+      <div style="font-size:11px;color:#9E9E9E;margin-bottom:8px">Lançado por: <strong style="color:#555">${cot.criado_por||'Compras'}</strong> · ${fmtD(cot.data_criacao)}</div>
+      <div style="display:grid;gap:10px;margin-bottom:14px">
+        ${it.map(i=>`
+        <div style="background:${i.forn===best?.forn?'#F1F8E9':'#F8F9FA'};border:1px solid ${i.forn===best?.forn?'#A5D6A7':'#E0E0E0'};border-radius:8px;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+            <div>
+              <span style="font-weight:600;font-size:14px">${i.forn}</span>
+              ${i.forn===best?.forn?'<span class="chip" style="background:#E8F5E9;color:#2E7D32;font-size:10px;margin-left:8px">✓ Menor preço</span>':''}
+              ${i.cnpj?`<div style="font-size:11px;color:#9E9E9E;margin-top:2px">CNPJ: ${i.cnpj}</div>`:''}
+            </div>
+            <div style="font-size:20px;font-weight:700;color:${i.forn===best?.forn?'#2E7D32':'#1565C0'}">${fmt(i.val)}</div>
+          </div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#666">
+            ${i.prazo?`<span>⏱ Prazo: <strong>${i.prazo} dias</strong></span>`:''}
+            ${i.pgto?`<span>💳 Pagamento: <strong>${i.pgto}</strong></span>`:''}
+            ${i.obs?`<span>📝 ${i.obs}</span>`:''}
+          </div>
+        </div>`).join('')}
+      </div>
+      <div style="background:#E8F5E9;border-radius:8px;padding:12px 14px;font-size:13px;color:#1B5E20;margin-bottom:14px">
+        💰 <strong>Recomendação:</strong> ${best?.forn||'—'} — ${fmt(best?.val)}
+      </div>`;
+    })()}
+    <div class="ib ibl">Sua aprovação final libera a compra.</div>
     <div class="f"><label>Observação</label><textarea class="inp" id="ov" placeholder="Comentário final..."></textarea></div>
     <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aprovada')">✓ Aprovar — Liberar Compra</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">✗ Reprovar</button></div>`:''}
   </div></div>`);
@@ -794,12 +823,19 @@ async function salvarFornOrc(n){
   const nome=document.getElementById(`ot${n}-forn`)?.value?.trim();
   const cnpj=document.getElementById(`ot${n}-cnpj`)?.value?.trim();
   if(!nome)return alert('Preencha o nome do fornecedor antes de salvar.');
-  // Verifica CNPJ duplicado
+  // Verifica duplicata por nome
+  const {data:existNome}=await sb.from('fornecedores').select('id,nome').ilike('nome',nome);
+  if(existNome&&existNome.length>0){
+    return alert(`⚠️ Fornecedor "${existNome[0].nome}" já está cadastrado no sistema.\nNão é possível duplicar.`);
+  }
+  // Verifica duplicata por CNPJ
   if(cnpj){
     const cnpjLimpo=cnpj.replace(/\D/g,'');
-    const {data:exist}=await sb.from('fornecedores').select('id,nome').ilike('cnpj','%'+cnpjLimpo.slice(0,8)+'%');
-    if(exist&&exist.length>0){
-      return alert(`⚠️ CNPJ já cadastrado no sistema para o fornecedor: "${exist[0].nome}".\nNão é possível duplicar.`);
+    if(cnpjLimpo.length>=8){
+      const {data:existCnpj}=await sb.from('fornecedores').select('id,nome').ilike('cnpj','%'+cnpjLimpo.slice(0,8)+'%');
+      if(existCnpj&&existCnpj.length>0){
+        return alert(`⚠️ CNPJ já cadastrado para o fornecedor: "${existCnpj[0].nome}".\nNão é possível duplicar.`);
+      }
     }
   }
   if(confirm(`Salvar "${nome}" no cadastro de fornecedores?`)){
