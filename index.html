@@ -898,30 +898,241 @@ async function vSOL(id){
 async function hExecutarCompra(solId,cotId,forn,val){
   if(!isCompras())return alert('⛔ Apenas o time de Compras pode executar a compra.');
   const sol=S.sol.find(s=>s.id===solId);
-  if(sol&&sol.status!=='Aprovada')return alert('⛔ Esta compra ainda não foi aprovada pelo Gerente.');
-  if(!confirm(`Confirmar execução da compra com ${forn} por ${fmt(val)}?`))return;
+  if(!sol||sol.status!=='Aprovada')return alert('⛔ Esta compra ainda não foi aprovada pelo Gerente.');
+  // Carrega cotacao com todos os fornecedores para comparativo
+  const {data:cots}=await sb.from('cotacoes').select('*').eq('solicitacao_id',solId);
+  const cotData=cots||[];
+  const PGTO=['À vista','Boleto 30 dias','Boleto 30/60 dias','Boleto 30/60/90 dias','Cartão de crédito','Pix','Transferência bancária','Cheque','Outro'];
+  // Get all suppliers from all cotacoes for this sol
+  let allForn=[];
+  cotData.forEach(c=>{
+    const it=typeof c.itens==='string'?JSON.parse(c.itens||'[]'):(c.itens||[]);
+    it.forEach(i=>{if(!allForn.find(f=>f.forn===i.forn))allForn.push(i);});
+  });
+  const mainCot=cotData[0];
+  const mainItens=mainCot?(typeof mainCot.itens==='string'?JSON.parse(mainCot.itens||'[]'):(mainCot.itens||[])):[];
+  const chosen=mainItens.find(i=>i.forn===forn)||mainItens[0];
+  const maxVal=mainItens.length?Math.max(...mainItens.map(i=>i.val||0)):0;
+  const saving=maxVal-val;
+  const savingPct=maxVal>0?((saving/maxVal)*100).toFixed(1):0;
+  const solItens=sol.itens_requisicao||[];
+
+  openModal(`<div class="modal" style="max-width:1100px;width:98vw">
+  <div class="mh" style="background:#0F2236;color:#fff;border-radius:14px 14px 0 0">
+    <div>
+      <div style="font-size:16px;font-weight:700">🛒 Ordem de Compra</div>
+      <div style="font-size:12px;opacity:.7;margin-top:2px">Solicitação ${sol.numero} · ${sol.loja_nome}</div>
+    </div>
+    <button class="xb" style="color:rgba(255,255,255,.6)" onclick="closeModal()">✕</button>
+  </div>
+  <div class="mb" style="padding:0;max-height:85vh;overflow:hidden">
+  <div style="display:grid;grid-template-columns:1fr 320px;height:100%">
+
+  <!-- COLUNA ESQUERDA -->
+  <div style="padding:22px;overflow-y:auto;max-height:85vh;border-right:1px solid #F0F2F5">
+
+    <!-- FORNECEDOR SELECIONADO -->
+    <div style="background:#fff;border:1.5px solid #A5D6A7;border-radius:12px;padding:18px;margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <div style="font-size:14px;font-weight:700;color:#0F2236">Fornecedor Selecionado</div>
+        <span class="chip" style="background:#E8F5E9;color:#2E7D32">Selecionado</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+        <div style="width:48px;height:48px;border-radius:10px;background:#1565C0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700;flex-shrink:0">${(forn||'?')[0]}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:16px;font-weight:700;color:#0F2236">${forn}</div>
+          ${chosen?.cnpj?`<div style="font-size:12px;color:#9E9E9E;margin-top:2px">CNPJ: ${chosen.cnpj}</div>`:''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:#9E9E9E">Valor Total</div>
+          <div style="font-size:22px;font-weight:700;color:#1565C0">${fmt(val)}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid #F0F2F5">
+        ${chosen?.data?`<div><div style="font-size:11px;color:#9E9E9E">Data do Orçamento</div><div style="font-size:13px;font-weight:500;margin-top:2px">${fmtD(chosen.data)}</div></div>`:''}
+        ${chosen?.validade?`<div><div style="font-size:11px;color:#9E9E9E">Validade</div><div style="font-size:13px;font-weight:500;margin-top:2px">${fmtD(chosen.validade)}</div></div>`:''}
+        ${chosen?.pgto?`<div><div style="font-size:11px;color:#9E9E9E">Pagamento</div><div style="font-size:13px;font-weight:500;margin-top:2px">${chosen.pgto}</div></div>`:''}
+      </div>
+    </div>
+
+    <!-- COMPARATIVO -->
+    ${mainItens.length>1?`<div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:18px;margin-bottom:18px">
+      <div style="font-size:14px;font-weight:700;color:#0F2236;margin-bottom:14px">Comparativo de Orçamentos</div>
+      <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#F8F9FA">
+          <th style="padding:10px;text-align:left;color:#555;font-weight:600;border-bottom:1px solid #E0E0E0;white-space:nowrap">Fornecedor</th>
+          ${mainItens.map(i=>`<th style="padding:10px;text-align:center;color:#555;font-weight:600;border-bottom:1px solid #E0E0E0;min-width:140px;background:${i.forn===forn?'#E8F5E9':''}">${i.forn}${i.forn===forn?'<br><span style="font-size:10px;color:#2E7D32;font-weight:400">Selecionado</span>':''}</th>`).join('')}
+        </tr></thead>
+        <tbody>
+          <tr><td style="padding:10px;color:#555;font-weight:600;border-bottom:1px solid #F0F2F5">Valor Total</td>${mainItens.map(i=>`<td style="padding:10px;text-align:center;font-weight:700;border-bottom:1px solid #F0F2F5;background:${i.forn===forn?'#E8F5E9':''};color:${i.forn===forn?'#2E7D32':'#333'}">${fmt(i.val)}</td>`).join('')}</tr>
+          <tr><td style="padding:10px;color:#555;font-weight:600;border-bottom:1px solid #F0F2F5">Prazo</td>${mainItens.map(i=>`<td style="padding:10px;text-align:center;border-bottom:1px solid #F0F2F5;background:${i.forn===forn?'#E8F5E9':''}">${i.prazo?i.prazo+' dias':'—'}</td>`).join('')}</tr>
+          <tr><td style="padding:10px;color:#555;font-weight:600">Pagamento</td>${mainItens.map(i=>`<td style="padding:10px;text-align:center;background:${i.forn===forn?'#E8F5E9':''}">${i.pgto||'—'}</td>`).join('')}</tr>
+        </tbody>
+      </table></div>
+    </div>`:''}
+
+    <!-- ITENS -->
+    ${solItens.length?`<div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:18px;margin-bottom:18px">
+      <div style="font-size:14px;font-weight:700;color:#0F2236;margin-bottom:14px">Itens da Requisição</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#F8F9FA">
+          <th style="padding:8px 10px;text-align:left;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0;width:40px">Nº</th>
+          <th style="padding:8px 10px;text-align:left;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">Descrição</th>
+          <th style="padding:8px 10px;text-align:center;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0;width:60px">Qtd.</th>
+          <th style="padding:8px 10px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0;width:110px">Valor Unit.</th>
+          <th style="padding:8px 10px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0;width:110px">Total</th>
+        </tr></thead>
+        <tbody>
+          ${solItens.map((i,idx)=>`<tr style="border-bottom:1px solid #F0F2F5">
+            <td style="padding:8px 10px;color:#9E9E9E;text-align:center">${idx+1}</td>
+            <td style="padding:8px 10px;font-weight:500">${i.desc||i.descricao||'—'}</td>
+            <td style="padding:8px 10px;text-align:center">${i.qtd||1}</td>
+            <td style="padding:8px 10px;text-align:right;color:#555">${i.val>0?fmt(i.val):'—'}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:600;color:#1565C0">${fmt(i.total||(i.qtd||1)*(i.val||0))}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="background:#F8F9FA;border-top:2px solid #E0E0E0">
+          <td colspan="4" style="padding:10px;text-align:right;font-weight:700">Total Geral</td>
+          <td style="padding:10px;text-align:right;font-weight:700;font-size:15px;color:#1565C0">${fmt(val)}</td>
+        </tr></tfoot>
+      </table>
+    </div>`:''}
+
+    <!-- VALOR FINAL -->
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:18px">
+      <div style="font-size:14px;font-weight:700;color:#0F2236;margin-bottom:14px">💰 Valor Final da Compra</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div class="f" style="margin:0">
+          <label>Valor Real Pago (R$) *</label>
+          <input class="inp" type="number" id="oc-valfinal" step="0.01" placeholder="0,00" value="${val}" oninput="calcSaving(${val})">
+        </div>
+        <div class="f" style="margin:0">
+          <label>Forma de Pagamento *</label>
+          <select class="inp" id="oc-pgto">${PGTO.map(p=>`<option${chosen?.pgto===p?' selected':''}>${p}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div id="saving-box" style="background:#E8F5E9;border-radius:8px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:11px;color:#555;margin-bottom:3px">Valor Aprovado</div>
+          <div style="font-size:18px;font-weight:700;color:#333">${fmt(val)}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#555;margin-bottom:3px">Desconto / Saving</div>
+          <div style="font-size:18px;font-weight:700;color:#2E7D32" id="saving-val">R$ 0,00</div>
+          <div style="font-size:12px;color:#2E7D32;font-weight:600" id="saving-pct">0,0%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLUNA DIREITA -->
+  <div style="padding:22px;background:#F8F9FA;overflow-y:auto;max-height:85vh;display:flex;flex-direction:column;gap:14px">
+
+    <!-- RESUMO -->
+    <div style="background:#0F2236;border-radius:12px;padding:18px;color:#fff">
+      <div style="font-size:13px;font-weight:700;margin-bottom:14px">Resumo da Compra</div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1);font-size:13px"><span style="opacity:.7">Total de Itens</span><span style="font-weight:600">${solItens.length||1}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1);font-size:13px"><span style="opacity:.7">Fornecedor</span><span style="font-weight:600;font-size:11px;text-align:right;max-width:150px">${forn}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1);font-size:13px"><span style="opacity:.7">Valor Total</span><span style="font-weight:700;color:#90CAF9">${fmt(val)}</span></div>
+      ${saving>0?`<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px"><span style="opacity:.7">Economia</span><span style="font-weight:700;color:#A5D6A7">${fmt(saving)} (${savingPct}%)</span></div>`:''}
+    </div>
+
+    <!-- ORDEM DE COMPRA -->
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:18px">
+      <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:14px">Informações da Ordem</div>
+      <div class="f" style="margin-bottom:10px">
+        <label>Data da Ordem</label>
+        <input class="inp" type="date" id="oc-data" value="${new Date().toISOString().slice(0,10)}">
+      </div>
+      <div class="f" style="margin-bottom:10px">
+        <label>Centro de Custo / Área</label>
+        <input class="inp" id="oc-cc" placeholder="Ex: Administrativo, MAN-001..." value="${sol.area||''}">
+      </div>
+      <div class="f" style="margin-bottom:10px">
+        <label>Observações</label>
+        <textarea class="inp" id="oc-obs" maxlength="300" placeholder="Informações adicionais sobre a compra..." style="min-height:80px"></textarea>
+      </div>
+      <div class="f" style="margin:0">
+        <label>Anexar Ordem de Compra</label>
+        <label for="oc-file" style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600">
+          📎 Selecionar arquivo
+        </label>
+        <input type="file" id="oc-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="prevArq(this,'oc-filelbl')">
+        <span id="oc-filelbl" style="font-size:11px;color:#9E9E9E;margin-top:4px">Nenhum arquivo</span>
+      </div>
+    </div>
+
+    <!-- APROVAÇÕES -->
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:14px">
+      <div style="font-size:12px;font-weight:700;color:#0F2236;margin-bottom:10px">Histórico de Aprovações</div>
+      ${sol.aprovado_dir_nome?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid #F0F2F5"><span style="color:#666">👔 Diretoria</span><span style="color:#333;font-weight:500">${sol.aprovado_dir_nome}<br><span style="color:#9E9E9E;font-weight:400">${fmtD(sol.aprovado_dir_data)}</span></span></div>`:''}
+      ${sol.aprovado_ger_nome?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0"><span style="color:#666">✅ Gerente</span><span style="color:#333;font-weight:500">${sol.aprovado_ger_nome}<br><span style="color:#9E9E9E;font-weight:400">${fmtD(sol.aprovado_ger_data)}</span></span></div>`:''}
+    </div>
+  </div>
+
+  </div>
+  </div>
+  <div class="mf" style="justify-content:space-between">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    <button class="btn bs" style="padding:11px 28px;font-size:14px" onclick="confirmarOC('${solId}','${cotId||''}','${forn}',${val})">
+      ✅ Confirmar Ordem de Compra
+    </button>
+  </div>
+  </div>`);
+}
+
+function calcSaving(valAprov){
+  const vf=parseFloat(document.getElementById('oc-valfinal')?.value)||0;
+  const desc=valAprov-vf;
+  const pct=valAprov>0?((desc/valAprov)*100):0;
+  const sv=document.getElementById('saving-val');
+  const sp=document.getElementById('saving-pct');
+  const sb2=document.getElementById('saving-box');
+  if(sv)sv.textContent=fmt(desc);
+  if(sp)sp.textContent=pct.toFixed(1)+'%';
+  if(sb2)sb2.style.background=desc>=0?'#E8F5E9':'#FFEBEE';
+  if(sv)sv.style.color=desc>=0?'#2E7D32':'#C62828';
+  if(sp)sp.style.color=desc>=0?'#2E7D32':'#C62828';
+}
+
+async function confirmarOC(solId,cotId,forn,valAprov){
+  const vf=parseFloat(document.getElementById('oc-valfinal')?.value)||parseFloat(valAprov);
+  const pgto=document.getElementById('oc-pgto')?.value||'';
+  const data=document.getElementById('oc-data')?.value||new Date().toISOString().slice(0,10);
+  const cc=document.getElementById('oc-cc')?.value||'';
+  const obs=document.getElementById('oc-obs')?.value||'';
+  const fileEl=document.getElementById('oc-file');
+  const arquivo=fileEl?.files?.[0]?.name||'';
+  if(!vf||vf<=0)return alert('Informe o valor final da compra.');
+  if(!pgto)return alert('Selecione a forma de pagamento.');
+  const desc=parseFloat(valAprov)-vf;
+  const pct=parseFloat(valAprov)>0?((desc/parseFloat(valAprov))*100):0;
+  const nome=`${S.user.nome} ${S.user.sobrenome}`;
+  const agora=new Date().toISOString();
+  const num=await genNum('PED');
+  const sol=S.sol.find(s=>s.id===solId);
+  const prev=new Date(data);prev.setDate(prev.getDate()+7);
   try{
     if(cotId)await sb.from('cotacoes').update({status:'Encerrada',vencedor:forn}).eq('id',cotId);
-    const num=await genNum('PED');
-    const sol=S.sol.find(s=>s.id===solId);
-    const nome=`${S.user.nome} ${S.user.sobrenome}`;
-    const agora=new Date().toISOString();
-    const prev=new Date();prev.setDate(prev.getDate()+7);
     await sb.from('solicitacoes').update({
-      status:'Comprada',comprado_por:nome,comprado_em:agora
+      status:'Comprada',valor_final:vf,
+      comprado_por:nome,comprado_em:agora
     }).eq('id',solId);
     await sb.from('pedidos').insert({
       numero:num,solicitacao_id:solId,cotacao_id:cotId||null,
       solicitacao_numero:sol?.numero,fornecedor:forn,
       loja_nome:sol?.loja_nome,descricao:sol?.descricao,
-      valor:val,data_compra:agora.slice(0,10),
-      prev_entrega:prev.toISOString().slice(0,10),
+      valor:parseFloat(valAprov),valor_final_compra:vf,
+      desconto:desc,saving_pct:Math.round(pct*10)/10,
+      forma_pagamento_oc:pgto,centro_custo:cc,
+      obs_compra:obs,anexo_oc:arquivo,
+      data_compra:data,prev_entrega:prev.toISOString().slice(0,10),
       status:'Em Trânsito',grupo:sol?.grupo
     });
     closeModal();
-    await loadSol();await loadPed();await loadCot();
-    render();
-    alert(`✅ Compra executada! Pedido ${num} criado.\nAguardando entrega.`);
+    await loadSol();await loadPed();render();
+    alert(`✅ Ordem de Compra gerada!\nPedido: ${num}\nFornecedor: ${forn}\nValor Final: ${fmt(vf)}${desc>0?`\nSaving: ${fmt(desc)} (${pct.toFixed(1)}%)`:''}\n\nAguardando entrega.`);
   }catch(e){alert('Erro: '+e.message);}
 }
 
