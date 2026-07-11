@@ -458,52 +458,10 @@ function pgDash(){
 
 // ── SOLICITAÇÕES ──────────────────────────────────────────────────────────
 function pgSol(){
-  const isReq=S.user?.perfil==='requisitante';
   const pD=S.sol.filter(s=>s.status==='Aguardando Diretoria').length;
   const pAD=S.sol.filter(s=>s.status==='Aguardando Aprovação Diretoria').length;
   const pG=S.sol.filter(s=>s.status==='Aguardando Aprovação Gerente').length;
   const pO=S.sol.filter(s=>s.status==='Aguardando Orçamento').length;
-
-  // VISÃO DO REQUISITANTE — cards com timeline
-  if(isReq){
-    return `
-<div class="tb">
-  <button class="btn bp" onclick="mdNovaSOL()">+ Nova Solicitação</button>
-</div>
-${!S.sol.length?`<div class="card" style="text-align:center;padding:48px;color:#ccc">
-  <div style="font-size:40px;margin-bottom:12px">📋</div>
-  <div style="font-size:15px;font-weight:500;margin-bottom:6px">Nenhuma solicitação ainda</div>
-  <div style="font-size:13px">Clique em "+ Nova Solicitação" para começar</div>
-</div>`:
-`<div style="display:grid;gap:14px">
-  ${S.sol.map(s=>`
-  <div class="card" style="padding:20px">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-      <div>
-        <div style="font-family:monospace;font-size:13px;font-weight:600;color:#1565C0">${s.numero}</div>
-        <div style="font-size:15px;font-weight:600;color:#0F2236;margin-top:2px">${s.descricao.length>50?s.descricao.slice(0,50)+'...':s.descricao}</div>
-        <div style="font-size:12px;color:#9E9E9E;margin-top:3px">${s.categoria} · ${s.loja_nome||'—'} · Aberta em ${fmtD(s.data_criacao)}</div>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        ${cu(s.urgencia)}
-        ${cs(s.status)}
-      </div>
-    </div>
-    ${buildTimeline(s.status)}
-    ${s.status==='Reprovada'?`<div style="background:#FFEBEE;border-left:3px solid #C62828;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#B71C1C;margin-top:4px">
-      ❌ <strong>Solicitação reprovada.</strong>${s.observacoes?' Motivo: '+s.observacoes:''}
-    </div>`:''}
-    ${s.status==='Entregue'?`<div style="background:#E8F5E9;border-left:3px solid #2E7D32;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#1B5E20;margin-top:4px">
-      ✅ <strong>Item entregue com sucesso!</strong> Valor final: ${fmt(s.valor_final)}
-    </div>`:''}
-    <div style="display:flex;justify-content:flex-end;margin-top:12px">
-      <button class="sm bl" onclick="vSOL('${s.id}')">Ver detalhes</button>
-    </div>
-  </div>`).join('')}
-</div>`}`;
-  }
-
-  // VISÃO DOS OUTROS PERFIS — tabela padrão
   return `
 <div class="tb">
   <button class="btn bp" onclick="mdNovaSOL()">+ Nova Solicitação</button>
@@ -512,159 +470,144 @@ ${!S.sol.length?`<div class="card" style="text-align:center;padding:48px;color:#
   ${isGerente()&&!isDiretoria()&&pG?`<span style="font-size:12px;background:#E8EAF6;color:#3949AB;padding:6px 12px;border-radius:20px;font-weight:600">${pG} aguardando sua aprovação final</span>`:''}
   ${isCompras()&&pO?`<span style="font-size:12px;background:#FFF3E0;color:#E65100;padding:6px 12px;border-radius:20px;font-weight:600">${pO} aguardando orçamento</span>`:''}
 </div>
-<div class="card"><div class="tw"><table>
-<thead><tr><th>Número</th><th>Área</th><th>Loja</th><th>Categoria</th><th>Descrição</th><th>Urg.</th><th>Status</th><th>Ações</th></tr></thead>
-<tbody>
-${S.sol.map(s=>`<tr>
-  <td><span style="font-family:monospace;font-size:12px">${s.numero}</span></td>
-  <td style="font-size:12px">${s.area||'—'}</td>
-  <td style="font-size:12px">${s.loja_nome||'—'}</td>
-  <td style="font-size:12px">${s.categoria}</td>
-  <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.descricao}</td>
-  <td>${cu(s.urgencia)}</td>
-  <td>${cs(s.status)}</td>
-  <td>
-    <button class="sm bl" onclick="vSOL('${s.id}')">Ver</button>
-    ${isDiretoria()&&s.status==='Aguardando Diretoria'?`<button class="sm ok" onclick="qSt('${s.id}','Aguardando Orçamento')">✓</button><button class="sm no" onclick="qSt('${s.id}','Reprovada')">✗</button>`:''}
-    ${isDiretoria()&&s.status==='Aguardando Aprovação Diretoria'?`<button class="sm ok" onclick="qSt('${s.id}','Aguardando Aprovação Gerente')">✓ Orç.</button><button class="sm no" onclick="qSt('${s.id}','Reprovada')">✗</button>`:''}
-    ${isGerente()&&s.status==='Aguardando Aprovação Gerente'?`<button class="sm ok" onclick="qSt('${s.id}','Aprovada')">✓ Final</button><button class="sm no" onclick="qSt('${s.id}','Reprovada')">✗</button>`:''}
-  </td>
-</tr>`).join('')}
-${!S.sol.length?`<tr><td colspan="8" style="text-align:center;padding:40px;color:#ccc">Nenhuma solicitação</td></tr>`:''}
-</tbody></table></div></div>`;
+${!S.sol.length?`<div class="card" style="text-align:center;padding:48px;color:#ccc">
+  <div style="font-size:40px;margin-bottom:12px">📋</div>
+  <div style="font-size:15px;font-weight:500;margin-bottom:6px">Nenhuma solicitação</div>
+  <div style="font-size:13px">Clique em "+ Nova Solicitação" para começar</div>
+</div>`:`
+<div style="display:grid;gap:14px">
+  ${S.sol.map(s=>`
+  <div class="card" style="padding:20px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-family:monospace;font-size:13px;font-weight:600;color:#1565C0">${s.numero}</div>
+        <div style="font-size:15px;font-weight:600;color:#0F2236;margin-top:2px">${s.descricao.length>60?s.descricao.slice(0,60)+'...':s.descricao}</div>
+        <div style="font-size:12px;color:#9E9E9E;margin-top:3px">${s.categoria} · ${s.loja_nome||'—'} · ${s.area||'—'} · Aberta em ${fmtD(s.data_criacao)}</div>
+        ${s.solicitante_nome?`<div style="font-size:11px;color:#BDBDBD;margin-top:2px">Solicitante: ${s.solicitante_nome}</div>`:''}
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${cu(s.urgencia)} ${cs(s.status)}
+      </div>
+    </div>
+    ${buildTimeline(s.status)}
+    ${s.status==='Reprovada'?`<div style="background:#FFEBEE;border-left:3px solid #C62828;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#B71C1C;margin-top:4px">❌ <strong>Reprovada.</strong>${s.observacoes?' Motivo: '+s.observacoes:''}</div>`:''}
+    ${s.status==='Entregue'?`<div style="background:#E8F5E9;border-left:3px solid #2E7D32;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#1B5E20;margin-top:4px">✅ <strong>Entregue!</strong> Valor final: ${fmt(s.valor_final)}</div>`:''}
+    ${s.fornecedor&&['Aprovada','Comprada','Entregue'].includes(s.status)?`<div style="background:#E3F2FD;border-left:3px solid #1565C0;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#0D47A1;margin-top:4px">🏢 <strong>Fornecedor escolhido:</strong> ${s.fornecedor} · ${fmt(s.valor_final)}</div>`:''}
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="sm bl" onclick="vSOL('${s.id}')">Ver detalhes</button>
+      ${isDiretoria()&&s.status==='Aguardando Diretoria'?`<button class="sm ok" onclick="qSt('${s.id}','Aguardando Orçamento')">✓ Aprovar</button><button class="sm no" onclick="qSt('${s.id}','Reprovada')">✗ Reprovar</button>`:''}
+      ${isGerente()&&s.status==='Aguardando Aprovação Gerente'?`<button class="sm ok" onclick="qSt('${s.id}','Aprovada')">✓ Aprovar Final</button><button class="sm no" onclick="qSt('${s.id}','Reprovada')">✗ Reprovar</button>`:''}
+    </div>
+  </div>`).join('')}
+</div>`}`;
 }
 
-function mdNovaSOL(){
-  const lo=S.lojas.map(l=>`<option value="${l.id}"${S.user?.loja_id===l.id?' selected':''}>${l.nome} (${l.grupo})</option>`).join('');
-  openModal(`<div class="modal" style="max-width:600px">
-  <div class="mh"><span>Nova Solicitação de Compra</span><button class="xb" onclick="closeModal()">✕</button></div>
-  <div class="mb">
-    <div class="ib ibl">Após enviar, a Diretoria receberá a solicitação para aprovação.</div>
-    <div class="fg2">
-      <div class="f"><label>Loja *</label><select class="inp" id="sl">${lo}</select></div>
-      <div class="f"><label>Área *</label><select class="inp" id="sa">${AREAS.map(a=>`<option${S.user?.area===a?' selected':''}>${a}</option>`).join('')}</select></div>
-    </div>
-    <div class="fg2">
-      <div class="f"><label>Categoria *</label><select class="inp" id="sc">${CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
-      <div class="f"><label>Urgência</label><select class="inp" id="su"><option>Baixa</option><option>Média</option><option>Alta</option></select></div>
-    </div>
-    <div class="f"><label>Descrição completa *</label><textarea class="inp" id="sd" placeholder="Descreva o item: marca, modelo, especificação técnica..."></textarea></div>
-    <div class="fg2">
-      <div class="f"><label>Quantidade *</label><input class="inp" type="number" id="sq" value="1" min="1"></div>
-      <div class="f"><label>Valor Estimado (R$)</label><input class="inp" type="number" id="sv" placeholder="0,00"></div>
-    </div>
-    <div class="f"><label>Justificativa *</label><textarea class="inp" id="sj" placeholder="Por que esta compra é necessária?"></textarea></div>
-  </div>
-  <div class="mf"><button class="btn bsc" onclick="closeModal()">Cancelar</button><button class="btn bp" onclick="hCriarSOL()">Enviar para Diretoria →</button></div>
-  </div>`);
-}
-
-async function hCriarSOL(){
-  const f={loja_id:V('sl'),area:V('sa'),cat:V('sc'),urg:V('su'),desc:V('sd'),qtd:V('sq'),val:V('sv'),just:V('sj')};
-  if(!f.loja_id||!f.cat||!f.desc||!f.just)return alert('Preencha todos os campos obrigatórios.');
-  try{await criarSol(f);closeModal();await loadSol();render();alert('✅ Solicitação enviada para a Diretoria!');}
-  catch(e){alert(e.message);}
-}
-
+// ── MODAL DETALHES ────────────────────────────────────────────────────────
 async function vSOL(id){
   const s=S.sol.find(x=>x.id===id);if(!s)return;
   const pD=isDiretoria()&&s.status==='Aguardando Diretoria';
-  const pAD=isDiretoria()&&s.status==='Aguardando Aprovação Diretoria';
-  const pG=isGerente()&&s.status==='Aguardando Aprovação Gerente';
-  // Sempre busca cotações do banco para esta solicitação
-  const {data:cotData}=await sb.from('cotacoes').select('*').eq('solicitacao_id',id);
-  const cotacoesSol=cotData||[];
-  openModal(`<div class="modal" style="max-width:560px">
-  <div class="mh"><span>${s.numero}</span><button class="xb" onclick="closeModal()">✕</button></div>
+  const pAD=isDiretoria()&&s.status==='Aguardando Aprovacao Diretoria';
+  const pG=isGerente()&&s.status==='Aguardando Aprovacao Gerente';
+  if(pAD){
+    const {data}=await sb.from('cotacoes').select('*').eq('solicitacao_id',id);
+    if(data&&data.length)S.cot=[...S.cot.filter(c=>c.solicitacao_id!==id),...data];
+  }
+  const cot=S.cot.find(c=>c.solicitacao_id===id);
+  const itens=cot?(typeof cot.itens==='string'?JSON.parse(cot.itens||'[]'):(cot.itens||[])):[];
+  const best=itens.length?itens.reduce((a,b)=>a.val<b.val?a:b,itens[0]):null;
+  const fmtBtn=(i)=>`<div style="background:${i.forn===best?.forn?'#F1F8E9':'#F8F9FA'};border:2px solid ${i.forn===best?.forn?'#A5D6A7':'#E0E0E0'};border-radius:10px;padding:16px;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+      <div><div style="font-weight:700;font-size:14px">${i.forn}</div>${i.cnpj?`<div style="font-size:11px;color:#9E9E9E">CNPJ: ${i.cnpj}</div>`:''}</div>
+      <div style="font-size:20px;font-weight:700;color:${i.forn===best?.forn?'#2E7D32':'#1565C0'}">${fmt(i.val)}</div>
+    </div>
+    <div style="font-size:12px;color:#666;margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap">
+      ${i.prazo?`<span>&#x23F1; ${i.prazo} dias</span>`:''}${i.pgto?`<span>&#x1F4B3; ${i.pgto}</span>`:''}${i.obs?`<span>&#x1F4DD; ${i.obs}</span>`:''}${i.arquivo?`<span>&#x1F4CE; ${i.arquivo}</span>`:''}
+    </div>
+    ${pAD?`<button onclick="hEscolherForn('${cot?.id}','${s.id}','${i.forn.replace(/'/g,"\'")}',${i.val})" style="width:100%;padding:9px;background:${i.forn===best?.forn?'#2E7D32':'#1565C0'};color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">${i.forn===best?.forn?'&#x2713; Escolher este (Menor preco)':'Escolher este fornecedor'}</button>`:''}
+  </div>`;
+
+  let cotHtml='';
+  if(pAD){
+    if(cot&&itens.length){
+      cotHtml=`<hr class="hdiv"><div style="font-size:14px;font-weight:700;color:#0F2236;margin-bottom:10px">Orcamentos recebidos</div>
+      <div style="font-size:11px;color:#9E9E9E;margin-bottom:10px">Lancado por: <strong style="color:#555">${cot.criado_por||'Compras'}</strong> . ${fmtD(cot.data_criacao)}</div>
+      ${itens.map(fmtBtn).join('')}
+      <div style="background:#E8F5E9;border-radius:8px;padding:10px 14px;font-size:12px;color:#1B5E20;margin-bottom:12px">Recomendacao: <strong>${best?.forn||'-'}</strong> com <strong>${fmt(best?.val)}</strong></div>
+      <div class="f"><label>Observacao</label><textarea class="inp" id="ov" placeholder="Comentario..."></textarea></div>
+      <button class="btn bd" style="width:100%" onclick="hSt('${s.id}','Reprovada')">x Reprovar todos os orcamentos</button>`;
+    }else{
+      cotHtml=`<hr class="hdiv"><div style="background:#F8F9FA;border-radius:8px;padding:14px;color:#9E9E9E;font-size:13px">Nenhum orcamento encontrado ainda.</div>`;
+    }
+  }
+
+  let gerenteHtml='';
+  if(pG){
+    gerenteHtml=`<hr class="hdiv">
+    ${s.fornecedor?`<div style="background:#E3F2FD;border-radius:8px;padding:14px;margin-bottom:12px">
+      <div style="font-size:11px;color:#9E9E9E">Fornecedor escolhido pela Diretoria</div>
+      <div style="font-size:16px;font-weight:700">${s.fornecedor}</div>
+      <div style="font-size:18px;font-weight:600;color:#1565C0">${fmt(s.valor_final)}</div></div>`:''}
+    <div class="ib ibl">Sua aprovacao libera a compra.</div>
+    <div class="f"><label>Observacao</label><textarea class="inp" id="ov" placeholder="Comentario final..."></textarea></div>
+    <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aprovada')">Aprovar</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">Reprovar</button></div>`;
+  }
+
+  let dirHtml='';
+  if(pD){
+    dirHtml=`<hr class="hdiv"><div class="ib ibo">Aprove para Compras realizar os orcamentos.</div>
+    <div class="f"><label>Observacao</label><textarea class="inp" id="ov" placeholder="Instrucao..."></textarea></div>
+    <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aguardando Orcamento')">Aprovar</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">Reprovar</button></div>`;
+  }
+
+  openModal(`<div class="modal" style="max-width:600px">
+  <div class="mh"><span>${s.numero}</span><button class="xb" onclick="closeModal()">x</button></div>
   <div class="mb">
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">${cs(s.status)} ${cu(s.urgencia)}</div>
-    ${dr('Loja',s.loja_nome)}${dr('Área',s.area)}${dr('Solicitante',s.solicitante_nome)}
+    ${dr('Loja',s.loja_nome)}${dr('Area',s.area)}${dr('Solicitante',s.solicitante_nome)}
     ${dr('Data',fmtD(s.data_criacao))}${dr('Categoria',s.categoria)}${dr('Quantidade',s.quantidade)}
     ${dr('Valor Estimado',fmt(s.valor_estimado))}
     ${s.valor_final?dr('Valor Final',fmt(s.valor_final)):''}
     ${s.fornecedor?dr('Fornecedor',s.fornecedor):''}
     <hr class="hdiv">
-    <div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">DESCRIÇÃO</div>
+    <div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">DESCRICAO</div>
     <div style="font-size:13px;line-height:1.6;color:#424242;margin-bottom:12px">${s.descricao}</div>
     <div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">JUSTIFICATIVA</div>
-    <div style="font-size:13px;line-height:1.6;color:#424242">${s.justificativa||'—'}</div>
-    ${s.observacoes?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">OBSERVAÇÕES</div><div style="font-size:13px;color:#424242">${s.observacoes}</div>`:''}
-    ${pD?`<hr class="hdiv"><div class="ib ibo">Aprove para enviar para a área de Compras realizar os orçamentos.</div>
-    <div class="f"><label>Observação</label><textarea class="inp" id="ov" placeholder="Instrução para Compras..."></textarea></div>
-    <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aguardando Orçamento')">✓ Aprovar</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">✗ Reprovar</button></div>`:''}
-    ${pAD?`<hr class="hdiv">
-    <div style="font-size:13px;font-weight:600;color:#0F2236;margin-bottom:12px">📋 Orçamentos recebidos</div>
-    ${(()=>{
-      const cot=cotacoesSol.find(c=>c.status==='Aberta')||cotacoesSol[0];
-      if(!cot)return '<div style="color:#9E9E9E;font-size:13px;padding:12px;background:#F8F9FA;border-radius:8px">Nenhum orçamento encontrado.</div>';
-      const it=typeof cot.itens==='string'?JSON.parse(cot.itens||'[]'):(cot.itens||[]);
-      const best=it.length?it.reduce((a,b)=>a.val<b.val?a:b,it[0]):null;
-      return `
-      <div style="font-size:11px;color:#9E9E9E;margin-bottom:8px">Lançado por: <strong style="color:#555">${cot.criado_por||'Compras'}</strong> · ${fmtD(cot.data_criacao)}</div>
-      <div style="display:grid;gap:10px;margin-bottom:14px">
-        ${it.map((i,idx)=>`
-        <div style="background:${i.forn===best?.forn?'#F1F8E9':'#F8F9FA'};border:1px solid ${i.forn===best?.forn?'#A5D6A7':'#E0E0E0'};border-radius:8px;padding:14px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
-            <div>
-              <span style="font-weight:600;font-size:14px">${i.forn}</span>
-              ${i.forn===best?.forn?'<span class="chip" style="background:#E8F5E9;color:#2E7D32;font-size:10px;margin-left:8px">✓ Menor preço</span>':''}
-              ${i.cnpj?`<div style="font-size:11px;color:#9E9E9E;margin-top:2px">CNPJ: ${i.cnpj}</div>`:''}
-            </div>
-            <div style="font-size:20px;font-weight:700;color:${i.forn===best?.forn?'#2E7D32':'#1565C0'}">${fmt(i.val)}</div>
-          </div>
-          <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#666">
-            ${i.prazo?`<span>⏱ Prazo: <strong>${i.prazo} dias</strong></span>`:''}
-            ${i.pgto?`<span>💳 Pagamento: <strong>${i.pgto}</strong></span>`:''}
-            ${i.obs?`<span>📝 Obs: ${i.obs}</span>`:''}
-          </div>
-        </div>`).join('')}
-      </div>
-      <div style="background:#E8F5E9;border-radius:8px;padding:12px 14px;font-size:13px;color:#1B5E20;margin-bottom:14px">
-        💰 <strong>Recomendação:</strong> ${best?.forn||'—'} com ${fmt(best?.val)} — menor preço entre os ${it.length} orçamentos.
-      </div>`;
-    })()}
-    <div class="ib ibo">Aprove os orçamentos para seguir ao Gerente de Setor.</div>
-    <div class="f"><label>Observação</label><textarea class="inp" id="ov" placeholder="Comentário sobre os orçamentos..."></textarea></div>
-    <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aguardando Aprovação Gerente')">✓ Aprovar Orçamentos</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">✗ Reprovar</button></div>`:''}
-    ${pG?`<hr class="hdiv">
-    <div style="font-size:13px;font-weight:600;color:#0F2236;margin-bottom:12px">📋 Orçamentos para análise</div>
-    ${(()=>{
-      const cot=cotacoesSol.find(c=>c.status==='Encerrada')||cotacoesSol[0];
-      if(!cot)return '<div style="color:#9E9E9E;font-size:13px;padding:12px;background:#F8F9FA;border-radius:8px">Nenhum orçamento encontrado.</div>';
-      const it=typeof cot.itens==='string'?JSON.parse(cot.itens||'[]'):(cot.itens||[]);
-      const best=it.length?it.reduce((a,b)=>a.val<b.val?a:b,it[0]):null;
-      return `
-      <div style="font-size:11px;color:#9E9E9E;margin-bottom:8px">Lançado por: <strong style="color:#555">${cot.criado_por||'Compras'}</strong> · ${fmtD(cot.data_criacao)}</div>
-      <div style="display:grid;gap:10px;margin-bottom:14px">
-        ${it.map(i=>`
-        <div style="background:${i.forn===best?.forn?'#F1F8E9':'#F8F9FA'};border:1px solid ${i.forn===best?.forn?'#A5D6A7':'#E0E0E0'};border-radius:8px;padding:14px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
-            <div>
-              <span style="font-weight:600;font-size:14px">${i.forn}</span>
-              ${i.forn===best?.forn?'<span class="chip" style="background:#E8F5E9;color:#2E7D32;font-size:10px;margin-left:8px">✓ Menor preço</span>':''}
-              ${i.cnpj?`<div style="font-size:11px;color:#9E9E9E;margin-top:2px">CNPJ: ${i.cnpj}</div>`:''}
-            </div>
-            <div style="font-size:20px;font-weight:700;color:${i.forn===best?.forn?'#2E7D32':'#1565C0'}">${fmt(i.val)}</div>
-          </div>
-          <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#666">
-            ${i.prazo?`<span>⏱ Prazo: <strong>${i.prazo} dias</strong></span>`:''}
-            ${i.pgto?`<span>💳 Pagamento: <strong>${i.pgto}</strong></span>`:''}
-            ${i.obs?`<span>📝 ${i.obs}</span>`:''}
-          </div>
-        </div>`).join('')}
-      </div>
-      <div style="background:#E8F5E9;border-radius:8px;padding:12px 14px;font-size:13px;color:#1B5E20;margin-bottom:14px">
-        💰 <strong>Recomendação:</strong> ${best?.forn||'—'} — ${fmt(best?.val)}
-      </div>`;
-    })()}
-    <div class="ib ibl">Sua aprovação final libera a compra.</div>
-    <div class="f"><label>Observação</label><textarea class="inp" id="ov" placeholder="Comentário final..."></textarea></div>
-    <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aprovada')">✓ Aprovar — Liberar Compra</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">✗ Reprovar</button></div>`:''}
+    <div style="font-size:13px;line-height:1.6;color:#424242">${s.justificativa||'-'}</div>
+    ${s.observacoes?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">OBSERVACOES</div><div style="font-size:13px">${s.observacoes}</div>`:''}
+    ${dirHtml}${cotHtml}${gerenteHtml}
   </div></div>`);
 }
 
-async function hSt(id,status){const obs=V('ov');try{await updateStatus(id,status,obs);closeModal();await loadSol();render();}catch(e){alert(e.message);}}
-async function qSt(id,status){try{await updateStatus(id,status,'');await loadSol();render();}catch(e){alert(e.message);}}
+async function hSt(id,status){
+  const obs=V('ov');
+  try{
+    const upd={status};
+    if(obs)upd.observacoes=obs;
+    if(status==='Aprovada')upd.data_aprovacao=new Date().toISOString();
+    await sb.from('solicitacoes').update(upd).eq('id',id);
+    closeModal();await loadSol();render();
+  }catch(e){alert(e.message);}
+}
+
+async function hEscolherForn(cotId,solId,forn,val){
+  if(!confirm('Confirma escolha de '+forn+' por '+fmt(val)+'?'))return;
+  const obs=V('ov');
+  try{
+    if(cotId)await sb.from('cotacoes').update({vencedor:forn,status:'Encerrada'}).eq('id',cotId);
+    const upd={status:'Aguardando Aprovacao Gerente',fornecedor:forn,valor_final:val};
+    if(obs)upd.observacoes=obs;
+    await sb.from('solicitacoes').update(upd).eq('id',solId);
+    closeModal();await loadSol();await loadCot();render();
+    alert('Fornecedor '+forn+' escolhido! Enviado para o Gerente.');
+  }catch(e){alert(e.message);}
+}
+
+async function qSt(id,status){
+  try{
+    await sb.from('solicitacoes').update({status}).eq('id',id);
+    await loadSol();render();
+  }catch(e){alert(e.message);}
+}
 
 // ── FORNECEDORES ──────────────────────────────────────────────────────────
 function pgForn(){
@@ -807,6 +750,13 @@ function mdCot(){
         <label>Observação</label>
         <input class="inp ot-obs" placeholder="Informações adicionais sobre este orçamento..." id="ot${n}-obs">
       </div>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+        <label for="ot${n}-file" style="display:flex;align-items:center;gap:6px;cursor:pointer;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600">
+          📎 Anexar orçamento (PDF/imagem)
+        </label>
+        <input type="file" id="ot${n}-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="prevFile(this,'ot${n}-filelbl')">
+        <span id="ot${n}-filelbl" style="font-size:11px;color:#9E9E9E">Nenhum arquivo</span>
+      </div>
     </div>`).join('')}
     <div id="melhor-preco" style="display:none;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:12px 16px;font-size:13px;color:#1B5E20;margin-top:4px">
       💰 <strong>Melhor preço:</strong> <span id="melhor-txt"></span>
@@ -854,6 +804,13 @@ async function salvarFornOrc(n){
   }
 }
 
+function prevFile(input,lblId){
+  const lbl=document.getElementById(lblId);
+  if(input.files&&input.files[0]){
+    if(lbl)lbl.textContent=input.files[0].name;
+  }
+}
+
 function fmtCNPJ(el){
   let v=el.value.replace(/\D/g,'').slice(0,14);
   if(v.length>12)v=v.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5');
@@ -892,7 +849,9 @@ async function hCot(){
     const pgto=document.getElementById(`ot${n}-pgto`)?.value||'';
     const obs=document.getElementById(`ot${n}-obs`)?.value||'';
     if(forn&&val>0){
-      it.push({forn,cnpj,val,prazo,pgto,obs});
+      const fileInput=document.getElementById(`ot${n}-file`);
+      const fileName=fileInput?.files?.[0]?.name||'';
+      it.push({forn,cnpj,val,prazo,pgto,obs,arquivo:fileName?`[${fileName}]`:''});
     }
   }
   if(it.length<2)return alert('Preencha no mínimo 2 orçamentos para continuar.');
