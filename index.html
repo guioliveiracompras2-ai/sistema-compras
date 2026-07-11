@@ -566,11 +566,16 @@ async function hCriarSOL(){
   catch(e){alert(e.message);}
 }
 
-function vSOL(id){
+async function vSOL(id){
   const s=S.sol.find(x=>x.id===id);if(!s)return;
   const pD=isDiretoria()&&s.status==='Aguardando Diretoria';
   const pAD=isDiretoria()&&s.status==='Aguardando Aprovação Diretoria';
   const pG=isGerente()&&s.status==='Aguardando Aprovação Gerente';
+  // Carrega cotações do banco se necessário
+  if(pAD||pG){
+    const {data}=await sb.from('cotacoes').select('*').eq('solicitacao_id',id);
+    if(data&&data.length)S.cot=[...S.cot.filter(c=>c.solicitacao_id!==id),...data];
+  }
   openModal(`<div class="modal" style="max-width:560px">
   <div class="mh"><span>${s.numero}</span><button class="xb" onclick="closeModal()">✕</button></div>
   <div class="mb">
