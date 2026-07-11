@@ -266,13 +266,18 @@ async function salvarCot(solId,itens){
   const num=await genNum('COT');
   const sol=S.sol.find(s=>s.id===solId);
   const criador=`${S.user.nome} ${S.user.sobrenome}`;
+  const agora=new Date().toISOString();
   const {error}=await sb.from('cotacoes').insert({
     numero:num,solicitacao_id:solId,solicitacao_numero:sol?.numero,
     descricao:sol?.descricao?.slice(0,80),itens:JSON.stringify(itens),
     grupo:sol?.grupo,status:'Aberta',criado_por:criador
   });
   if(error)throw new Error(error.message);
-  await sb.from('solicitacoes').update({status:'Aguardando Aprovação Diretoria'}).eq('id',solId);
+  await sb.from('solicitacoes').update({
+    status:'Aguardando Aprovação Diretoria',
+    cotacao_por:criador,
+    cotacao_data:agora
+  }).eq('id',solId);
 }
 
 async function escolherVencedor(cotId,solId,forn,val){
@@ -280,14 +285,20 @@ async function escolherVencedor(cotId,solId,forn,val){
   const sol=S.sol.find(s=>s.id===solId);
   const cot=S.cot.find(c=>c.id===cotId);
   const prev=new Date();prev.setDate(prev.getDate()+7);
+  const nome=`${S.user.nome} ${S.user.sobrenome}`;
+  const agora=new Date().toISOString();
   await sb.from('cotacoes').update({status:'Encerrada',vencedor:forn}).eq('id',cotId);
-  await sb.from('solicitacoes').update({status:'Comprada',valor_final:val,fornecedor:forn}).eq('id',solId);
-  await sb.from('pedidos').insert({numero:num,solicitacao_id:solId,cotacao_id:cotId,solicitacao_numero:sol?.numero,fornecedor:forn,loja_nome:sol?.loja_nome,descricao:cot?.descricao,valor:val,data_compra:new Date().toISOString().slice(0,10),prev_entrega:prev.toISOString().slice(0,10),status:'Em Trânsito',grupo:sol?.grupo});
+  await sb.from('solicitacoes').update({status:'Comprada',valor_final:val,fornecedor:forn,comprado_por:nome,comprado_em:agora}).eq('id',solId);
+  await sb.from('pedidos').insert({numero:num,solicitacao_id:solId,cotacao_id:cotId,solicitacao_numero:sol?.numero,fornecedor:forn,loja_nome:sol?.loja_nome,descricao:cot?.descricao,valor:val,data_compra:agora.slice(0,10),prev_entrega:prev.toISOString().slice(0,10),status:'Em Trânsito',grupo:sol?.grupo});
 }
 
 async function confirmarEntrega(pedId,solId,nf){
-  await sb.from('pedidos').update({status:'Entregue',data_entrega:new Date().toISOString().slice(0,10),nf:nf||''}).eq('id',pedId);
-  if(solId)await sb.from('solicitacoes').update({status:'Entregue'}).eq('id',solId);
+  const nome=`${S.user.nome} ${S.user.sobrenome}`;
+  const agora=new Date().toISOString();
+  await sb.from('pedidos').update({status:'Entregue',data_entrega:agora.slice(0,10),nf:nf||''}).eq('id',pedId);
+  if(solId)await sb.from('solicitacoes').update({
+    status:'Entregue',entregue_por:nome,entregue_em:agora
+  }).eq('id',solId);
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────
@@ -382,35 +393,68 @@ function buildPage(){
   return({dashboard:pgDash,solicitacoes:pgSol,fornecedores:pgForn,cotacoes:pgCot,pedidos:pgPed,relatorios:pgRel,usuarios:pgUsers}[S.page]||pgDash)();
 }
 
-function buildTimeline(status){
+function buildTimeline(s){
+  const status=typeof s==='string'?s:s?.status;
   const steps=[
-    {label:'Solicitação Aberta',   statuses:['Aguardando Diretoria'],                       icon:'📝'},
-    {label:'Aprovação Diretoria',  statuses:['Aguardando Orçamento'],                       icon:'👔'},
-    {label:'Cotação em Andamento', statuses:['Aguardando Aprovação Diretoria'],             icon:'📋'},
-    {label:'Aprovação Final',      statuses:['Aguardando Aprovação Gerente','Aprovada'],    icon:'✅'},
-    {label:'Compra Realizada',     statuses:['Comprada'],                                   icon:'🛒'},
-    {label:'Entregue',             statuses:['Entregue'],                                   icon:'📦'},
+    {
+      label:'Solicitação Aberta',
+      statuses:['Aguardando Diretoria'],
+      icon:'📝',
+      info:typeof s==='object'?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.data_criacao)}<br><span style="color:#555">${s?.solicitante_nome?.split(' ')[0]||''}</span></div>`:''
+    },
+    {
+      label:'Aprovação Diretoria',
+      statuses:['Aguardando Orçamento'],
+      icon:'👔',
+      info:typeof s==='object'&&s?.aprovado_dir_nome?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.aprovado_dir_data)}<br><span style="color:#555">${s?.aprovado_dir_nome?.split(' ')[0]||''}</span></div>`:''
+    },
+    {
+      label:'Cotação Compras',
+      statuses:['Aguardando Aprovação Diretoria'],
+      icon:'📋',
+      info:typeof s==='object'&&s?.cotacao_por?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.cotacao_data)}<br><span style="color:#555">${s?.cotacao_por?.split(' ')[0]||''}</span></div>`:''
+    },
+    {
+      label:'Aprovação Final',
+      statuses:['Aguardando Aprovação Gerente','Aprovada'],
+      icon:'✅',
+      info:typeof s==='object'&&s?.aprovado_ger_nome?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.aprovado_ger_data)}<br><span style="color:#555">Dir: ${s?.aprovado_dir_nome?.split(' ')[0]||''}</span><br><span style="color:#555">Ger: ${s?.aprovado_ger_nome?.split(' ')[0]||''}</span></div>`:''
+    },
+    {
+      label:'Compra Realizada',
+      statuses:['Comprada'],
+      icon:'🛒',
+      info:typeof s==='object'&&s?.comprado_por?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.comprado_em)}<br><span style="color:#555">${s?.comprado_por?.split(' ')[0]||''}</span></div>`:''
+    },
+    {
+      label:'Entregue',
+      statuses:['Entregue'],
+      icon:'📦',
+      info:typeof s==='object'&&s?.entregue_por?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.entregue_em)}<br><span style="color:#555">${s?.entregue_por?.split(' ')[0]||''}</span></div>`:''
+    },
   ];
   const isReprovada=status==='Reprovada';
   const ORDER=['Aguardando Diretoria','Aguardando Orçamento','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue'];
   const curIdx=ORDER.indexOf(status);
-  return `<div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding:4px 0 12px">
+  return `<div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding:4px 0 8px">
     ${steps.map((step,i)=>{
       const stepIdx=ORDER.indexOf(step.statuses[0]);
       const done=curIdx>=stepIdx&&!isReprovada;
       const active=step.statuses.includes(status);
       return `
-      ${i>0?`<div style="flex:1;height:2px;background:${done?'#1565C0':'#E0E0E0'};margin-top:18px;min-width:16px"></div>`:''}
-      <div style="display:flex;flex-direction:column;align-items:center;gap:5px;min-width:72px">
-        <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid ${done?'#1565C0':'#E0E0E0'};background:${active?'#1565C0':done?'#E3F2FD':'#fff'};transition:all .3s">
+      ${i>0?`<div style="flex:1;height:2px;background:${done?'#1565C0':'#E0E0E0'};margin-top:18px;min-width:12px"></div>`:''}
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:72px">
+        <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid ${done?'#1565C0':'#E0E0E0'};background:${active?'#1565C0':done?'#E3F2FD':'#fff'}">
           ${active?`<span style="color:#fff">${step.icon}</span>`:done?`<span style="color:#1565C0">✓</span>`:`<span style="color:#ccc">${step.icon}</span>`}
         </div>
-        <div style="font-size:10px;font-weight:${active?'700':'400'};color:${active?'#1565C0':done?'#424242':'#9E9E9E'};text-align:center;line-height:1.3;max-width:70px">${step.label}</div>
+        <div style="font-size:10px;font-weight:${active?'700':'400'};color:${active?'#1565C0':done?'#424242':'#9E9E9E'};text-align:center;line-height:1.3;max-width:72px">${step.label}</div>
+        ${done||active?step.info:''}
       </div>`;
     }).join('')}
-    ${isReprovada?`<div style="display:flex;flex-direction:column;align-items:center;gap:5px;min-width:72px">
-      <div style="flex:1;height:2px;background:#FFEBEE;margin-top:18px;min-width:16px"></div>
-      <div style="width:36px;height:36px;border-radius:50%;background:#FFEBEE;border:2px solid #C62828;display:flex;align-items:center;justify-content:center;font-size:16px">❌</div>
+    ${isReprovada?`
+    <div style="flex:1;height:2px;background:#FFEBEE;margin-top:18px;min-width:12px"></div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:60px">
+      <div style="width:36px;height:36px;border-radius:50%;background:#FFEBEE;border:2px solid #C62828;display:flex;align-items:center;justify-content:center;font-size:15px">❌</div>
       <div style="font-size:10px;font-weight:700;color:#C62828;text-align:center">Reprovada</div>
     </div>`:''}
   </div>`;
@@ -489,7 +533,7 @@ ${!S.sol.length?`<div class="card" style="text-align:center;padding:48px;color:#
         ${cu(s.urgencia)} ${cs(s.status)}
       </div>
     </div>
-    ${buildTimeline(s.status)}
+    ${buildTimeline(s)}
     ${s.status==='Reprovada'?`<div style="background:#FFEBEE;border-left:3px solid #C62828;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#B71C1C;margin-top:4px">❌ <strong>Reprovada.</strong>${s.observacoes?' Motivo: '+s.observacoes:''}</div>`:''}
     ${s.status==='Entregue'?`<div style="background:#E8F5E9;border-left:3px solid #2E7D32;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#1B5E20;margin-top:4px">✅ <strong>Entregue!</strong> Valor final: ${fmt(s.valor_final)}</div>`:''}
     ${s.fornecedor&&['Aprovada','Comprada','Entregue'].includes(s.status)?`<div style="background:#E3F2FD;border-left:3px solid #1565C0;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#0D47A1;margin-top:4px">🏢 <strong>Fornecedor escolhido:</strong> ${s.fornecedor} · ${fmt(s.valor_final)}</div>`:''}
@@ -500,6 +544,201 @@ ${!S.sol.length?`<div class="card" style="text-align:center;padding:48px;color:#
     </div>
   </div>`).join('')}
 </div>`}`;
+}
+
+
+// ── NOVA SOLICITAÇÃO ──────────────────────────────────────────────────────
+function mdNovaSOL(){
+  const lo=S.lojas.map(l=>`<option value="${l.id}"${S.user?.loja_id===l.id?' selected':''}>${l.nome} (${l.grupo})</option>`).join('');
+  const TIPOS=['Material','Servico','Equipamento','Software','Manutencao','Outros'];
+  openModal(`<div class="modal" style="max-width:940px;width:96vw">
+  <div class="mh"><span>Nova Requisicao de Compra</span><button class="xb" onclick="closeModal()">x</button></div>
+  <div class="mb" style="padding:0;max-height:80vh;overflow:hidden">
+  <div style="display:grid;grid-template-columns:1fr 280px;height:100%">
+
+  <div style="padding:20px;overflow-y:auto;max-height:80vh">
+
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:18px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:14px">Informacoes da Requisicao</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="f" style="margin:0"><label>1. Loja *</label><select class="inp" id="sl">${lo}</select></div>
+        <div class="f" style="margin:0"><label>2. Departamento *</label><select class="inp" id="sa">${AREAS.map(a=>`<option${S.user?.area===a?' selected':''}>${a}</option>`).join('')}</select></div>
+        <div class="f" style="margin:0"><label>3. Tipo de Compra *</label><select class="inp" id="sti">${TIPOS.map(t=>`<option>${t}</option>`).join('')}</select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="f" style="margin:0"><label>4. Categoria *</label><select class="inp" id="sc">${CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
+        <div class="f" style="margin:0"><label>5. Prioridade</label><select class="inp" id="su"><option value="Baixa">Baixa</option><option value="Media">Media</option><option value="Alta">Alta</option></select></div>
+        <div class="f" style="margin:0"><label>6. Data Estimada</label><input class="inp" type="date" id="sdt"></div>
+      </div>
+      <div class="f" style="margin:0">
+        <label>7. Justificativa *</label>
+        <textarea class="inp" id="sj" maxlength="500" placeholder="Motivo da compra, impacto e urgencia..." style="min-height:80px" oninput="document.getElementById('sjc').textContent=this.value.length+'/500'"></textarea>
+        <div style="font-size:11px;color:#9E9E9E;text-align:right;margin-top:2px"><span id="sjc">0/500</span> caracteres</div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:18px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:12px">8. Itens da Requisicao</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#F8F9FA">
+          <th style="padding:8px;text-align:left;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:36px">N</th>
+          <th style="padding:8px;text-align:left;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0">Descricao do Item *</th>
+          <th style="padding:8px;text-align:center;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:70px">Qtd.</th>
+          <th style="padding:8px;text-align:right;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:110px">Valor Unit.</th>
+          <th style="padding:8px;text-align:right;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:110px">Total</th>
+          <th style="padding:8px;width:36px;border-bottom:1px solid #E0E0E0"></th>
+        </tr></thead>
+        <tbody id="itens-tbody">
+          <tr id="item-row-1">
+            <td style="padding:6px 8px;color:#9E9E9E;font-size:12px">1</td>
+            <td style="padding:3px 4px"><input class="inp item-desc" style="padding:7px 10px" placeholder="Descricao do item..."></td>
+            <td style="padding:3px 4px"><input class="inp item-qtd" type="number" min="1" value="1" style="padding:7px 6px;text-align:center" oninput="calcTotal()"></td>
+            <td style="padding:3px 4px"><input class="inp item-val" type="number" min="0" step="0.01" placeholder="0,00" style="padding:7px 6px;text-align:right" oninput="calcTotal()"></td>
+            <td style="padding:6px 8px;text-align:right;font-weight:600;color:#1565C0" id="item-total-1">R$ 0,00</td>
+            <td style="padding:3px 4px;text-align:center"><button onclick="removerItem('item-row-1')" style="background:#FFEBEE;border:none;color:#C62828;border-radius:6px;padding:5px 7px;cursor:pointer">X</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <button onclick="adicionarItem()" style="margin-top:10px;background:#fff;border:1.5px dashed #1565C0;color:#1565C0;border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;width:100%">+ Adicionar Item</button>
+    </div>
+
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:18px">
+      <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:12px">9. Anexos</div>
+      <div onclick="document.getElementById('sol-files').click()" ondragover="event.preventDefault();this.style.background='#E3F2FD'" ondragleave="this.style.background='#F8F9FA'" ondrop="hDrop(event)"
+        style="border:2px dashed #BDBDBD;border-radius:10px;padding:24px;text-align:center;cursor:pointer;background:#F8F9FA">
+        <div style="font-size:24px;margin-bottom:6px">📎</div>
+        <div style="font-size:13px;font-weight:500;color:#555;margin-bottom:3px">Arraste e solte arquivos aqui</div>
+        <div style="font-size:12px;color:#9E9E9E">ou <span style="color:#1565C0;font-weight:600">clique para selecionar</span></div>
+        <div style="font-size:11px;color:#BDBDBD;margin-top:6px">PDF, JPG, PNG - max 10MB</div>
+      </div>
+      <input type="file" id="sol-files" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="showFiles(this)">
+      <div id="files-list" style="margin-top:8px;display:grid;gap:5px"></div>
+    </div>
+  </div>
+
+  <div style="padding:18px;background:#F8F9FA;display:flex;flex-direction:column;gap:12px;overflow-y:auto;max-height:80vh">
+    <div style="background:#1565C0;color:#fff;border-radius:10px;padding:16px">
+      <div style="font-size:12px;opacity:.8;margin-bottom:4px">10. Resumo</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px"><span>Total de Itens</span><span id="resumo-itens" style="font-weight:700">0</span></div>
+      <div style="border-top:1px solid rgba(255,255,255,.2);padding-top:8px;margin-top:4px">
+        <div style="font-size:11px;opacity:.8;margin-bottom:3px">Valor Total Estimado</div>
+        <div id="resumo-valor" style="font-size:22px;font-weight:700">R$ 0,00</div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px">
+      <div style="font-size:11px;color:#9E9E9E;margin-bottom:6px">Fluxo de aprovacao</div>
+      <div style="font-size:12px;color:#555;line-height:2">
+        <div>1. Voce abre a requisicao</div>
+        <div>2. Diretoria aprova</div>
+        <div>3. Compras faz 3 cotacoes</div>
+        <div>4. Diretoria escolhe fornecedor</div>
+        <div>5. Gerente aprova</div>
+        <div>6. Compras executa compra</div>
+        <div>7. Entrega confirmada</div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px">
+      <div style="font-size:11px;color:#9E9E9E;margin-bottom:4px">Solicitante</div>
+      <div style="font-weight:600;font-size:13px">${S.user.nome} ${S.user.sobrenome}</div>
+      <div style="font-size:11px;color:#9E9E9E;margin-top:2px">${PERFIS[S.user.perfil]?.label||S.user.perfil}</div>
+    </div>
+  </div>
+
+  </div>
+  </div>
+  <div class="mf">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    <button class="btn bp" onclick="hCriarSOL()">Enviar para Aprovacao</button>
+  </div>
+  </div>`);
+}
+
+let itemCount=1;
+
+function adicionarItem(){
+  itemCount++;
+  const tbody=document.getElementById('itens-tbody');
+  if(!tbody)return;
+  const n=itemCount;
+  const tr=document.createElement('tr');
+  tr.id='item-row-'+n;
+  tr.innerHTML=`<td style="padding:6px 8px;color:#9E9E9E;font-size:12px">${n}</td>
+    <td style="padding:3px 4px"><input class="inp item-desc" style="padding:7px 10px" placeholder="Descricao..."></td>
+    <td style="padding:3px 4px"><input class="inp item-qtd" type="number" min="1" value="1" style="padding:7px 6px;text-align:center" oninput="calcTotal()"></td>
+    <td style="padding:3px 4px"><input class="inp item-val" type="number" min="0" step="0.01" placeholder="0,00" style="padding:7px 6px;text-align:right" oninput="calcTotal()"></td>
+    <td style="padding:6px 8px;text-align:right;font-weight:600;color:#1565C0" id="item-total-${n}">R$ 0,00</td>
+    <td style="padding:3px 4px;text-align:center"><button onclick="removerItem('item-row-${n}')" style="background:#FFEBEE;border:none;color:#C62828;border-radius:6px;padding:5px 7px;cursor:pointer">X</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function removerItem(rowId){
+  if(document.querySelectorAll('#itens-tbody tr').length<=1)return alert('Mantenha ao menos 1 item.');
+  const r=document.getElementById(rowId);if(r)r.remove();calcTotal();
+}
+
+function calcTotal(){
+  let total=0,count=0;
+  document.querySelectorAll('#itens-tbody tr').forEach(tr=>{
+    const qtd=parseFloat(tr.querySelector('.item-qtd')?.value)||0;
+    const val=parseFloat(tr.querySelector('.item-val')?.value)||0;
+    const sub=qtd*val;total+=sub;if(qtd>0)count++;
+    const el=tr.querySelector('[id^="item-total-"]');
+    if(el)el.textContent='R$ '+sub.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  });
+  const ri=document.getElementById('resumo-itens');const rv=document.getElementById('resumo-valor');
+  if(ri)ri.textContent=count;
+  if(rv)rv.textContent='R$ '+total.toLocaleString('pt-BR',{minimumFractionDigits:2});
+}
+
+function showFiles(input){
+  const list=document.getElementById('files-list');if(!list)return;list.innerHTML='';
+  Array.from(input.files).forEach(f=>{
+    const d=document.createElement('div');
+    d.style.cssText='display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:8px 12px;font-size:12px';
+    d.innerHTML=`<span>${f.name.endsWith('.pdf')?'📄':'🖼️'}</span><span style="flex:1">${f.name}</span><span style="color:#9E9E9E">${(f.size/1024).toFixed(0)}KB</span>`;
+    list.appendChild(d);
+  });
+}
+
+function hDrop(e){
+  e.preventDefault();
+  const input=document.getElementById('sol-files');
+  if(input&&e.dataTransfer.files.length){Object.defineProperty(input,'files',{value:e.dataTransfer.files});showFiles(input);}
+}
+
+async function hCriarSOL(){
+  const loja_id=V('sl'),area=V('sa'),tipo=V('sti'),cat=V('sc'),urg=V('su'),just=V('sj'),data_est=V('sdt');
+  if(!loja_id)return alert('Selecione a loja.');
+  if(!just.trim())return alert('Preencha a justificativa.');
+  const itens=[];let valorTotal=0;
+  document.querySelectorAll('#itens-tbody tr').forEach(tr=>{
+    const desc=tr.querySelector('.item-desc')?.value?.trim();
+    const qtd=parseFloat(tr.querySelector('.item-qtd')?.value)||0;
+    const val=parseFloat(tr.querySelector('.item-val')?.value)||0;
+    if(desc){itens.push({desc,qtd,val,total:qtd*val});valorTotal+=qtd*val;}
+  });
+  if(!itens.length)return alert('Adicione ao menos 1 item com descricao.');
+  const files=document.getElementById('sol-files')?.files;
+  const fileNames=files&&files.length?Array.from(files).map(f=>f.name).join(', '):'';
+  const loja=S.lojas.find(l=>l.id===loja_id);
+  const num=await genNum('SOL',loja?.grupo||'DHG');
+  const descricao=itens.map(i=>i.qtd+'x '+i.desc).join(' | ').slice(0,200);
+  const {error}=await sb.from('solicitacoes').insert({
+    numero:num,loja_id,loja_nome:loja?.nome,
+    solicitante_nome:`${S.user.nome} ${S.user.sobrenome}`,
+    usuario_id:S.user.id,area,
+    tipo_compra:tipo,categoria:cat,urgencia:urg,
+    descricao,justificativa:just,
+    quantidade:itens.reduce((a,b)=>a+b.qtd,0),
+    valor_estimado:valorTotal,
+    data_estimada:data_est||null,
+    itens_requisicao:itens,
+    anexos:fileNames||null,
+    grupo:loja?.grupo,status:'Aguardando Diretoria'
+  });
+  if(error)return alert('Erro: '+error.message);
+  closeModal();await loadSol();render();
+  alert('Requisicao '+num+' enviada! Itens: '+itens.length+' - Total: R$ '+valorTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}));
 }
 
 // ── MODAL DETALHES ────────────────────────────────────────────────────────
@@ -580,10 +819,25 @@ async function vSOL(id){
 
 async function hSt(id,status){
   const obs=V('ov');
+  const nome=`${S.user.nome} ${S.user.sobrenome}`;
+  const agora=new Date().toISOString();
   try{
     const upd={status};
     if(obs)upd.observacoes=obs;
-    if(status==='Aprovada')upd.data_aprovacao=new Date().toISOString();
+    // Auditoria por etapa
+    if(status==='Aguardando Orçamento'){
+      upd.aprovado_dir_nome=nome;
+      upd.aprovado_dir_data=agora;
+    }
+    if(status==='Aprovada'){
+      upd.aprovado_ger_nome=nome;
+      upd.aprovado_ger_data=agora;
+      upd.data_aprovacao=agora;
+    }
+    if(status==='Reprovada'){
+      upd.aprovado_ger_nome=nome;
+      upd.aprovado_ger_data=agora;
+    }
     await sb.from('solicitacoes').update(upd).eq('id',id);
     closeModal();await loadSol();render();
   }catch(e){alert(e.message);}
@@ -592,13 +846,20 @@ async function hSt(id,status){
 async function hEscolherForn(cotId,solId,forn,val){
   if(!confirm('Confirma escolha de '+forn+' por '+fmt(val)+'?'))return;
   const obs=V('ov');
+  const nome=`${S.user.nome} ${S.user.sobrenome}`;
+  const agora=new Date().toISOString();
   try{
     if(cotId)await sb.from('cotacoes').update({vencedor:forn,status:'Encerrada'}).eq('id',cotId);
-    const upd={status:'Aguardando Aprovacao Gerente',fornecedor:forn,valor_final:val};
+    const upd={
+      status:'Aguardando Aprovação Gerente',
+      fornecedor:forn,valor_final:val,
+      aprovado_dir_nome:nome,
+      aprovado_dir_data:agora
+    };
     if(obs)upd.observacoes=obs;
     await sb.from('solicitacoes').update(upd).eq('id',solId);
     closeModal();await loadSol();await loadCot();render();
-    alert('Fornecedor '+forn+' escolhido! Enviado para o Gerente.');
+    alert('✅ '+forn+' escolhido! Enviado para aprovação do Gerente.');
   }catch(e){alert(e.message);}
 }
 
