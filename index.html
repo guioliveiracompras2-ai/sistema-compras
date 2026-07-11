@@ -1114,6 +1114,7 @@ async function confirmarOC(solId,cotId,forn,valAprov){
   const sol=S.sol.find(s=>s.id===solId);
   const prev=new Date(data);prev.setDate(prev.getDate()+7);
   try{
+    // Fecha a cotação apenas quando a compra é confirmada
     if(cotId)await sb.from('cotacoes').update({status:'Encerrada',vencedor:forn}).eq('id',cotId);
     await sb.from('solicitacoes').update({
       status:'Comprada',valor_final:vf,
@@ -1169,7 +1170,8 @@ async function hEscolherForn(cotId,solId,forn,val){
   const nome=`${S.user.nome} ${S.user.sobrenome}`;
   const agora=new Date().toISOString();
   try{
-    if(cotId)await sb.from('cotacoes').update({vencedor:forn,status:'Encerrada'}).eq('id',cotId);
+    // Apenas marca o vencedor — não fecha a cotação ainda
+    if(cotId)await sb.from('cotacoes').update({vencedor:forn}).eq('id',cotId);
     const upd={
       status:'Aguardando Aprovação Gerente',
       fornecedor:forn,valor_final:val,
@@ -1258,7 +1260,7 @@ function pgCot(){
     <div style="padding:14px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #F0F2F5">
       <div><div style="font-weight:600">${c.numero} · ${c.descricao||'—'}</div>
       <div style="font-size:11px;color:#9E9E9E;margin-top:2px">Sol: ${c.solicitacao_numero||'—'} · ${fmtD(c.data_criacao)}</div></div>
-      ${c.status==='Encerrada'?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">Encerrada</span>':'<span class="chip" style="background:#FFF8E1;color:#E65100">Aberta</span>'}
+      ${c.status==='Encerrada'?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">Compra Executada</span>':c.vencedor?'<span class="chip" style="background:#E8EAF6;color:#3949AB">Fornecedor Escolhido</span>':'<span class="chip" style="background:#FFF8E1;color:#E65100">Aguardando Diretoria</span>'}
     </div>
     <div class="tw"><table>
     <thead><tr><th>Fornecedor</th><th>CNPJ</th><th>Valor</th><th>Prazo</th><th>Pagamento</th><th>Obs</th><th>Status</th></tr></thead>
@@ -1271,7 +1273,7 @@ function pgCot(){
       <td style="font-size:12px">${i.prazo?i.prazo+' dias':'—'}</td>
       <td style="font-size:11px">${i.pgto||'—'}</td>
       <td style="font-size:11px;color:#9E9E9E">${i.obs||'—'}</td>
-      <td>${c.vencedor===i.forn?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">✓ Escolhido</span>':c.vencedor?'<span style="color:#ccc;font-size:12px">—</span>':'<span class="chip" style="background:#FFF3E0;color:#E65100">Aguard. Diretoria</span>'}</td>
+      <td>${c.status==='Encerrada'&&c.vencedor===i.forn?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">✓ Comprado</span>':c.vencedor===i.forn?'<span class="chip" style="background:#E8EAF6;color:#3949AB">✓ Escolhido</span>':c.vencedor?'<span style="color:#ccc;font-size:12px">—</span>':'<span class="chip" style="background:#FFF3E0;color:#E65100">Aguard. Diretoria</span>'}</td>
     </tr>`).join('')}
     </tbody></table></div></div>`;
   }).join('')}</div>`}`;
@@ -1632,7 +1634,7 @@ async function hEsc(cotId,solId,forn,val){
 
 Após confirmar, irá para aprovação do Gerente.`))return;
   try{
-    await sb.from('cotacoes').update({vencedor:forn,status:'Encerrada'}).eq('id',cotId);
+    await sb.from('cotacoes').update({vencedor:forn}).eq('id',cotId);
     const nome=`${S.user.nome} ${S.user.sobrenome}`;
     const agora=new Date().toISOString();
     await sb.from('solicitacoes').update({
