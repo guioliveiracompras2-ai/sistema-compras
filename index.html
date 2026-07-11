@@ -1095,6 +1095,16 @@ function mdCot(){
           <label>Observação</label>
           <input class="inp cf-obs" id="cf${n}-obs" placeholder="Informações adicionais, descontos, condições...">
         </div>
+        <div style="margin-top:10px">
+          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:5px">Anexar Orçamento (PDF/imagem)</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <label for="cf${n}-file" style="display:flex;align-items:center;gap:6px;cursor:pointer;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;white-space:nowrap">
+              📎 Selecionar arquivo
+            </label>
+            <input type="file" id="cf${n}-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="prevArq(this,'cf${n}-filelbl')">
+            <span id="cf${n}-filelbl" style="font-size:12px;color:#9E9E9E">Nenhum arquivo selecionado</span>
+          </div>
+        </div>
       </div>`).join('')}
     </div>
   </div>
@@ -1184,7 +1194,9 @@ async function hCot(){
       valTotal+=total;
       itensForn.push({desc:item.desc||item.descricao||'Item '+(idx+1),qtd,vunit,total});
     });
-    it.push({forn:nome,cnpj,val:valTotal,prazo:0,pgto,obs,data,validade:valid,itens:itensForn});
+    const fileInput=document.getElementById(`cf${n}-file`);
+    const arquivo=fileInput?.files?.[0]?.name||'';
+    it.push({forn:nome,cnpj,val:valTotal,prazo:0,pgto,obs,data,validade:valid,itens:itensForn,arquivo});
   }
 
   if(it.length<2)return alert('Preencha ao menos 2 fornecedores para continuar.');
@@ -1261,6 +1273,11 @@ function prevFile(input,lblId){
   if(input.files&&input.files[0]){
     if(lbl)lbl.textContent=input.files[0].name;
   }
+}
+
+function prevArq(input,lblId){
+  const lbl=document.getElementById(lblId);
+  if(lbl&&input.files&&input.files[0])lbl.textContent=input.files[0].name;
 }
 
 function fmtCNPJ(el){
