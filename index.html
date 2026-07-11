@@ -394,65 +394,78 @@ function buildPage(){
 }
 
 function buildTimeline(s){
-  const status=typeof s==='string'?s:s?.status;
+  const status=typeof s==='string'?s:(s?.status||'');
+  const obj=typeof s==='object'?s:null;
+  const ORDER=[
+    'Aguardando Diretoria',
+    'Aguardando Orçamento',
+    'Aguardando Aprovação Diretoria',
+    'Aguardando Aprovação Gerente',
+    'Aprovada',
+    'Comprada',
+    'Entregue'
+  ];
   const steps=[
     {
       label:'Solicitação Aberta',
-      statuses:['Aguardando Diretoria'],
+      status:'Aguardando Diretoria',
       icon:'📝',
-      info:typeof s==='object'?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.data_criacao)}<br><span style="color:#555">${s?.solicitante_nome?.split(' ')[0]||''}</span></div>`:''
+      sub:obj?`${fmtD(obj.data_criacao)}${obj.solicitante_nome?'<br>'+obj.solicitante_nome.split(' ')[0]:''}`:''
     },
     {
       label:'Aprovação Diretoria',
-      statuses:['Aguardando Orçamento'],
+      status:'Aguardando Orçamento',
       icon:'👔',
-      info:typeof s==='object'&&s?.aprovado_dir_nome?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.aprovado_dir_data)}<br><span style="color:#555">${s?.aprovado_dir_nome?.split(' ')[0]||''}</span></div>`:''
+      sub:obj&&obj.aprovado_dir_nome?`${fmtD(obj.aprovado_dir_data)}<br>${obj.aprovado_dir_nome.split(' ')[0]}`:''
     },
     {
       label:'Cotação Compras',
-      statuses:['Aguardando Aprovação Diretoria'],
+      status:'Aguardando Aprovação Diretoria',
       icon:'📋',
-      info:typeof s==='object'&&s?.cotacao_por?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.cotacao_data)}<br><span style="color:#555">${s?.cotacao_por?.split(' ')[0]||''}</span></div>`:''
+      sub:obj&&obj.cotacao_por?`${fmtD(obj.cotacao_data)}<br>${obj.cotacao_por.split(' ')[0]}`:''
     },
     {
       label:'Aprovação Final',
-      statuses:['Aguardando Aprovação Gerente','Aprovada'],
+      status:'Aguardando Aprovação Gerente',
       icon:'✅',
-      info:typeof s==='object'&&s?.aprovado_ger_nome?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.aprovado_ger_data)}<br><span style="color:#555">Dir: ${s?.aprovado_dir_nome?.split(' ')[0]||''}</span><br><span style="color:#555">Ger: ${s?.aprovado_ger_nome?.split(' ')[0]||''}</span></div>`:''
+      sub:obj&&obj.aprovado_ger_nome?`${fmtD(obj.aprovado_ger_data)}<br>Dir: ${(obj.aprovado_dir_nome||'').split(' ')[0]}<br>Ger: ${obj.aprovado_ger_nome.split(' ')[0]}`:
+          obj&&obj.aprovado_dir_nome&&ORDER.indexOf(status)>=ORDER.indexOf('Aguardando Aprovação Gerente')?`Dir: ${obj.aprovado_dir_nome.split(' ')[0]}`:''
     },
     {
       label:'Compra Realizada',
-      statuses:['Comprada'],
+      status:'Comprada',
       icon:'🛒',
-      info:typeof s==='object'&&s?.comprado_por?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.comprado_em)}<br><span style="color:#555">${s?.comprado_por?.split(' ')[0]||''}</span></div>`:''
+      sub:obj&&obj.comprado_por?`${fmtD(obj.comprado_em)}<br>${obj.comprado_por.split(' ')[0]}`:''
     },
     {
       label:'Entregue',
-      statuses:['Entregue'],
+      status:'Entregue',
       icon:'📦',
-      info:typeof s==='object'&&s?.entregue_por?`<div style="font-size:10px;color:#1565C0;margin-top:3px;text-align:center;line-height:1.4;max-width:80px">${fmtD(s?.entregue_em)}<br><span style="color:#555">${s?.entregue_por?.split(' ')[0]||''}</span></div>`:''
+      sub:obj&&obj.entregue_por?`${fmtD(obj.entregue_em)}<br>${obj.entregue_por.split(' ')[0]}`:''
     },
   ];
   const isReprovada=status==='Reprovada';
-  const ORDER=['Aguardando Diretoria','Aguardando Orçamento','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue'];
   const curIdx=ORDER.indexOf(status);
-  return `<div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding:4px 0 8px">
+
+  return `<div style="display:flex;align-items:flex-start;overflow-x:auto;padding:4px 0 8px">
     ${steps.map((step,i)=>{
-      const stepIdx=ORDER.indexOf(step.statuses[0]);
-      const done=curIdx>=stepIdx&&!isReprovada;
-      const active=step.statuses.includes(status);
+      const stepIdx=ORDER.indexOf(step.status);
+      const done=!isReprovada&&curIdx>=stepIdx;
+      const active=status===step.status||(step.status==='Aguardando Aprovação Gerente'&&status==='Aprovada');
+      const color=done?'#1565C0':'#E0E0E0';
+      const bgCircle=active?'#1565C0':done?'#E3F2FD':'#fff';
       return `
-      ${i>0?`<div style="flex:1;height:2px;background:${done?'#1565C0':'#E0E0E0'};margin-top:18px;min-width:12px"></div>`:''}
-      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:72px">
-        <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid ${done?'#1565C0':'#E0E0E0'};background:${active?'#1565C0':done?'#E3F2FD':'#fff'}">
-          ${active?`<span style="color:#fff">${step.icon}</span>`:done?`<span style="color:#1565C0">✓</span>`:`<span style="color:#ccc">${step.icon}</span>`}
+      ${i>0?`<div style="flex:1;height:2px;background:${color};margin-top:17px;min-width:10px"></div>`:''}
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:74px;max-width:90px">
+        <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid ${color};background:${bgCircle};flex-shrink:0">
+          ${active?`<span style="color:#fff">${step.icon}</span>`:done?`<span style="color:#1565C0;font-size:13px;font-weight:700">✓</span>`:`<span style="color:#ccc">${step.icon}</span>`}
         </div>
-        <div style="font-size:10px;font-weight:${active?'700':'400'};color:${active?'#1565C0':done?'#424242':'#9E9E9E'};text-align:center;line-height:1.3;max-width:72px">${step.label}</div>
-        ${done||active?step.info:''}
+        <div style="font-size:10px;font-weight:${active?'700':'400'};color:${active?'#1565C0':done?'#424242':'#9E9E9E'};text-align:center;line-height:1.3">${step.label}</div>
+        ${(done||active)&&step.sub?`<div style="font-size:10px;color:#1565C0;text-align:center;line-height:1.5;font-weight:500">${step.sub}</div>`:''}
       </div>`;
     }).join('')}
     ${isReprovada?`
-    <div style="flex:1;height:2px;background:#FFEBEE;margin-top:18px;min-width:12px"></div>
+    <div style="flex:1;height:2px;background:#FFEBEE;margin-top:17px;min-width:10px"></div>
     <div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:60px">
       <div style="width:36px;height:36px;border-radius:50%;background:#FFEBEE;border:2px solid #C62828;display:flex;align-items:center;justify-content:center;font-size:15px">❌</div>
       <div style="font-size:10px;font-weight:700;color:#C62828;text-align:center">Reprovada</div>
@@ -460,7 +473,7 @@ function buildTimeline(s){
   </div>`;
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────────────────
+
 function pgDash(){
   const sol=S.sol,ped=S.ped;
   const total=sol.length,concl=sol.filter(s=>['Comprada','Entregue'].includes(s.status)).length;
@@ -540,8 +553,10 @@ ${!S.sol.length?`<div class="card" style="text-align:center;padding:48px;color:#
     ${s.fornecedor&&['Aprovada','Comprada','Entregue'].includes(s.status)?`<div style="background:#E3F2FD;border-left:3px solid #1565C0;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#0D47A1;margin-top:4px">🏢 <strong>Fornecedor escolhido:</strong> ${s.fornecedor} · ${fmt(s.valor_final)}</div>`:''}
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap">
       <button class="sm bl" onclick="vSOL('${s.id}')">Ver detalhes</button>
-      ${isDiretoria()&&s.status==='Aguardando Diretoria'?`<button class="sm ok" onclick="qSt('${s.id}','Aguardando Orçamento')">✓ Aprovar</button><button class="sm no" onclick="qSt('${s.id}','Reprovada')">✗ Reprovar</button>`:''}
-      ${isGerente()&&s.status==='Aguardando Aprovação Gerente'?`<button class="sm ok" onclick="qSt('${s.id}','Aprovada')">✓ Aprovar Final</button><button class="sm no" onclick="qSt('${s.id}','Reprovada')">✗ Reprovar</button>`:''}
+      ${isDiretoria()&&s.status==='Aguardando Diretoria'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar</button>`:''}
+      ${isDiretoria()&&s.status==='Aguardando Aprovação Diretoria'?`<button class="sm ok" onclick="vSOL('${s.id}')">📋 Ver Orçamentos</button>`:''}
+      ${isGerente()&&s.status==='Aguardando Aprovação Gerente'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar Final</button>`:''}
+      ${isCompras()&&s.status==='Aprovada'?`<button class="sm or" onclick="vSOL('${s.id}')">🛒 Executar Compra</button>`:''}
     </div>
   </div>`).join('')}
 </div>`}`;
