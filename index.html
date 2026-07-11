@@ -1117,7 +1117,9 @@ function mdCot(){
   </div>`);
 }
 
+let _cotSolId='';
 function loadItensCot(solId){
+  _cotSolId=solId;
   const sel=document.getElementById('cot-sol');
   const opt=sel?.querySelector(`option[value="${solId}"]`);
   if(!opt)return;
@@ -1169,10 +1171,10 @@ function calcTotalForn(n){
 }
 
 async function hCot(){
-  const solId=document.getElementById('cot-sol')?.value;
+  const solId=document.getElementById('cot-sol')?.value||_cotSolId;
   if(!solId)return alert('Selecione uma solicitação.');
   const sel=document.getElementById('cot-sol');
-  const opt=sel?.querySelector(`option[value="${solId}"]`);
+  const opt=sel?.querySelector(`option[value="${solId}"]`)||sel?.querySelector(`option[value="${_cotSolId}"]`);
   let solItens=[];
   try{solItens=JSON.parse(opt?.dataset?.itens||'[]');}catch(e){solItens=[];}
 
@@ -1224,6 +1226,9 @@ async function salvarFornOrc2(n){
   }
   if(!confirm(`Salvar "${nome}" no cadastro de fornecedores?`))return;
   try{
+    // Verificar nome duplicado
+    const {data:existNome}=await sb.from('fornecedores').select('id,nome').ilike('nome',nome);
+    if(existNome&&existNome.length>0)return alert(`⚠️ Fornecedor "${existNome[0].nome}" já está cadastrado com esse nome.`);
     const {error}=await sb.from('fornecedores').insert({nome,cnpj:cnpj||'',contato:'',telefone:'',email:'',categorias:[],avaliacao:3,grupo:'TODOS',ativo:true});
     if(error){
       if(error.message.includes('unique'))return alert(`Fornecedor "${nome}" já cadastrado.`);
