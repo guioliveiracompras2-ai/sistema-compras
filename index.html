@@ -1023,66 +1023,79 @@ function mdCot(){
   const ag=S.sol.filter(s=>s.status==='Aguardando Orçamento');
   if(!ag.length)return alert('Nenhuma solicitação aguardando orçamento.');
   const PGTO=['À vista','Boleto 30 dias','Boleto 30/60 dias','Boleto 30/60/90 dias','Cartão de crédito','Pix','Transferência bancária','Cheque','Outro'];
-  openModal(`<div class="modal" style="max-width:820px">
+
+  openModal(`<div class="modal" style="max-width:900px;width:97vw">
   <div class="mh"><span>📋 Registrar Orçamentos</span><button class="xb" onclick="closeModal()">✕</button></div>
-  <div class="mb">
-    <div class="ib ibl">Preencha no mínimo <strong>2 orçamentos</strong> para enviar à Diretoria. O fornecedor não precisa estar cadastrado no sistema.</div>
-    <div class="f" style="margin-bottom:18px">
-      <label>Solicitação *</label>
-      <select class="inp" id="cs">
-        <option value="">Selecione a solicitação...</option>
-        ${ag.map(s=>`<option value="${s.id}">${s.numero} · ${s.loja_nome} · ${s.area||''} · ${s.descricao?.slice(0,45)}</option>`).join('')}
+  <div class="mb" style="padding:20px">
+    <div class="ib ibl" style="margin-bottom:16px">Selecione a solicitação e preencha os valores por item de cada fornecedor. Mínimo <strong>2 fornecedores</strong>.</div>
+    <div class="f" style="margin-bottom:20px">
+      <label style="font-size:13px;font-weight:600">Solicitação *</label>
+      <select class="inp" id="cot-sol" onchange="loadItensCot(this.value)" style="font-size:14px;padding:10px 14px">
+        <option value="">— Selecione a solicitação —</option>
+        ${ag.map(s=>`<option value="${s.id}" data-itens='${JSON.stringify(s.itens_requisicao||[]).replace(/'/g,"&#39;")}'>${s.numero} · ${s.loja_nome} · ${s.descricao?.slice(0,50)}</option>`).join('')}
       </select>
     </div>
-    <hr class="hdiv">
-    ${[1,2,3].map(n=>`
-    <div style="background:#F8F9FA;border-radius:10px;padding:16px;margin-bottom:14px;border:1px solid #E0E0E0">
-      <div style="font-size:12px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">
-        Orçamento ${n} ${n<=2?'<span style="color:#C62828">*</span>':'<span style="color:#9E9E9E;font-weight:400;font-size:11px">(opcional)</span>'}
-      </div>
-      <div class="fg2" style="margin-bottom:10px">
-        <div class="f" style="margin-bottom:0">
-          <label>Fornecedor *</label>
-          <input class="inp ot-forn" placeholder="Nome do fornecedor" id="ot${n}-forn">
-        </div>
-        <div class="f" style="margin-bottom:0">
-          <label>CNPJ</label>
-          <div style="display:flex;gap:8px">
-            <input class="inp ot-cnpj" placeholder="00.000.000/0000-00" id="ot${n}-cnpj" oninput="fmtCNPJ(this)" style="flex:1">
-            <button type="button" onclick="salvarFornOrc(${n})" style="padding:0 12px;background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Salvar no sistema</button>
+    <div id="cot-fornecedores" style="display:none">
+      ${[1,2,3].map(n=>`
+      <div style="background:#F8F9FA;border:1px solid #E0E0E0;border-radius:12px;padding:18px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:13px;font-weight:700;color:#1565C0">
+            Fornecedor ${n} ${n<=2?'<span style="color:#C62828">*</span>':'<span style="color:#9E9E9E;font-weight:400;font-size:11px">(opcional)</span>'}
           </div>
         </div>
-      </div>
-      <div class="fg3" style="margin-bottom:10px">
-        <div class="f" style="margin-bottom:0">
-          <label>Valor (R$) *</label>
-          <input class="inp ot-val" type="number" placeholder="0,00" step="0.01" id="ot${n}-val" oninput="calcMelhor()">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div class="f" style="margin:0">
+            <label>Nome do Fornecedor *</label>
+            <input class="inp cf-nome" id="cf${n}-nome" placeholder="Nome do fornecedor">
+          </div>
+          <div class="f" style="margin:0">
+            <label>CNPJ</label>
+            <div style="display:flex;gap:8px">
+              <input class="inp cf-cnpj" id="cf${n}-cnpj" placeholder="00.000.000/0000-00" oninput="fmtCNPJ(this)" style="flex:1">
+              <button type="button" onclick="salvarFornOrc2(${n})" style="padding:0 10px;background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">+ Sistema</button>
+            </div>
+          </div>
         </div>
-        <div class="f" style="margin-bottom:0">
-          <label>Prazo de entrega (dias)</label>
-          <input class="inp ot-prazo" type="number" placeholder="7" id="ot${n}-prazo">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+          <div class="f" style="margin:0">
+            <label>Data do Orçamento</label>
+            <input class="inp cf-data" id="cf${n}-data" type="date" value="${new Date().toISOString().slice(0,10)}">
+          </div>
+          <div class="f" style="margin:0">
+            <label>Validade</label>
+            <input class="inp cf-valid" id="cf${n}-valid" type="date">
+          </div>
+          <div class="f" style="margin:0">
+            <label>Forma de Pagamento</label>
+            <select class="inp cf-pgto" id="cf${n}-pgto">${PGTO.map(p=>`<option>${p}</option>`).join('')}</select>
+          </div>
         </div>
-        <div class="f" style="margin-bottom:0">
-          <label>Forma de pagamento</label>
-          <select class="inp ot-pgto" id="ot${n}-pgto">
-            ${PGTO.map(p=>`<option>${p}</option>`).join('')}
-          </select>
+
+        <!-- TABELA DE ITENS -->
+        <div style="background:#fff;border-radius:8px;overflow:hidden;border:1px solid #E0E0E0;margin-bottom:12px">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:#F0F4FF">
+              <th style="padding:8px 10px;text-align:left;color:#555;font-weight:600;border-bottom:1px solid #E0E0E0">Item</th>
+              <th style="padding:8px 10px;text-align:left;color:#555;font-weight:600;border-bottom:1px solid #E0E0E0">Descrição</th>
+              <th style="padding:8px 10px;text-align:center;color:#555;font-weight:600;border-bottom:1px solid #E0E0E0;width:55px">Qtd.</th>
+              <th style="padding:8px 10px;text-align:right;color:#555;font-weight:600;border-bottom:1px solid #E0E0E0;width:120px">Valor Unit. (R$)</th>
+              <th style="padding:8px 10px;text-align:right;color:#555;font-weight:600;border-bottom:1px solid #E0E0E0;width:110px">Total (R$)</th>
+            </tr></thead>
+            <tbody id="cf${n}-itens"><tr><td colspan="5" style="padding:16px;text-align:center;color:#9E9E9E;font-size:12px">Selecione uma solicitação acima para carregar os itens</td></tr></tbody>
+            <tfoot>
+              <tr style="background:#F8F9FA;border-top:2px solid #E0E0E0">
+                <td colspan="4" style="padding:10px;text-align:right;font-weight:700;color:#0F2236;font-size:13px">VALOR TOTAL</td>
+                <td style="padding:10px;text-align:right;font-weight:700;font-size:14px;color:#1565C0" id="cf${n}-total">R$ 0,00</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
-      </div>
-      <div class="f" style="margin-bottom:0">
-        <label>Observação</label>
-        <input class="inp ot-obs" placeholder="Informações adicionais sobre este orçamento..." id="ot${n}-obs">
-      </div>
-      <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
-        <label for="ot${n}-file" style="display:flex;align-items:center;gap:6px;cursor:pointer;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600">
-          📎 Anexar orçamento (PDF/imagem)
-        </label>
-        <input type="file" id="ot${n}-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="prevFile(this,'ot${n}-filelbl')">
-        <span id="ot${n}-filelbl" style="font-size:11px;color:#9E9E9E">Nenhum arquivo</span>
-      </div>
-    </div>`).join('')}
-    <div id="melhor-preco" style="display:none;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:12px 16px;font-size:13px;color:#1B5E20;margin-top:4px">
-      💰 <strong>Melhor preço:</strong> <span id="melhor-txt"></span>
+
+        <div class="f" style="margin:0">
+          <label>Observação</label>
+          <input class="inp cf-obs" id="cf${n}-obs" placeholder="Informações adicionais, descontos, condições...">
+        </div>
+      </div>`).join('')}
     </div>
   </div>
   <div class="mf">
@@ -1091,6 +1104,122 @@ function mdCot(){
   </div>
   </div>`);
 }
+
+function loadItensCot(solId){
+  const sel=document.getElementById('cot-sol');
+  const opt=sel?.querySelector(`option[value="${solId}"]`);
+  if(!opt)return;
+  let itens=[];
+  try{itens=JSON.parse(opt.dataset.itens||'[]');}catch(e){itens=[];}
+
+  // If no itens_requisicao, create a single generic item from descricao
+  if(!itens.length){
+    const sol=S.sol.find(s=>s.id===solId);
+    if(sol)itens=[{desc:sol.descricao,qtd:sol.quantidade||1,val:0,total:0}];
+  }
+
+  const block=document.getElementById('cot-fornecedores');
+  if(block)block.style.display='block';
+
+  [1,2,3].forEach(n=>{
+    const tbody=document.getElementById(`cf${n}-itens`);
+    if(!tbody)return;
+    tbody.innerHTML=itens.map((item,idx)=>`
+      <tr style="border-bottom:1px solid #F0F2F5">
+        <td style="padding:8px 10px;color:#9E9E9E;font-size:11px;text-align:center">${idx+1}</td>
+        <td style="padding:8px 10px;font-size:12px">${item.desc||item.descricao||'—'}</td>
+        <td style="padding:8px 10px;text-align:center;font-weight:600">${item.qtd||1}</td>
+        <td style="padding:4px 6px">
+          <input type="number" min="0" step="0.01" placeholder="0,00"
+            style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;text-align:right"
+            data-qtd="${item.qtd||1}" data-idx="${idx}"
+            oninput="calcTotalForn(${n})"
+            class="cf${n}-vunit">
+        </td>
+        <td style="padding:8px 10px;text-align:right;font-weight:600;color:#1565C0;font-size:12px" id="cf${n}-row${idx}-total">R$ 0,00</td>
+      </tr>`).join('');
+  });
+}
+
+function calcTotalForn(n){
+  let total=0;
+  document.querySelectorAll(`.cf${n}-vunit`).forEach(inp=>{
+    const qtd=parseFloat(inp.dataset.qtd)||1;
+    const vunit=parseFloat(inp.value)||0;
+    const sub=qtd*vunit;
+    total+=sub;
+    const idx=inp.dataset.idx;
+    const el=document.getElementById(`cf${n}-row${idx}-total`);
+    if(el)el.textContent='R$ '+sub.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  });
+  const el=document.getElementById(`cf${n}-total`);
+  if(el)el.textContent='R$ '+total.toLocaleString('pt-BR',{minimumFractionDigits:2});
+}
+
+async function hCot(){
+  const solId=document.getElementById('cot-sol')?.value;
+  if(!solId)return alert('Selecione uma solicitação.');
+  const sel=document.getElementById('cot-sol');
+  const opt=sel?.querySelector(`option[value="${solId}"]`);
+  let solItens=[];
+  try{solItens=JSON.parse(opt?.dataset?.itens||'[]');}catch(e){solItens=[];}
+
+  const it=[];
+  for(let n=1;n<=3;n++){
+    const nome=document.getElementById(`cf${n}-nome`)?.value?.trim();
+    if(!nome)continue;
+    const cnpj=document.getElementById(`cf${n}-cnpj`)?.value?.trim();
+    const data=document.getElementById(`cf${n}-data`)?.value||'';
+    const valid=document.getElementById(`cf${n}-valid`)?.value||'';
+    const pgto=document.getElementById(`cf${n}-pgto`)?.value||'';
+    const obs=document.getElementById(`cf${n}-obs`)?.value||'';
+    // Collect item prices
+    const itensForn=[];
+    let valTotal=0;
+    document.querySelectorAll(`.cf${n}-vunit`).forEach((inp,idx)=>{
+      const item=solItens[idx]||{};
+      const qtd=parseFloat(inp.dataset.qtd)||1;
+      const vunit=parseFloat(inp.value)||0;
+      const total=qtd*vunit;
+      valTotal+=total;
+      itensForn.push({desc:item.desc||item.descricao||'Item '+(idx+1),qtd,vunit,total});
+    });
+    it.push({forn:nome,cnpj,val:valTotal,prazo:0,pgto,obs,data,validade:valid,itens:itensForn});
+  }
+
+  if(it.length<2)return alert('Preencha ao menos 2 fornecedores para continuar.');
+  if(it.some(i=>i.val<=0))return alert('Preencha os valores unitários de todos os itens.');
+  try{
+    await salvarCot(solId,it);
+    closeModal();
+    await loadCot();
+    await loadSol();
+    render();
+    alert(`✅ ${it.length} orçamentos enviados para aprovação da Diretoria!`);
+  }catch(e){alert(e.message);}
+}
+
+async function salvarFornOrc2(n){
+  const nome=document.getElementById(`cf${n}-nome`)?.value?.trim();
+  const cnpj=document.getElementById(`cf${n}-cnpj`)?.value?.trim();
+  if(!nome)return alert('Preencha o nome do fornecedor antes de salvar.');
+  if(cnpj){
+    const cnpjLimpo=cnpj.replace(/\D/g,'');
+    const {data:exist}=await sb.from('fornecedores').select('id,nome').ilike('cnpj','%'+cnpjLimpo.slice(0,8)+'%');
+    if(exist&&exist.length>0)return alert(`CNPJ já cadastrado para: "${exist[0].nome}"`);
+  }
+  if(!confirm(`Salvar "${nome}" no cadastro de fornecedores?`))return;
+  try{
+    const {error}=await sb.from('fornecedores').insert({nome,cnpj:cnpj||'',contato:'',telefone:'',email:'',categorias:[],avaliacao:3,grupo:'TODOS',ativo:true});
+    if(error){
+      if(error.message.includes('unique'))return alert(`Fornecedor "${nome}" já cadastrado.`);
+      throw new Error(error.message);
+    }
+    alert(`✅ "${nome}" salvo! Complete os dados em Fornecedores.`);
+    await loadForn();
+  }catch(e){alert('Erro: '+e.message);}
+}
+
 
 async function salvarFornOrc(n){
   const nome=document.getElementById(`ot${n}-forn`)?.value?.trim();
