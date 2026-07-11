@@ -808,9 +808,25 @@ async function vSOL(id){
       <div style="font-size:11px;color:#9E9E9E">Fornecedor escolhido pela Diretoria</div>
       <div style="font-size:16px;font-weight:700">${s.fornecedor}</div>
       <div style="font-size:18px;font-weight:600;color:#1565C0">${fmt(s.valor_final)}</div></div>`:''}
-    <div class="ib ibl">Sua aprovacao libera a compra.</div>
+    <div class="ib ibl">Sua aprovacao libera a compra para o time de Compras executar.</div>
     <div class="f"><label>Observacao</label><textarea class="inp" id="ov" placeholder="Comentario final..."></textarea></div>
-    <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aprovada')">Aprovar</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">Reprovar</button></div>`;
+    <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aprovada')">✓ Aprovar — Liberar para Compras</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">✗ Reprovar</button></div>`;
+  }
+
+  // Compras executa a compra após aprovação do gerente
+  const pCompras=isCompras()&&s.status==='Aprovada';
+  let comprasHtml='';
+  if(pCompras){
+    const cotVenc=S.cot.find(c=>c.solicitacao_id===s.id);
+    comprasHtml=`<hr class="hdiv">
+    <div style="background:#E8F5E9;border-radius:8px;padding:16px;margin-bottom:14px">
+      <div style="font-size:12px;color:#2E7D32;font-weight:600;margin-bottom:6px">✅ APROVADA — Aguardando execução da compra</div>
+      <div style="font-size:14px;font-weight:700">${s.fornecedor||'—'}</div>
+      <div style="font-size:18px;font-weight:700;color:#1565C0;margin-top:4px">${fmt(s.valor_final)}</div>
+      ${s.aprovado_dir_nome?`<div style="font-size:11px;color:#9E9E9E;margin-top:6px">Aprovado por: Dir. ${s.aprovado_dir_nome} + Ger. ${s.aprovado_ger_nome||'—'}</div>`:''}
+    </div>
+    <div class="ib ibo">Confirme que a compra foi realizada para gerar o pedido de entrega.</div>
+    <button class="btn bs" style="width:100%" onclick="hExecutarCompra('${s.id}','${cotVenc?.id||''}','${s.fornecedor||''}',${s.valor_final||0})">🛒 Confirmar Execução da Compra</button>`;
   }
 
   let dirHtml='';
@@ -875,8 +891,35 @@ async function vSOL(id){
     <div style="font-size:13px;line-height:1.6;color:#424242">${s.justificativa||'-'}</div>
     ${s.anexos?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">ANEXOS</div><div style="font-size:12px;color:#1565C0">📎 ${s.anexos}</div>`:''}
     ${s.observacoes?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">OBSERVACOES</div><div style="font-size:13px">${s.observacoes}</div>`:''}
-    ${dirHtml}${cotHtml}${gerenteHtml}
+    ${dirHtml}${cotHtml}${gerenteHtml}${comprasHtml}
   </div></div>`);
+}
+
+async function hExecutarCompra(solId,cotId,forn,val){
+  if(!confirm(`Confirmar execução da compra com ${forn} por ${fmt(val)}?`))return;
+  try{
+    if(cotId)await sb.from('cotacoes').update({status:'Encerrada',vencedor:forn}).eq('id',cotId);
+    const num=await genNum('PED');
+    const sol=S.sol.find(s=>s.id===solId);
+    const nome=`${S.user.nome} ${S.user.sobrenome}`;
+    const agora=new Date().toISOString();
+    const prev=new Date();prev.setDate(prev.getDate()+7);
+    await sb.from('solicitacoes').update({
+      status:'Comprada',comprado_por:nome,comprado_em:agora
+    }).eq('id',solId);
+    await sb.from('pedidos').insert({
+      numero:num,solicitacao_id:solId,cotacao_id:cotId||null,
+      solicitacao_numero:sol?.numero,fornecedor:forn,
+      loja_nome:sol?.loja_nome,descricao:sol?.descricao,
+      valor:val,data_compra:agora.slice(0,10),
+      prev_entrega:prev.toISOString().slice(0,10),
+      status:'Em Trânsito',grupo:sol?.grupo
+    });
+    closeModal();
+    await loadSol();await loadPed();await loadCot();
+    render();
+    alert(`✅ Compra executada! Pedido ${num} criado.\nAguardando entrega.`);
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 async function hSt(id,status){
@@ -1003,7 +1046,7 @@ function pgCot(){
       ${c.status==='Encerrada'?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">Encerrada</span>':'<span class="chip" style="background:#FFF8E1;color:#E65100">Aberta</span>'}
     </div>
     <div class="tw"><table>
-    <thead><tr><th>Fornecedor</th><th>CNPJ</th><th>Valor</th><th>Prazo</th><th>Pagamento</th><th>Obs</th>${!c.vencedor?'<th>Ação</th>':''}</tr></thead>
+    <thead><tr><th>Fornecedor</th><th>CNPJ</th><th>Valor</th><th>Prazo</th><th>Pagamento</th><th>Obs</th><th>Status</th></tr></thead>
     <tbody>${it.map(i=>`<tr style="${i.forn===best?.forn?'background:#F1F8E9':''}">
       <td style="font-weight:${i.forn===best?.forn?'600':'400'}">
         ${i.forn}${i.forn===best?.forn?' <span class="chip" style="background:#E8F5E9;color:#2E7D32;font-size:10px">✓ Menor preço</span>':''}
@@ -1013,7 +1056,7 @@ function pgCot(){
       <td style="font-size:12px">${i.prazo?i.prazo+' dias':'—'}</td>
       <td style="font-size:11px">${i.pgto||'—'}</td>
       <td style="font-size:11px;color:#9E9E9E">${i.obs||'—'}</td>
-      ${!c.vencedor?`<td><button class="sm ok" onclick="hEsc('${c.id}','${c.solicitacao_id}','${i.forn}',${i.val})">Escolher</button></td>`:''}
+      <td>${c.vencedor===i.forn?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">✓ Escolhido</span>':c.vencedor?'<span style="color:#ccc;font-size:12px">—</span>':'<span class="chip" style="background:#FFF3E0;color:#E65100">Aguard. Diretoria</span>'}</td>
     </tr>`).join('')}
     </tbody></table></div></div>`;
   }).join('')}</div>`}`;
@@ -1241,8 +1284,8 @@ async function salvarFornOrc2(n){
 
 
 async function salvarFornOrc(n){
-  const nome=document.getElementById(`ot${n}-forn`)?.value?.trim();
-  const cnpj=document.getElementById(`ot${n}-cnpj`)?.value?.trim();
+  const nome=document.getElementById(`cf${n}-nome`)?.value?.trim();
+  const cnpj=document.getElementById(`cf${n}-cnpj`)?.value?.trim();
   if(!nome)return alert('Preencha o nome do fornecedor antes de salvar.');
   // Verifica duplicata por nome
   const {data:existNome}=await sb.from('fornecedores').select('id,nome').ilike('nome',nome);
@@ -1345,8 +1388,10 @@ function fmtCNPJ(el){
 
 function calcMelhor(){
   const vals=[1,2,3].map(n=>{
-    const forn=document.getElementById(`ot${n}-forn`)?.value;
-    const val=parseFloat(document.getElementById(`ot${n}-val`)?.value);
+    const forn=document.getElementById(`cf${n}-nome`)?.value;
+    const totalEl=document.getElementById(`cf${n}-total`);
+    const valStr=totalEl?.textContent?.replace(/[R$\s.]/g,'').replace(',','.')||'0';
+    const val=parseFloat(valStr)||0;
     return forn&&val>0?{forn,val}:null;
   }).filter(Boolean);
   const el=document.getElementById('melhor-preco');
