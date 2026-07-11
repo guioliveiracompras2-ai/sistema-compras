@@ -1085,6 +1085,162 @@ async function hExecutarCompra(solId,cotId,forn,val){
   </div>`);
 }
 
+async function gerarOCPed(pedId){
+  const p=S.ped.find(x=>x.id===pedId);
+  if(!p)return alert('Pedido não encontrado.');
+  // Busca solicitação se necessário
+  let sol=S.sol.find(s=>s.id===p.solicitacao_id);
+  if(!sol){
+    const {data}=await sb.from('solicitacoes').select('*').eq('id',p.solicitacao_id).single();
+    sol=data;
+  }
+  if(!sol)return alert('Dados da solicitação não encontrados.');
+  const vf=p.valor_final_compra||p.valor;
+  const valAprov=p.valor||vf;
+  const desc=valAprov-vf;
+  const pct=valAprov>0?((desc/valAprov)*100).toFixed(1):0;
+  const itens=sol.itens_requisicao||[];
+  const num='OC-'+sol.numero.replace(/[^0-9]/g,'');
+  const hoje=new Date().toLocaleDateString('pt-BR');
+
+  const html=`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Ordem de Compra ${num}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Arial,sans-serif;font-size:12px;color:#333;padding:24px;max-width:800px;margin:0 auto}
+  .header{background:#0F2236;color:#fff;padding:20px 24px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+  .header h1{font-size:20px;font-weight:700}
+  .header p{font-size:12px;opacity:.7;margin-top:4px}
+  .badge{background:#1565C0;color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700}
+  .section{background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:16px;margin-bottom:14px}
+  .section h2{font-size:13px;font-weight:700;color:#0F2236;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F0F2F5}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .field{margin-bottom:4px}
+  .field label{font-size:10px;color:#9E9E9E;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em}
+  .field span{font-size:13px;font-weight:600;color:#333}
+  table{width:100%;border-collapse:collapse}
+  th{padding:8px 10px;background:#F8F9FA;text-align:left;font-size:11px;color:#666;border-bottom:2px solid #E0E0E0;font-weight:600}
+  td{padding:8px 10px;border-bottom:1px solid #F5F5F5;font-size:12px}
+  .total-row td{font-weight:700;background:#F8F9FA;border-top:2px solid #E0E0E0;font-size:13px}
+  .saving{background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:8px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;margin-bottom:14px}
+  .saving .val{font-size:18px;font-weight:700;margin-top:4px}
+  .saving .lbl{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.05em}
+  .footer{text-align:center;margin-top:20px;padding-top:14px;border-top:1px solid #E0E0E0;color:#9E9E9E;font-size:11px}
+  .assinaturas{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:30px}
+  .ass{text-align:center;padding-top:36px;border-top:1.5px solid #333}
+  .ass .nome{font-weight:600;font-size:12px}
+  .ass .cargo{font-size:10px;color:#666;margin-top:3px}
+  @media print{
+    body{padding:12px}
+    .no-print{display:none}
+    @page{margin:1.5cm}
+  }
+</style>
+</head>
+<body>
+<div class="no-print" style="background:#1565C0;color:#fff;padding:12px 20px;border-radius:8px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+  <span style="font-weight:600">📄 Ordem de Compra — ${num}</span>
+  <button onclick="window.print()" style="background:#fff;color:#1565C0;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer;font-size:13px">🖨️ Imprimir / Salvar PDF</button>
+</div>
+
+<div class="header">
+  <div>
+    <h1>ORDEM DE COMPRA — ${num}</h1>
+    <p>Grupo DHG & BMMOT · Pedido: ${p.numero} · Emitida em ${hoje}</p>
+  </div>
+  <div class="badge">OC APROVADA</div>
+</div>
+
+<div class="section">
+  <h2>Informações da Ordem</h2>
+  <div class="grid3">
+    <div class="field"><label>Número OC</label><span>${num}</span></div>
+    <div class="field"><label>Número Pedido</label><span>${p.numero}</span></div>
+    <div class="field"><label>Solicitação</label><span>${sol.numero}</span></div>
+    <div class="field"><label>Loja</label><span>${sol.loja_nome||'—'}</span></div>
+    <div class="field"><label>Área / Departamento</label><span>${sol.area||'—'}</span></div>
+    <div class="field"><label>Data da Compra</label><span>${fmtD(p.data_compra)}</span></div>
+    <div class="field"><label>Solicitante</label><span>${sol.solicitante_nome||'—'}</span></div>
+    <div class="field"><label>Executado por</label><span>${sol.comprado_por||'—'}</span></div>
+    <div class="field"><label>Centro de Custo</label><span>${p.centro_custo||sol.area||'—'}</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Fornecedor Selecionado</h2>
+  <div class="grid3">
+    <div class="field"><label>Nome</label><span>${p.fornecedor}</span></div>
+    <div class="field"><label>Forma de Pagamento</label><span>${p.forma_pagamento_oc||'—'}</span></div>
+    <div class="field"><label>Previsão de Entrega</label><span>${fmtD(p.prev_entrega)}</span></div>
+  </div>
+</div>
+
+${itens.length?`<div class="section">
+  <h2>Itens da Requisição</h2>
+  <table>
+    <thead><tr><th>Nº</th><th>Descrição</th><th>Qtd.</th><th style="text-align:right">Valor Unit.</th><th style="text-align:right">Total</th></tr></thead>
+    <tbody>
+      ${itens.map((i,idx)=>`<tr>
+        <td style="color:#9E9E9E;text-align:center;width:40px">${idx+1}</td>
+        <td>${i.desc||i.descricao||'—'}</td>
+        <td style="text-align:center;width:60px">${i.qtd||1}</td>
+        <td style="text-align:right;width:120px">${i.val>0?'R$ '+parseFloat(i.val).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td>
+        <td style="text-align:right;width:120px;font-weight:600">R$ ${(parseFloat(i.total)||((i.qtd||1)*(i.val||0))).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+      </tr>`).join('')}
+    </tbody>
+    <tfoot><tr class="total-row">
+      <td colspan="4" style="text-align:right;padding:10px">VALOR TOTAL DA COMPRA</td>
+      <td style="text-align:right;padding:10px;color:#1565C0;font-size:15px">R$ ${vf.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+    </tr></tfoot>
+  </table>
+</div>`:''}
+
+<div class="saving">
+  <div><div class="lbl">Valor Aprovado</div><div class="val" style="color:#333">R$ ${parseFloat(valAprov).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div></div>
+  <div><div class="lbl">Valor Final Pago</div><div class="val" style="color:#1565C0">R$ ${parseFloat(vf).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div></div>
+  <div><div class="lbl">Saving / Economia</div><div class="val" style="color:#2E7D32">R$ ${parseFloat(desc).toLocaleString('pt-BR',{minimumFractionDigits:2})}<br><span style="font-size:14px">(${pct}%)</span></div></div>
+</div>
+
+<div class="section">
+  <h2>Histórico de Aprovações</h2>
+  <div class="grid3">
+    <div class="field"><label>👔 Aprovado — Diretoria</label><span>${sol.aprovado_dir_nome||'—'}</span><br><span style="font-size:11px;color:#9E9E9E">${fmtD(sol.aprovado_dir_data)}</span></div>
+    <div class="field"><label>✅ Aprovado — Gerente</label><span>${sol.aprovado_ger_nome||'—'}</span><br><span style="font-size:11px;color:#9E9E9E">${fmtD(sol.aprovado_ger_data)}</span></div>
+    <div class="field"><label>🛒 Compra Executada</label><span>${sol.comprado_por||'—'}</span><br><span style="font-size:11px;color:#9E9E9E">${fmtD(sol.comprado_em)}</span></div>
+  </div>
+</div>
+
+${p.obs_compra?`<div class="section"><h2>Observações</h2><p style="line-height:1.7">${p.obs_compra}</p></div>`:''}
+
+<div class="assinaturas">
+  <div class="ass">
+    <div class="nome">${sol.solicitante_nome||'—'}</div>
+    <div class="cargo">Solicitante</div>
+  </div>
+  <div class="ass">
+    <div class="nome">${sol.aprovado_dir_nome||'—'}</div>
+    <div class="cargo">Diretoria</div>
+  </div>
+  <div class="ass">
+    <div class="nome">${sol.aprovado_ger_nome||'—'}</div>
+    <div class="cargo">Gerente de Setor</div>
+  </div>
+</div>
+
+<div class="footer">
+  Sistema de Compras · Grupo DHG & BMMOT · Documento gerado em ${hoje}
+</div>
+</body></html>`;
+
+  const win=window.open('','_blank','width=900,height=700');
+  win.document.write(html);
+  win.document.close();
+}
+
 function calcSaving(valAprov){
   const vf=parseFloat(document.getElementById('oc-valfinal')?.value)||0;
   const desc=valAprov-vf;
@@ -1772,36 +1928,98 @@ Após confirmar, irá para aprovação do Gerente.`))return;
 // ── PEDIDOS ───────────────────────────────────────────────────────────────
 function pgPed(){
   return `<div class="card"><div class="tw"><table>
-  <thead><tr><th>Número</th><th>Sol.</th><th>Loja</th><th>Fornecedor</th><th>Valor</th><th>Prev. Entrega</th><th>Status</th><th>NF</th><th>Ação</th></tr></thead>
+  <thead><tr><th>Número</th><th>Sol.</th><th>Loja</th><th>Fornecedor</th><th>Valor Aprov.</th><th>Valor Final</th><th>Saving</th><th>Prev. Entrega</th><th>Status</th><th>NF</th><th>Ações</th></tr></thead>
   <tbody>
   ${S.ped.map(p=>`<tr>
     <td><span style="font-family:monospace;font-size:12px">${p.numero}</span></td>
     <td style="font-size:11px">${p.solicitacao_numero||'—'}</td>
     <td style="font-size:12px">${p.loja_nome||'—'}</td>
-    <td style="font-size:12px">${p.fornecedor||'—'}</td>
-    <td>${fmt(p.valor)}</td>
+    <td style="font-size:12px;font-weight:500">${p.fornecedor||'—'}</td>
+    <td style="font-size:12px">${fmt(p.valor)}</td>
+    <td style="font-size:12px;font-weight:600;color:#1565C0">${p.valor_final_compra?fmt(p.valor_final_compra):'—'}</td>
+    <td style="font-size:11px">${p.saving_pct?`<span class="chip" style="background:#E8F5E9;color:#2E7D32">${p.saving_pct}%</span>`:'—'}</td>
     <td style="font-size:12px">${fmtD(p.prev_entrega)}</td>
     <td>${p.status==='Entregue'?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">Entregue</span>':'<span class="chip" style="background:#FFF3E0;color:#E65100">Em Trânsito</span>'}</td>
     <td style="font-size:11px;color:#9E9E9E">${p.nf||'—'}</td>
-    <td>${p.status!=='Entregue'?`<button class="sm ok" onclick="mdEnt('${p.id}','${p.solicitacao_id||''}')">Confirmar</button>`:'✅'}</td>
+    <td style="white-space:nowrap">
+      <button class="sm bl" onclick="gerarOCPed('${p.id}')">📄 OC</button>
+      ${p.status!=='Entregue'?`<button class="sm ok" onclick="mdEnt('${p.id}','${p.solicitacao_id||''}')">✓ Entrega</button>`:'<span style="color:#2E7D32;font-size:13px">✅</span>'}
+    </td>
   </tr>`).join('')}
-  ${!S.ped.length?`<tr><td colspan="9" style="text-align:center;padding:40px;color:#ccc">Nenhum pedido</td></tr>`:''}
+  ${!S.ped.length?`<tr><td colspan="11" style="text-align:center;padding:40px;color:#ccc">Nenhum pedido</td></tr>`:''}
   </tbody></table></div></div>`;
 }
 
 function mdEnt(pedId,solId){
-  openModal(`<div class="modal" style="max-width:400px">
-  <div class="mh"><span>Confirmar Entrega</span><button class="xb" onclick="closeModal()">✕</button></div>
+  const p=S.ped.find(x=>x.id===pedId);
+  openModal(`<div class="modal" style="max-width:480px">
+  <div class="mh"><span>✅ Confirmar Entrega</span><button class="xb" onclick="closeModal()">✕</button></div>
   <div class="mb">
-    <div class="f"><label>Número da Nota Fiscal</label><input class="inp" id="nf" placeholder="NF-0000 (opcional)"></div>
-    <p style="font-size:13px;color:#555;line-height:1.6">Confirma que o item foi recebido e está em conformidade?</p>
+    <div class="ib ibg">Confirme o recebimento do item. Esta ação finaliza a esteira do pedido.</div>
+    <div style="background:#F8F9FA;border-radius:8px;padding:12px 14px;margin-bottom:16px">
+      <div style="font-size:12px;color:#9E9E9E;margin-bottom:4px">Pedido</div>
+      <div style="font-weight:600;font-size:14px">${p?.numero||pedId}</div>
+      <div style="font-size:12px;color:#555;margin-top:2px">${p?.fornecedor||'—'} · ${fmt(p?.valor_final_compra||p?.valor)}</div>
+    </div>
+    <div class="fg2">
+      <div class="f">
+        <label>Número da Nota Fiscal *</label>
+        <input class="inp" id="nf" placeholder="NF-000000">
+      </div>
+      <div class="f">
+        <label>Data de Recebimento</label>
+        <input class="inp" type="date" id="dt-ent" value="${new Date().toISOString().slice(0,10)}">
+      </div>
+    </div>
+    <div class="f">
+      <label>Recebido por (nome completo) *</label>
+      <input class="inp" id="rec-por" placeholder="Nome de quem recebeu o item" value="${S.user.nome} ${S.user.sobrenome}">
+    </div>
+    <div class="f">
+      <label>Condição do item recebido</label>
+      <select class="inp" id="cond-item">
+        <option>✅ Conforme — item recebido em perfeitas condições</option>
+        <option>⚠️ Parcial — entrega incompleta, aguardando restante</option>
+        <option>❌ Com avaria — item com danos, registrar ocorrência</option>
+      </select>
+    </div>
+    <div class="f">
+      <label>Observações (opcional)</label>
+      <textarea class="inp" id="obs-ent" placeholder="Informações adicionais sobre a entrega..." style="min-height:60px"></textarea>
+    </div>
   </div>
-  <div class="mf"><button class="btn bsc" onclick="closeModal()">Cancelar</button><button class="btn bs" onclick="hEnt('${pedId}','${solId}')">✓ Confirmar</button></div>
+  <div class="mf">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    <button class="btn bs" onclick="hEnt('${pedId}','${solId}')">✅ Confirmar Entrega</button>
+  </div>
   </div>`);
 }
 async function hEnt(pedId,solId){
-  try{await confirmarEntrega(pedId,solId||null,V('nf'));closeModal();await loadPed();await loadSol();render();}
-  catch(e){alert(e.message);}
+  const nf=V('nf');
+  const recPor=V('rec-por');
+  const dtEnt=V('dt-ent');
+  const cond=V('cond-item');
+  const obs=V('obs-ent');
+  if(!nf)return alert('Informe o número da Nota Fiscal.');
+  if(!recPor)return alert('Informe quem recebeu o item.');
+  try{
+    const agora=new Date().toISOString();
+    const nome=`${S.user.nome} ${S.user.sobrenome}`;
+    await sb.from('pedidos').update({
+      status:'Entregue',
+      data_entrega:dtEnt||agora.slice(0,10),
+      nf,obs_entrega:obs,
+      condicao_entrega:cond,
+      recebido_por:recPor
+    }).eq('id',pedId);
+    if(solId)await sb.from('solicitacoes').update({
+      status:'Entregue',
+      entregue_por:nome,
+      entregue_em:agora
+    }).eq('id',solId);
+    closeModal();await loadPed();await loadSol();render();
+    alert('✅ Entrega confirmada!\nNF: '+nf+'\nRecebido por: '+recPor);
+  }catch(e){alert(e.message);}
 }
 
 // ── RELATÓRIOS ────────────────────────────────────────────────────────────
