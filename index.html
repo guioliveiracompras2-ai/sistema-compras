@@ -1360,33 +1360,7 @@ function calcMelhor(){
   }
 }
 
-async function hCot(){
-  const solId=V('cs');
-  if(!solId)return alert('Selecione uma solicitação.');
-  const it=[];
-  for(let n=1;n<=3;n++){
-    const forn=document.getElementById(`ot${n}-forn`)?.value?.trim();
-    const val=parseFloat(document.getElementById(`ot${n}-val`)?.value);
-    const cnpj=document.getElementById(`ot${n}-cnpj`)?.value?.trim();
-    const prazo=parseInt(document.getElementById(`ot${n}-prazo`)?.value)||0;
-    const pgto=document.getElementById(`ot${n}-pgto`)?.value||'';
-    const obs=document.getElementById(`ot${n}-obs`)?.value||'';
-    if(forn&&val>0){
-      const fileInput=document.getElementById(`ot${n}-file`);
-      const fileName=fileInput?.files?.[0]?.name||'';
-      it.push({forn,cnpj,val,prazo,pgto,obs,arquivo:fileName?`[${fileName}]`:''});
-    }
-  }
-  if(it.length<2)return alert('Preencha no mínimo 2 orçamentos para continuar.');
-  try{
-    await salvarCot(solId,it);
-    closeModal();
-    await loadCot();
-    await loadSol();
-    render();
-    alert(`✅ ${it.length} orçamentos enviados para aprovação da Diretoria!`);
-  }catch(e){alert(e.message);}
-}
+// hCot removido (duplicado)
 
 async function hEsc(cotId,solId,forn,val){
   if(!confirm(`Confirmar compra com ${forn} por ${fmt(val)}?`))return;
