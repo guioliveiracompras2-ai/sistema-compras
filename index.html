@@ -2251,9 +2251,7 @@ async function hSenha(id,loginAtual){
     const msgs=[];
     if(novoLogin)msgs.push(`Login: ${novoLogin}`);
     if(s1)msgs.push('Senha atualizada');
-    alert('✅ Alterações salvas!
-'+msgs.join('
-'));
+    alert('✅ Alterações salvas!\n'+msgs.join('\n'));
   }catch(e){alert(e.message);}
 }
 
