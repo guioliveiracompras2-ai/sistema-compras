@@ -2201,21 +2201,58 @@ function pgRel(){
 </div>`;
 }
 
+// ── FUNÇÕES DE FILTRO ────────────────────────────────────────────────────
+function aplicarFiltroBase(s){
+  // Aplica filtros de período, grupo, loja e área em uma solicitação
+  if(relFiltros.de||relFiltros.ate){
+    // Usa data de criação para filtrar período
+    const d=(s.data_criacao||'').slice(0,7);
+    if(relFiltros.de&&d<relFiltros.de)return false;
+    if(relFiltros.ate&&d>relFiltros.ate)return false;
+  }
+  if(relFiltros.grupo&&s.grupo!==relFiltros.grupo)return false;
+  if(relFiltros.loja&&s.loja_id!==relFiltros.loja)return false;
+  if(relFiltros.area&&s.area!==relFiltros.area)return false;
+  return true;
+}
+
 function filtrarSol(){
-  return S.sol.filter(s=>{
-    if(!['Comprada','Entregue'].includes(s.status))return false;
-    if(relFiltros.de){const d=s.data_criacao?.slice(0,7);if(d<relFiltros.de)return false;}
-    if(relFiltros.ate){const d=s.data_criacao?.slice(0,7);if(d>relFiltros.ate)return false;}
-    if(relFiltros.grupo&&s.grupo!==relFiltros.grupo)return false;
-    if(relFiltros.loja&&s.loja_id!==relFiltros.loja)return false;
-    if(relFiltros.area&&s.area!==relFiltros.area)return false;
-    return true;
-  });
+  // Apenas solicitações finalizadas (Comprada ou Entregue)
+  return S.sol.filter(s=>['Comprada','Entregue'].includes(s.status)&&aplicarFiltroBase(s));
+}
+
+function filtrarAllSol(){
+  // Todas as solicitações do período (para indicadores gerais)
+  return S.sol.filter(s=>aplicarFiltroBase(s));
 }
 
 function filtrarPed(){
+  // Pedidos vinculados às solicitações filtradas
   const solIds=new Set(filtrarSol().map(s=>s.id));
-  return S.ped.filter(p=>solIds.has(p.solicitacao_id));
+  return S.ped.filter(p=>solIds.has(p.solicitacao_id)||
+    // Também inclui pedidos sem solicitacao_id mas do período
+    (!p.solicitacao_id&&aplicarFiltroBase({
+      data_criacao:p.data_compra,
+      grupo:p.grupo,
+      loja_id:p.loja_id
+    }))
+  );
+}
+
+function calcValorFinal(sol,ped){
+  // Valor final: prioridade ao valor_final_compra do pedido,
+  // depois valor_final da solicitação, depois valor do pedido,
+  // por último valor_estimado
+  return ped?.valor_final_compra||sol?.valor_final||ped?.valor||sol?.valor_estimado||0;
+}
+
+function calcSavingRel(sol,ped){
+  // Saving = valor estimado (orçado) - valor final pago
+  // Se desconto já calculado no pedido, usa direto
+  if(ped?.desconto&&ped.desconto>0)return ped.desconto;
+  const estimado=sol?.valor_estimado||ped?.valor||0;
+  const final=calcValorFinal(sol,ped);
+  return Math.max(0,estimado-final);
 }
 
 function renderRel(){
@@ -2223,36 +2260,46 @@ function renderRel(){
   Object.values(relCharts).forEach(c=>{try{c.destroy();}catch(e){}});
   relCharts={};
 
-  const sol=filtrarSol();
+  const sol=filtrarSol();        // Compradas/Entregues
+  const allSol=filtrarAllSol();  // Todas do período
   const ped=filtrarPed();
-  const allSol=S.sol.filter(s=>{
-    if(relFiltros.de){const d=s.data_criacao?.slice(0,7);if(d<relFiltros.de)return false;}
-    if(relFiltros.ate){const d=s.data_criacao?.slice(0,7);if(d>relFiltros.ate)return false;}
-    if(relFiltros.grupo&&s.grupo!==relFiltros.grupo)return false;
-    if(relFiltros.loja&&s.loja_id!==relFiltros.loja)return false;
-    if(relFiltros.area&&s.area!==relFiltros.area)return false;
-    return true;
+
+  // Mapa de pedidos por solicitacao_id para cruzamento
+  const pedMap={};
+  ped.forEach(p=>{if(p.solicitacao_id)pedMap[p.solicitacao_id]=p;});
+
+  // KPIs — calculados cruzando solicitações com pedidos
+  let totalComprado=0, totalEcon=0, totalAprov=0;
+  sol.forEach(s=>{
+    const p=pedMap[s.id];
+    const vf=calcValorFinal(s,p);
+    const sv=calcSavingRel(s,p);
+    totalComprado+=vf;
+    totalEcon+=sv;
+    totalAprov+=(s.valor_estimado||0);
+  });
+  // Também soma pedidos sem solicitação vinculada
+  ped.filter(p=>!p.solicitacao_id).forEach(p=>{
+    totalComprado+=(p.valor_final_compra||p.valor||0);
+    totalEcon+=(p.desconto||0);
   });
 
-  // KPIs
-  const totalComprado=ped.reduce((a,p)=>a+(p.valor_final_compra||p.valor||0),0);
-  const totalAprov=sol.reduce((a,s)=>a+(s.valor_estimado||0),0);
-  const totalEcon=ped.reduce((a,p)=>a+(p.desconto||0),0);
   const pctEcon=totalAprov>0?((totalEcon/totalAprov)*100):0;
-  const ticketMedio=ped.length>0?totalComprado/ped.length:0;
+  const ticketMedio=sol.length>0?totalComprado/sol.length:0;
   const emAberto=allSol.filter(s=>['Aguardando Diretoria','Aguardando Orçamento','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada'].includes(s.status)).length;
   const reprovadas=allSol.filter(s=>s.status==='Reprovada').length;
-  const totalSol=allSol.length;
-  const txAprov=totalSol>0?(Math.round((sol.length/totalSol)*100)):0;
+  const totalSolAll=allSol.length;
+  const txAprov=totalSolAll>0?(Math.round((sol.length/totalSolAll)*100)):0;
 
-  // Por mês
+  // Por mês — usa data_criacao da solicitação (mais confiável)
   const meses={};
-  ped.forEach(p=>{
-    const m=p.data_compra?.slice(0,7)||'';
+  sol.forEach(s=>{
+    const p=pedMap[s.id];
+    const m=(s.comprado_em||s.data_criacao||'').slice(0,7);
     if(!m)return;
     if(!meses[m])meses[m]={comprado:0,econ:0};
-    meses[m].comprado+=(p.valor_final_compra||p.valor||0);
-    meses[m].econ+=(p.desconto||0);
+    meses[m].comprado+=calcValorFinal(s,p);
+    meses[m].econ+=calcSavingRel(s,p);
   });
   const mesesKeys=Object.keys(meses).sort();
   const mesesLabels=mesesKeys.map(m=>{const[y,mo]=m.split('-');return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mo)-1]+'/'+y.slice(2);});
@@ -2267,27 +2314,36 @@ function renderRel(){
   ped.forEach(p=>{if(p.loja_nome){lojas[p.loja_nome]=(lojas[p.loja_nome]||0)+(p.valor_final_compra||p.valor||0);}});
   const lojaEntries=Object.entries(lojas).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
-  // Top fornecedores
+  // Top fornecedores — cruzado com solicitações para saving correto
   const forns={};
-  ped.forEach(p=>{
-    if(p.fornecedor){
-      if(!forns[p.fornecedor])forns[p.fornecedor]={val:0,econ:0,count:0};
-      forns[p.fornecedor].val+=(p.valor_final_compra||p.valor||0);
-      forns[p.fornecedor].econ+=(p.desconto||0);
-      forns[p.fornecedor].count++;
-    }
+  sol.forEach(s=>{
+    const p=pedMap[s.id];
+    const forn=s.fornecedor||p?.fornecedor;
+    if(!forn)return;
+    if(!forns[forn])forns[forn]={val:0,econ:0,count:0};
+    forns[forn].val+=calcValorFinal(s,p);
+    forns[forn].econ+=calcSavingRel(s,p);
+    forns[forn].count++;
+  });
+  // Pedidos sem sol vinculada
+  ped.filter(p=>!p.solicitacao_id&&p.fornecedor).forEach(p=>{
+    if(!forns[p.fornecedor])forns[p.fornecedor]={val:0,econ:0,count:0};
+    forns[p.fornecedor].val+=(p.valor_final_compra||p.valor||0);
+    forns[p.fornecedor].econ+=(p.desconto||0);
+    forns[p.fornecedor].count++;
   });
   const topForns=Object.entries(forns).sort((a,b)=>b[1].val-a[1].val).slice(0,5);
 
-  // Por área
+  // Por área — usa valor calculado corretamente
   const areas={};
   sol.forEach(s=>{
-    if(s.area){
-      if(!areas[s.area])areas[s.area]={orcado:0,comprado:0,count:0};
-      areas[s.area].orcado+=(s.valor_estimado||0);
-      areas[s.area].comprado+=(s.valor_final||0);
-      areas[s.area].count++;
-    }
+    const p=pedMap[s.id];
+    const area=s.area||'Sem área';
+    if(!areas[area])areas[area]={orcado:0,comprado:0,econ:0,count:0};
+    areas[area].orcado+=(s.valor_estimado||0);
+    areas[area].comprado+=calcValorFinal(s,p);
+    areas[area].econ+=calcSavingRel(s,p);
+    areas[area].count++;
   });
 
   // Saving acumulado
@@ -2423,8 +2479,8 @@ function renderRel(){
               ${d.orcado>0?(d.comprado/d.orcado*100).toFixed(1):0}%
             </div>
           </td>
-          <td style="padding:8px 12px;text-align:right;color:#2E7D32;font-weight:600">${fmt(d.orcado-d.comprado)}</td>
-          <td style="padding:8px 12px;text-align:right;color:#2E7D32">${d.orcado>0?((d.orcado-d.comprado)/d.orcado*100).toFixed(1):0}%</td>
+          <td style="padding:8px 12px;text-align:right;color:#2E7D32;font-weight:600">${fmt(d.econ)}</td>
+          <td style="padding:8px 12px;text-align:right;color:#2E7D32">${d.orcado>0?(d.econ/d.orcado*100).toFixed(1):0}%</td>
         </tr>`).join('')}
         ${!Object.keys(areas).length?'<tr><td colspan="7" style="text-align:center;padding:32px;color:#ccc">Sem dados para o período</td></tr>':''}
       </tbody>
@@ -2434,8 +2490,8 @@ function renderRel(){
         <td style="padding:10px 12px;text-align:right">${fmt(totalAprov)}</td>
         <td style="padding:10px 12px;text-align:right;color:#1565C0">${fmt(totalComprado)}</td>
         <td style="padding:10px 12px;text-align:right">${totalAprov>0?(totalComprado/totalAprov*100).toFixed(1):0}%</td>
-        <td style="padding:10px 12px;text-align:right;color:#2E7D32">${fmt(totalEcon)}</td>
-        <td style="padding:10px 12px;text-align:right;color:#2E7D32">${pctEcon.toFixed(1)}%</td>
+        <td style="padding:10px 12px;text-align:right;color:#2E7D32;font-weight:700">${fmt(totalEcon)}</td>
+        <td style="padding:10px 12px;text-align:right;color:#2E7D32;font-weight:700">${pctEcon.toFixed(1)}%</td>
       </tr></tfoot>
     </table>
   </div>`;
