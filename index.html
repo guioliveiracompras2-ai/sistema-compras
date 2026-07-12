@@ -179,8 +179,21 @@ function doLogout(){
 function loadSession(){
   try{
     const saved=localStorage.getItem(SESSION_KEY);
-    if(saved)S.user=JSON.parse(saved);
-  }catch(e){localStorage.removeItem(SESSION_KEY);}
+    if(saved){
+      const u=JSON.parse(saved);
+      // Valida sessão — deve ter id, login e perfil
+      if(u&&u.id&&u.login&&u.perfil){
+        S.user=u;
+      } else {
+        // Sessão inválida (sem id) — limpa e força novo login
+        localStorage.removeItem(SESSION_KEY);
+        S.user=null;
+      }
+    }
+  }catch(e){
+    localStorage.removeItem(SESSION_KEY);
+    S.user=null;
+  }
 }
 
 // ── DATA ──────────────────────────────────────────────────────────────────
@@ -2093,7 +2106,7 @@ function pgUsers(){
   </span>
 </div>
 <div style="display:grid;gap:10px">
-  ${S.users.map(u=>`
+  ${S.users.filter(u=>u.id).map(u=>`
   <div class="uc" style="opacity:${u.ativo?1:.55}">
     <div class="av" style="background:${pColor(u.perfil)};width:42px;height:42px;font-size:14px;flex-shrink:0">${ini(u.nome,u.sobrenome)}</div>
     <div style="flex:1;min-width:0">
@@ -2251,7 +2264,7 @@ async function hSenha(id,loginAtual){
     const msgs=[];
     if(novoLogin)msgs.push(`Login: ${novoLogin}`);
     if(s1)msgs.push('Senha atualizada');
-    alert('✅ Alterações salvas!\n'+msgs.join('\n'));
+    alert('✅ Alterações salvas! ' + msgs.join(' | '));
   }catch(e){alert(e.message);}
 }
 
