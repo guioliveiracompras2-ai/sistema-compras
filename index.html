@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sistema de Compras · DHG & BMMOT</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Inter,system-ui,sans-serif;background:#F0F2F5;color:#1A202C}
@@ -384,7 +385,7 @@ function buildApp(){
       {id:'cotacoes',icon:'📋',label:'Cotações',badge:pO},
       {id:'pedidos',icon:'🚚',label:'Pedidos'},
     ]:[]),
-    ...(isDiretoria()||isGerente()||isGestor()?[{id:'relatorios',icon:'📈',label:'Relatórios'}]:[]),
+    ...(isDiretoria()||isCompras()||isGestor()?[{id:'relatorios',icon:'📈',label:'Relatórios'}]:[]),
     ...(isGestor()?[{id:'usuarios',icon:'👥',label:'Usuários'}]:[]),
   ];
 
@@ -2061,39 +2062,352 @@ async function hEnt(pedId,solId){
 }
 
 // ── RELATÓRIOS ────────────────────────────────────────────────────────────
+let relCharts={};
+let relFiltros={de:'',ate:'',loja:'',grupo:'',area:''};
+
 function pgRel(){
-  const sol=S.sol;
-  const tE=sol.reduce((a,b)=>a+(parseFloat(b.valor_estimado)||0),0);
-  const tR=sol.filter(s=>s.valor_final).reduce((a,b)=>a+(parseFloat(b.valor_final)||0),0);
-  const cats={};sol.forEach(s=>{cats[s.categoria]=(cats[s.categoria]||0)+(parseFloat(s.valor_estimado)||0);});
-  const cA=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
-  const mxC=cA[0]?.[1]||1;
-  const lojas=[...new Set(sol.map(s=>s.loja_nome))].filter(Boolean);
+  if(!isDiretoria()&&!isCompras()&&!isGestor()){
+    return '<div class="card" style="text-align:center;padding:48px;color:#9E9E9E">Acesso restrito à Diretoria e Compras.</div>';
+  }
+  const lojaOpts=S.lojas.map(l=>`<option value="${l.id}">${l.nome}</option>`).join('');
+  const hoje=new Date().toISOString().slice(0,7);
+  const tresAtras=new Date(new Date().setMonth(new Date().getMonth()-5)).toISOString().slice(0,7);
+  if(!relFiltros.de)relFiltros.de=tresAtras;
+  if(!relFiltros.ate)relFiltros.ate=hoje;
+  setTimeout(()=>renderRel(),100);
   return `
-<div class="kg" style="grid-template-columns:repeat(3,1fr)">
-  <div class="kpi"><div class="kl">Total Orçado</div><div class="kv" style="color:#1565C0;font-size:18px">${fmt(tE)}</div></div>
-  <div class="kpi"><div class="kl">Total Realizado</div><div class="kv" style="color:#2E7D32;font-size:18px">${fmt(tR)}</div></div>
-  <div class="kpi"><div class="kl">Economia Gerada</div><div class="kv" style="color:#6A1B9A;font-size:18px">${fmt(tE-tR)}</div></div>
+<div style="background:#fff;border-radius:10px;border:1px solid #E0E0E0;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <div style="font-size:13px;font-weight:600;color:#555">Período:</div>
+  <input type="month" class="inp" style="width:160px;padding:7px 12px" id="rf-de" value="${relFiltros.de}" onchange="relFiltros.de=this.value;renderRel()">
+  <span style="color:#9E9E9E">até</span>
+  <input type="month" class="inp" style="width:160px;padding:7px 12px" id="rf-ate" value="${relFiltros.ate}" onchange="relFiltros.ate=this.value;renderRel()">
+  <select class="inp" style="width:160px;padding:7px 12px" id="rf-grupo" onchange="relFiltros.grupo=this.value;renderRel()">
+    <option value="">Todos os Grupos</option>
+    <option value="DHG"${relFiltros.grupo==='DHG'?' selected':''}>DHG</option>
+    <option value="BMMOT"${relFiltros.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+  </select>
+  <select class="inp" style="width:200px;padding:7px 12px" id="rf-loja" onchange="relFiltros.loja=this.value;renderRel()">
+    <option value="">Todas as Lojas</option>
+    ${lojaOpts}
+  </select>
+  <select class="inp" style="width:180px;padding:7px 12px" id="rf-area" onchange="relFiltros.area=this.value;renderRel()">
+    <option value="">Todos os Departamentos</option>
+    ${AREAS.map(a=>`<option value="${a}"${relFiltros.area===a?' selected':''}>${a}</option>`).join('')}
+  </select>
+  <button class="btn bsc" onclick="relFiltros={de:'',ate:'',loja:'',grupo:'',area:''};pgRel();goTo('relatorios')" style="padding:7px 14px;font-size:12px">↺ Limpar</button>
+  <button class="btn bp" onclick="exportarRel()" style="padding:7px 14px;font-size:12px;margin-left:auto">📥 Exportar CSV</button>
 </div>
-<div class="card" style="padding:18px;margin-bottom:16px">
-  <div style="font-size:12px;font-weight:600;color:#9E9E9E;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px">Gasto por categoria</div>
-  ${cA.slice(0,7).map(([c,v])=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>${c}</span><span style="font-weight:600">${fmt(v)}</span></div><div class="bw2"><div class="bf" style="width:${Math.round(v/mxC*100)}%"></div></div></div>`).join('')}
-  ${!cA.length?'<div style="text-align:center;color:#ccc;padding:20px">Sem dados</div>':''}
-</div>
-<div class="card">
-  <div style="padding:16px 18px;border-bottom:1px solid #F0F2F5;font-size:12px;font-weight:600;color:#9E9E9E;text-transform:uppercase;letter-spacing:.05em">Por loja</div>
-  <div class="tw"><table>
-  <thead><tr><th>Loja</th><th>Grupo</th><th>Sol.</th><th>Orçado</th><th>Realizado</th><th>Taxa Aprov.</th></tr></thead>
-  <tbody>${lojas.map(l=>{
-    const ls=sol.filter(s=>s.loja_nome===l);
-    const ap=ls.filter(s=>['Aprovada','Comprada','Entregue'].includes(s.status)).length;
-    const vE=ls.reduce((a,b)=>a+(parseFloat(b.valor_estimado)||0),0);
-    const vR=ls.filter(s=>s.valor_final).reduce((a,b)=>a+(parseFloat(b.valor_final)||0),0);
-    return `<tr><td style="font-weight:500">${l}</td><td>${ls[0]?.grupo||'—'}</td><td>${ls.length}</td><td>${fmt(vE)}</td><td>${vR?fmt(vR):'—'}</td><td><span class="chip" style="background:#E8F5E9;color:#2E7D32">${ls.length?Math.round(ap/ls.length*100):0}%</span></td></tr>`;
-  }).join('')}
-  ${!lojas.length?`<tr><td colspan="6" style="text-align:center;padding:40px;color:#ccc">Sem dados</td></tr>`:''}
-  </tbody></table></div>
+<div id="rel-body">
+  <div style="text-align:center;padding:60px;color:#9E9E9E">Carregando relatório...</div>
 </div>`;
+}
+
+function filtrarSol(){
+  return S.sol.filter(s=>{
+    if(!['Comprada','Entregue'].includes(s.status))return false;
+    if(relFiltros.de){const d=s.data_criacao?.slice(0,7);if(d<relFiltros.de)return false;}
+    if(relFiltros.ate){const d=s.data_criacao?.slice(0,7);if(d>relFiltros.ate)return false;}
+    if(relFiltros.grupo&&s.grupo!==relFiltros.grupo)return false;
+    if(relFiltros.loja&&s.loja_id!==relFiltros.loja)return false;
+    if(relFiltros.area&&s.area!==relFiltros.area)return false;
+    return true;
+  });
+}
+
+function filtrarPed(){
+  const solIds=new Set(filtrarSol().map(s=>s.id));
+  return S.ped.filter(p=>solIds.has(p.solicitacao_id));
+}
+
+function renderRel(){
+  // Destroy old charts
+  Object.values(relCharts).forEach(c=>{try{c.destroy();}catch(e){}});
+  relCharts={};
+
+  const sol=filtrarSol();
+  const ped=filtrarPed();
+  const allSol=S.sol.filter(s=>{
+    if(relFiltros.de){const d=s.data_criacao?.slice(0,7);if(d<relFiltros.de)return false;}
+    if(relFiltros.ate){const d=s.data_criacao?.slice(0,7);if(d>relFiltros.ate)return false;}
+    if(relFiltros.grupo&&s.grupo!==relFiltros.grupo)return false;
+    if(relFiltros.loja&&s.loja_id!==relFiltros.loja)return false;
+    if(relFiltros.area&&s.area!==relFiltros.area)return false;
+    return true;
+  });
+
+  // KPIs
+  const totalComprado=ped.reduce((a,p)=>a+(p.valor_final_compra||p.valor||0),0);
+  const totalAprov=sol.reduce((a,s)=>a+(s.valor_estimado||0),0);
+  const totalEcon=ped.reduce((a,p)=>a+(p.desconto||0),0);
+  const pctEcon=totalAprov>0?((totalEcon/totalAprov)*100):0;
+  const ticketMedio=ped.length>0?totalComprado/ped.length:0;
+  const emAberto=allSol.filter(s=>['Aguardando Diretoria','Aguardando Orçamento','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada'].includes(s.status)).length;
+  const reprovadas=allSol.filter(s=>s.status==='Reprovada').length;
+  const totalSol=allSol.length;
+  const txAprov=totalSol>0?(Math.round((sol.length/totalSol)*100)):0;
+
+  // Por mês
+  const meses={};
+  ped.forEach(p=>{
+    const m=p.data_compra?.slice(0,7)||'';
+    if(!m)return;
+    if(!meses[m])meses[m]={comprado:0,econ:0};
+    meses[m].comprado+=(p.valor_final_compra||p.valor||0);
+    meses[m].econ+=(p.desconto||0);
+  });
+  const mesesKeys=Object.keys(meses).sort();
+  const mesesLabels=mesesKeys.map(m=>{const[y,mo]=m.split('-');return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mo)-1]+'/'+y.slice(2);});
+
+  // Por categoria
+  const cats={};
+  sol.forEach(s=>{if(s.categoria){cats[s.categoria]=(cats[s.categoria]||0)+(s.valor_estimado||0);}});
+  const catEntries=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  // Por loja
+  const lojas={};
+  ped.forEach(p=>{if(p.loja_nome){lojas[p.loja_nome]=(lojas[p.loja_nome]||0)+(p.valor_final_compra||p.valor||0);}});
+  const lojaEntries=Object.entries(lojas).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  // Top fornecedores
+  const forns={};
+  ped.forEach(p=>{
+    if(p.fornecedor){
+      if(!forns[p.fornecedor])forns[p.fornecedor]={val:0,econ:0,count:0};
+      forns[p.fornecedor].val+=(p.valor_final_compra||p.valor||0);
+      forns[p.fornecedor].econ+=(p.desconto||0);
+      forns[p.fornecedor].count++;
+    }
+  });
+  const topForns=Object.entries(forns).sort((a,b)=>b[1].val-a[1].val).slice(0,5);
+
+  // Por área
+  const areas={};
+  sol.forEach(s=>{
+    if(s.area){
+      if(!areas[s.area])areas[s.area]={orcado:0,comprado:0,count:0};
+      areas[s.area].orcado+=(s.valor_estimado||0);
+      areas[s.area].comprado+=(s.valor_final||0);
+      areas[s.area].count++;
+    }
+  });
+
+  // Saving acumulado
+  let acum=0;
+  const savAcum=mesesKeys.map(m=>{acum+=(meses[m]?.econ||0);return acum;});
+
+  // Colors
+  const COLORS=['#1565C0','#2E7D32','#E65100','#6A1B9A','#C62828','#00838F','#F57F17','#4527A0'];
+
+  const body=document.getElementById('rel-body');
+  if(!body)return;
+
+  body.innerHTML=`
+  <!-- KPIs -->
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px">
+    <div class="kpi">
+      <div class="kl">Valor Total Comprado</div>
+      <div style="font-size:20px;font-weight:700;color:#1565C0">${fmt(totalComprado)}</div>
+      <div style="font-size:11px;color:#9E9E9E;margin-top:4px">${ped.length} pedidos</div>
+    </div>
+    <div class="kpi">
+      <div class="kl">Economia (Savings)</div>
+      <div style="font-size:20px;font-weight:700;color:#2E7D32">${fmt(totalEcon)}</div>
+      <div style="font-size:11px;color:#2E7D32;margin-top:4px">↓ ${pctEcon.toFixed(1)}% do orçado</div>
+    </div>
+    <div class="kpi">
+      <div class="kl">% Economia</div>
+      <div style="font-size:28px;font-weight:700;color:#6A1B9A">${pctEcon.toFixed(1)}%</div>
+      <div style="background:#F0F2F5;border-radius:4px;height:6px;margin-top:6px"><div style="height:6px;border-radius:4px;background:#6A1B9A;width:${Math.min(pctEcon,100).toFixed(0)}%"></div></div>
+    </div>
+    <div class="kpi">
+      <div class="kl">Pedidos de Compra</div>
+      <div style="font-size:28px;font-weight:700;color:#E65100">${ped.length}</div>
+      <div style="font-size:11px;color:#9E9E9E;margin-top:4px">${emAberto} em aberto · ${reprovadas} reprovadas</div>
+    </div>
+    <div class="kpi">
+      <div class="kl">Ticket Médio</div>
+      <div style="font-size:18px;font-weight:700;color:#0F2236">${fmt(ticketMedio)}</div>
+      <div style="font-size:11px;color:#9E9E9E;margin-top:4px">Taxa aprovação: ${txAprov}%</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: Evolução + Categoria + Por Loja -->
+  <div style="display:grid;grid-template-columns:1.6fr 1fr 1.4fr;gap:14px;margin-bottom:14px">
+    <div class="card" style="padding:18px">
+      <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:14px">📊 Evolução das Compras</div>
+      <canvas id="ch-evolucao" height="180"></canvas>
+    </div>
+    <div class="card" style="padding:18px">
+      <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:14px">🏷️ Por Categoria</div>
+      <canvas id="ch-cat" height="180"></canvas>
+    </div>
+    <div class="card" style="padding:18px">
+      <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:14px">🏢 Compras por Loja</div>
+      <canvas id="ch-loja" height="180"></canvas>
+    </div>
+  </div>
+
+  <!-- ROW 2: Top Fornecedores + Status + Saving Acumulado -->
+  <div style="display:grid;grid-template-columns:1.6fr 0.9fr 1.5fr;gap:14px;margin-bottom:14px">
+    <div class="card" style="padding:18px">
+      <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:12px">🏆 Top ${topForns.length} Fornecedores</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#F8F9FA">
+          <th style="padding:7px 10px;text-align:left;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">Fornecedor</th>
+          <th style="padding:7px 10px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">Valor (R$)</th>
+          <th style="padding:7px 10px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">% Total</th>
+          <th style="padding:7px 10px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">Economia</th>
+          <th style="padding:7px 10px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">% Econ.</th>
+        </tr></thead>
+        <tbody>
+          ${topForns.map(([nome,d],i)=>`<tr style="border-bottom:1px solid #F0F2F5">
+            <td style="padding:8px 10px;font-weight:500">${i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '} ${nome}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:600">${fmt(d.val)}</td>
+            <td style="padding:8px 10px;text-align:right">${totalComprado>0?(d.val/totalComprado*100).toFixed(1):0}%</td>
+            <td style="padding:8px 10px;text-align:right;color:#2E7D32;font-weight:600">${fmt(d.econ)}</td>
+            <td style="padding:8px 10px;text-align:right;color:#2E7D32">${d.val>0?(d.econ/d.val*100).toFixed(1):0}%</td>
+          </tr>`).join('')}
+          ${!topForns.length?'<tr><td colspan="5" style="text-align:center;padding:24px;color:#ccc">Sem dados</td></tr>':''}
+        </tbody>
+        <tfoot><tr style="background:#F8F9FA;border-top:2px solid #E0E0E0">
+          <td style="padding:8px 10px;font-weight:700">Total Geral</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700;color:#1565C0">${fmt(totalComprado)}</td>
+          <td style="padding:8px 10px;text-align:right">100%</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700;color:#2E7D32">${fmt(totalEcon)}</td>
+          <td style="padding:8px 10px;text-align:right;color:#2E7D32">${totalComprado>0?(totalEcon/totalComprado*100).toFixed(1):0}%</td>
+        </tr></tfoot>
+      </table>
+    </div>
+    <div class="card" style="padding:18px">
+      <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:14px">📋 Status das Solicitações</div>
+      <canvas id="ch-status" height="160"></canvas>
+      <div style="margin-top:12px;font-size:11px">
+        ${[
+          ['Compradas/Entregues',sol.length,'#2E7D32'],
+          ['Em Andamento',emAberto,'#1565C0'],
+          ['Reprovadas',reprovadas,'#C62828'],
+        ].map(([l,n,c])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F0F2F5">
+          <span style="color:#555;display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:${c};display:inline-block"></span>${l}</span>
+          <span style="font-weight:600">${n}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="padding:18px">
+      <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:14px">📈 Economia (Savings) Acumulada</div>
+      <canvas id="ch-saving" height="180"></canvas>
+    </div>
+  </div>
+
+  <!-- ROW 3: Por Área/Departamento -->
+  <div class="card" style="padding:18px">
+    <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:12px">📂 Compras por Departamento / Centro de Custo</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#F8F9FA">
+        <th style="padding:8px 12px;text-align:left;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">Departamento</th>
+        <th style="padding:8px 12px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">Qtd. Pedidos</th>
+        <th style="padding:8px 12px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">Valor Orçado</th>
+        <th style="padding:8px 12px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">Valor Comprado</th>
+        <th style="padding:8px 12px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">% Executado</th>
+        <th style="padding:8px 12px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">Economia</th>
+        <th style="padding:8px 12px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">% Economia</th>
+      </tr></thead>
+      <tbody>
+        ${Object.entries(areas).sort((a,b)=>b[1].comprado-a[1].comprado).map(([area,d])=>`
+        <tr style="border-bottom:1px solid #F0F2F5">
+          <td style="padding:8px 12px;font-weight:500">${area}</td>
+          <td style="padding:8px 12px;text-align:right">${d.count}</td>
+          <td style="padding:8px 12px;text-align:right">${fmt(d.orcado)}</td>
+          <td style="padding:8px 12px;text-align:right;font-weight:600;color:#1565C0">${fmt(d.comprado)}</td>
+          <td style="padding:8px 12px;text-align:right">
+            <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+              <div style="width:60px;background:#F0F2F5;border-radius:4px;height:6px"><div style="height:6px;border-radius:4px;background:#1565C0;width:${d.orcado>0?Math.min(d.comprado/d.orcado*100,100).toFixed(0):0}%"></div></div>
+              ${d.orcado>0?(d.comprado/d.orcado*100).toFixed(1):0}%
+            </div>
+          </td>
+          <td style="padding:8px 12px;text-align:right;color:#2E7D32;font-weight:600">${fmt(d.orcado-d.comprado)}</td>
+          <td style="padding:8px 12px;text-align:right;color:#2E7D32">${d.orcado>0?((d.orcado-d.comprado)/d.orcado*100).toFixed(1):0}%</td>
+        </tr>`).join('')}
+        ${!Object.keys(areas).length?'<tr><td colspan="7" style="text-align:center;padding:32px;color:#ccc">Sem dados para o período</td></tr>':''}
+      </tbody>
+      <tfoot><tr style="background:#F8F9FA;border-top:2px solid #E0E0E0;font-weight:700">
+        <td style="padding:10px 12px">Total Geral</td>
+        <td style="padding:10px 12px;text-align:right">${sol.length}</td>
+        <td style="padding:10px 12px;text-align:right">${fmt(totalAprov)}</td>
+        <td style="padding:10px 12px;text-align:right;color:#1565C0">${fmt(totalComprado)}</td>
+        <td style="padding:10px 12px;text-align:right">${totalAprov>0?(totalComprado/totalAprov*100).toFixed(1):0}%</td>
+        <td style="padding:10px 12px;text-align:right;color:#2E7D32">${fmt(totalEcon)}</td>
+        <td style="padding:10px 12px;text-align:right;color:#2E7D32">${pctEcon.toFixed(1)}%</td>
+      </tr></tfoot>
+    </table>
+  </div>`;
+
+  // Render charts after DOM update
+  setTimeout(()=>{
+    // Chart 1: Evolução
+    const ctx1=document.getElementById('ch-evolucao');
+    if(ctx1&&mesesKeys.length){
+      relCharts.ev=new Chart(ctx1,{type:'bar',data:{
+        labels:mesesLabels,
+        datasets:[
+          {label:'Valor Comprado',data:mesesKeys.map(m=>meses[m]?.comprado||0),backgroundColor:'#1565C0',borderRadius:4},
+          {label:'Economia',data:mesesKeys.map(m=>meses[m]?.econ||0),backgroundColor:'#2E7D32',borderRadius:4}
+        ]
+      },options:{responsive:true,plugins:{legend:{position:'top'}},scales:{y:{ticks:{callback:v=>v>=1000?'R$'+(v/1000).toFixed(0)+'K':'R$'+v}}}}});
+    }
+
+    // Chart 2: Categorias
+    const ctx2=document.getElementById('ch-cat');
+    if(ctx2&&catEntries.length){
+      relCharts.cat=new Chart(ctx2,{type:'doughnut',data:{
+        labels:catEntries.map(([k])=>k.length>15?k.slice(0,15)+'...':k),
+        datasets:[{data:catEntries.map(([,v])=>v),backgroundColor:COLORS,borderWidth:2}]
+      },options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}}}}});
+    }
+
+    // Chart 3: Por Loja (horizontal bar)
+    const ctx3=document.getElementById('ch-loja');
+    if(ctx3&&lojaEntries.length){
+      relCharts.loja=new Chart(ctx3,{type:'bar',data:{
+        labels:lojaEntries.map(([l])=>l.length>18?l.slice(0,18)+'...':l),
+        datasets:[{label:'Valor',data:lojaEntries.map(([,v])=>v),backgroundColor:'#1565C0',borderRadius:4}]
+      },options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>'R$'+(v/1000).toFixed(0)+'K'}}}}});
+    }
+
+    // Chart 4: Status donut
+    const ctx4=document.getElementById('ch-status');
+    if(ctx4){
+      relCharts.st=new Chart(ctx4,{type:'doughnut',data:{
+        labels:['Concluídas','Em Andamento','Reprovadas'],
+        datasets:[{data:[sol.length,emAberto,reprovadas],backgroundColor:['#2E7D32','#1565C0','#C62828'],borderWidth:2}]
+      },options:{responsive:true,plugins:{legend:{display:false}},cutout:'65%'}});
+    }
+
+    // Chart 5: Saving Acumulado
+    const ctx5=document.getElementById('ch-saving');
+    if(ctx5&&mesesKeys.length){
+      relCharts.sav=new Chart(ctx5,{type:'line',data:{
+        labels:mesesLabels,
+        datasets:[{label:'Saving Acumulado',data:savAcum,borderColor:'#2E7D32',backgroundColor:'rgba(46,125,50,0.1)',fill:true,tension:0.4,pointRadius:4,pointBackgroundColor:'#2E7D32'}]
+      },options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'R$'+(v/1000).toFixed(0)+'K'}}}}});
+    }
+  },50);
+}
+
+function exportarRel(){
+  const sol=filtrarSol();
+  const ped=filtrarPed();
+  let csv='Número,Loja,Área,Categoria,Fornecedor,Valor Orçado,Valor Final,Desconto,Saving %,Status,Data Compra\n';
+  ped.forEach(p=>{
+    const s=S.sol.find(x=>x.id===p.solicitacao_id);
+    const desc=p.desconto||0;
+    const pct=p.valor>0?(desc/p.valor*100).toFixed(1):0;
+    csv+=`"${p.solicitacao_numero||''}","${p.loja_nome||''}","${s?.area||''}","${s?.categoria||''}","${p.fornecedor||''}",${p.valor||0},${p.valor_final_compra||p.valor||0},${desc},${pct}%,"${p.status||''}","${p.data_compra||''}"\n`;
+  });
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='relatorio_compras.csv';a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── USUÁRIOS ──────────────────────────────────────────────────────────────
