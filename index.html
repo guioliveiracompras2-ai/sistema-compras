@@ -425,6 +425,7 @@ function buildPage(){
 function buildTimeline(s){
   const status=typeof s==='string'?s:(s?.status||'');
   const obj=typeof s==='object'&&s!==null?s:null;
+  const sid=obj?.id||'';
   const ORDER=[
     'Aguardando Diretoria',
     'Aguardando Orçamento',
@@ -439,47 +440,50 @@ function buildTimeline(s){
       key:'Aguardando Diretoria',
       label:'Solicitação Aberta',
       icon:'📝',
-      sub:obj?`${fmtD(obj.data_criacao)}${obj.solicitante_nome?'<br>'+obj.solicitante_nome.split(' ')[0]:''}`:''
+      sub:obj?`${fmtD(obj.data_criacao)}<br>${(obj.solicitante_nome||'').split(' ')[0]}`:'' ,
+      action:sid?`<button onclick="mdVerSol('${sid}')" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;margin-top:3px" title="Ver solicitação">🔍</button>`:''
     },
     {
       key:'Aguardando Orçamento',
       label:'Aprovação Diretoria',
       icon:'👔',
-      sub:obj&&obj.aprovado_dir_nome?`${fmtD(obj.aprovado_dir_data)}<br>${obj.aprovado_dir_nome.split(' ')[0]}`:''
+      sub:obj&&obj.aprovado_dir_nome?`${fmtD(obj.aprovado_dir_data)}<br>${obj.aprovado_dir_nome.split(' ')[0]}`:'',
+      action:''
     },
     {
       key:'Aguardando Aprovação Diretoria',
       label:'Cotação Compras',
       icon:'📋',
-      sub:obj&&obj.cotacao_por?`${fmtD(obj.cotacao_data)}<br>${obj.cotacao_por.split(' ')[0]}`:''
+      sub:obj&&obj.cotacao_por?`${fmtD(obj.cotacao_data)}<br>${obj.cotacao_por.split(' ')[0]}`:'',
+      action:sid?`<button onclick="mdVerCot('${sid}')" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;margin-top:3px" title="Ver orçamentos">🔍</button>`:''
     },
     {
       key:'Aguardando Aprovação Gerente',
       label:'Aprovação Final',
       icon:'✅',
-      sub:obj&&obj.aprovado_ger_nome
-        ?`${fmtD(obj.aprovado_ger_data)}<br>Dir: ${(obj.aprovado_dir_nome||'').split(' ')[0]}<br>Ger: ${obj.aprovado_ger_nome.split(' ')[0]}`
-        :obj&&obj.aprovado_dir_nome&&ORDER.indexOf(status)>=ORDER.indexOf('Aguardando Aprovação Gerente')
-          ?`Dir: ${obj.aprovado_dir_nome.split(' ')[0]}`:''
+      sub:obj&&obj.aprovado_ger_nome?`${fmtD(obj.aprovado_ger_data)}<br>Dir: ${(obj.aprovado_dir_nome||'').split(' ')[0]}<br>Ger: ${obj.aprovado_ger_nome.split(' ')[0]}`:'',
+      action:''
     },
     {
       key:'Comprada',
       label:'Compra Realizada',
       icon:'🛒',
-      sub:obj&&obj.comprado_por?`${fmtD(obj.comprado_em)}<br>${obj.comprado_por.split(' ')[0]}`:''
+      sub:obj&&obj.comprado_por?`${fmtD(obj.comprado_em)}<br>${obj.comprado_por.split(' ')[0]}`:'',
+      action:sid?`<button onclick="mdVerCompra('${sid}')" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;margin-top:3px" title="Ver relatório da compra">📊</button>`:''
     },
     {
       key:'Entregue',
       label:'Entregue',
       icon:'📦',
-      sub:obj&&obj.entregue_por?`${fmtD(obj.entregue_em)}<br>${obj.entregue_por.split(' ')[0]}`:''
+      sub:obj&&obj.entregue_por?`${fmtD(obj.entregue_em)}<br>${obj.entregue_por.split(' ')[0]}`:'',
+      action:sid?`<button onclick="mdVerEntrega('${sid}')" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;margin-top:3px" title="Ver dados da entrega">🔍</button>`:''
     },
   ];
 
   const isReprovada=status==='Reprovada';
   const curIdx=ORDER.indexOf(status);
 
-  return `<div style="display:flex;align-items:flex-start;overflow-x:auto;padding:6px 0 10px">
+  return `<div style="display:flex;align-items:flex-start;overflow-x:auto;padding:6px 0 8px">
     ${steps.map((step,i)=>{
       const stepIdx=ORDER.indexOf(step.key);
       const done=!isReprovada&&curIdx>stepIdx;
@@ -489,14 +493,15 @@ function buildTimeline(s){
       const txtColor=active?'#1565C0':done?'#333':'#9E9E9E';
       return `
       ${i>0?`<div style="flex:1;height:2px;background:${clr};margin-top:17px;min-width:10px"></div>`:''}
-      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:76px;max-width:90px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:76px;max-width:90px">
         <div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid ${clr};background:${bg}">
           ${active?`<span style="color:#fff">${step.icon}</span>`
             :done?`<span style="color:#1565C0;font-weight:700;font-size:13px">✓</span>`
             :`<span style="color:#ccc">${step.icon}</span>`}
         </div>
         <div style="font-size:10px;font-weight:${active?'700':'400'};color:${txtColor};text-align:center;line-height:1.3">${step.label}</div>
-        ${(done||active)&&step.sub?`<div style="font-size:10px;color:#1565C0;text-align:center;line-height:1.5;font-weight:500;margin-top:1px">${step.sub}</div>`:''}
+        ${(done||active)&&step.sub?`<div style="font-size:10px;color:#1565C0;text-align:center;line-height:1.5;font-weight:500">${step.sub}</div>`:''}
+        ${(done||active)&&step.action?step.action:''}
       </div>`;
     }).join('')}
     ${isReprovada?`
@@ -506,6 +511,187 @@ function buildTimeline(s){
       <div style="font-size:10px;font-weight:700;color:#C62828;text-align:center">Reprovada</div>
     </div>`:''}
   </div>`;
+}
+
+// ── MODAIS DA TIMELINE ────────────────────────────────────────────────────
+async function mdVerSol(id){
+  const s=S.sol.find(x=>x.id===id);
+  if(!s)return;
+  const itens=s.itens_requisicao||[];
+  openModal(`<div class="modal" style="max-width:540px">
+  <div class="mh"><span>🔍 Solicitação — ${s.numero}</span><button class="xb" onclick="closeModal()">✕</button></div>
+  <div class="mb">
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">${cs(s.status)} ${cu(s.urgencia)}</div>
+    ${dr('Solicitante',s.solicitante_nome)}
+    ${dr('Data',fmtD(s.data_criacao))}
+    ${dr('Loja',s.loja_nome)}
+    ${dr('Área',s.area)}
+    ${dr('Tipo',s.tipo_compra||s.categoria)}
+    ${dr('Valor Estimado',fmt(s.valor_estimado))}
+    <hr class="hdiv">
+    ${itens.length?`
+    <div style="font-size:12px;font-weight:700;color:#0F2236;margin-bottom:10px">ITENS SOLICITADOS</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px">
+      <thead><tr style="background:#F8F9FA">
+        <th style="padding:7px 10px;text-align:left;color:#9E9E9E;border-bottom:1px solid #E0E0E0">Descrição</th>
+        <th style="padding:7px 10px;text-align:center;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:50px">Qtd</th>
+        <th style="padding:7px 10px;text-align:right;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:110px">Total</th>
+      </tr></thead>
+      <tbody>
+        ${itens.map((i,idx)=>`<tr style="border-bottom:1px solid #F0F2F5">
+          <td style="padding:7px 10px">${i.desc||i.descricao||'—'}</td>
+          <td style="padding:7px 10px;text-align:center">${i.qtd||1}</td>
+          <td style="padding:7px 10px;text-align:right;font-weight:600;color:#1565C0">${fmt(i.total||(i.qtd||1)*(i.val||0))}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot><tr style="background:#F8F9FA;border-top:2px solid #E0E0E0">
+        <td colspan="2" style="padding:8px 10px;font-weight:700;text-align:right">TOTAL ESTIMADO</td>
+        <td style="padding:8px 10px;text-align:right;font-weight:700;color:#1565C0">${fmt(s.valor_estimado)}</td>
+      </tr></tfoot>
+    </table>`:`
+    <div style="font-size:12px;font-weight:700;color:#0F2236;margin-bottom:8px">DESCRIÇÃO</div>
+    <div style="font-size:13px;line-height:1.6;color:#424242;margin-bottom:12px">${s.descricao||'—'}</div>`}
+    <div style="font-size:12px;font-weight:700;color:#0F2236;margin-bottom:6px">JUSTIFICATIVA</div>
+    <div style="font-size:13px;line-height:1.6;color:#555;background:#F8F9FA;border-radius:8px;padding:10px 14px">${s.justificativa||'—'}</div>
+    ${s.anexos?`<hr class="hdiv"><div style="font-size:12px;color:#1565C0;margin-top:4px">📎 ${s.anexos}</div>`:''}
+  </div>
+  <div class="mf"><button class="btn bsc" onclick="closeModal()">Fechar</button></div>
+  </div>`);
+}
+
+async function mdVerCot(id){
+  // Carrega cotações se necessário
+  const {data}=await sb.from('cotacoes').select('*').eq('solicitacao_id',id);
+  const cots=data||[];
+  if(!cots.length)return alert('Nenhum orçamento encontrado para esta solicitação.');
+  const cot=cots[0];
+  const itens=typeof cot.itens==='string'?JSON.parse(cot.itens||'[]'):(cot.itens||[]);
+  const best=itens.length?itens.reduce((a,b)=>a.val<b.val?a:b,itens[0]):null;
+  openModal(`<div class="modal" style="max-width:700px">
+  <div class="mh"><span>🔍 Orçamentos — ${cot.numero}</span><button class="xb" onclick="closeModal()">✕</button></div>
+  <div class="mb">
+    <div style="font-size:12px;color:#9E9E9E;margin-bottom:14px">
+      Lançado por: <strong style="color:#555">${cot.criado_por||'Compras'}</strong> · ${fmtD(cot.data_criacao)}
+      ${cot.vencedor?` · <span style="color:#2E7D32;font-weight:600">✓ Aprovado: ${cot.vencedor}</span>`:''}
+    </div>
+    <div style="display:grid;gap:12px">
+      ${itens.map((i,idx)=>`
+      <div style="background:${i.forn===best?.forn?'#F1F8E9':'#F8F9FA'};border:2px solid ${i.forn===best?.forn?'#A5D6A7':'#E0E0E0'};border-radius:10px;padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          <div>
+            <div style="font-weight:700;font-size:14px">${i.forn}</div>
+            ${i.cnpj?`<div style="font-size:11px;color:#9E9E9E">CNPJ: ${i.cnpj}</div>`:''}
+            ${i.forn===best?.forn?'<span class="chip" style="background:#E8F5E9;color:#2E7D32;font-size:10px;margin-top:3px;display:inline-block">✓ Menor preço</span>':''}
+            ${i.forn===cot.vencedor?'<span class="chip" style="background:#1565C0;color:#fff;font-size:10px;margin-top:3px;margin-left:4px;display:inline-block">✓ Escolhido</span>':''}
+          </div>
+          <div style="font-size:22px;font-weight:700;color:${i.forn===best?.forn?'#2E7D32':'#1565C0'}">${fmt(i.val)}</div>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#666">
+          ${i.prazo?`<span>⏱ <strong>${i.prazo} dias</strong></span>`:''}
+          ${i.pgto?`<span>💳 <strong>${i.pgto}</strong></span>`:''}
+          ${i.obs?`<span>📝 ${i.obs}</span>`:''}
+          ${i.arquivo?`<span>📎 ${i.arquivo}</span>`:''}
+        </div>
+        ${i.itens&&i.itens.length?`
+        <div style="margin-top:10px;border-top:1px solid #E0E0E0;padding-top:10px">
+          <table style="width:100%;font-size:11px;border-collapse:collapse">
+            <thead><tr><th style="text-align:left;color:#9E9E9E;padding:4px 6px">Item</th><th style="text-align:center;color:#9E9E9E;padding:4px 6px">Qtd</th><th style="text-align:right;color:#9E9E9E;padding:4px 6px">Unit.</th><th style="text-align:right;color:#9E9E9E;padding:4px 6px">Total</th></tr></thead>
+            <tbody>${i.itens.map(it=>`<tr style="border-top:1px solid #F0F2F5"><td style="padding:4px 6px">${it.desc||'—'}</td><td style="padding:4px 6px;text-align:center">${it.qtd||1}</td><td style="padding:4px 6px;text-align:right">${it.vunit>0?fmt(it.vunit):'—'}</td><td style="padding:4px 6px;text-align:right;font-weight:600">${fmt(it.total||(it.qtd||1)*(it.vunit||0))}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>`:''}
+      </div>`).join('')}
+    </div>
+    ${best?`<div style="background:#E8F5E9;border-radius:8px;padding:12px 14px;font-size:13px;color:#1B5E20;margin-top:14px">
+      💰 <strong>Menor preço:</strong> ${best.forn} com ${fmt(best.val)}
+    </div>`:''}
+  </div>
+  <div class="mf"><button class="btn bsc" onclick="closeModal()">Fechar</button></div>
+  </div>`);
+}
+
+async function mdVerCompra(id){
+  const s=S.sol.find(x=>x.id===id);
+  if(!s)return;
+  let ped=S.ped.find(p=>p.solicitacao_id===id);
+  if(!ped){
+    const {data}=await sb.from('pedidos').select('*').eq('solicitacao_id',id).single();
+    if(data){ped=data;S.ped=[...S.ped,data];}
+  }
+  const valAprov=s.valor_estimado||0;
+  const valFinal=ped?.valor_final_compra||s.valor_final||ped?.valor||0;
+  const desconto=ped?.desconto||(valAprov>valFinal?valAprov-valFinal:0);
+  const pct=valAprov>0?((desconto/valAprov)*100).toFixed(1):0;
+  openModal(`<div class="modal" style="max-width:500px">
+  <div class="mh"><span>📊 Relatório da Compra — ${s.numero}</span><button class="xb" onclick="closeModal()">✕</button></div>
+  <div class="mb">
+    <div style="background:#0F2236;border-radius:10px;padding:16px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:11px;opacity:.7">Fornecedor</div>
+        <div style="font-size:16px;font-weight:700">${s.fornecedor||'—'}</div>
+        ${ped?.numero?`<div style="font-size:11px;opacity:.6;margin-top:2px">Pedido: ${ped.numero}</div>`:''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;opacity:.7">Valor Final</div>
+        <div style="font-size:22px;font-weight:700;color:#90CAF9">${fmt(valFinal)}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="kpi">
+        <div class="kl">Valor Orçado</div>
+        <div style="font-size:17px;font-weight:700;color:#333">${fmt(valAprov)}</div>
+      </div>
+      <div class="kpi">
+        <div class="kl">Valor Final Pago</div>
+        <div style="font-size:17px;font-weight:700;color:#1565C0">${fmt(valFinal)}</div>
+      </div>
+      <div class="kpi" style="background:#E8F5E9;border-color:#A5D6A7">
+        <div class="kl" style="color:#2E7D32">Desconto / Saving</div>
+        <div style="font-size:17px;font-weight:700;color:#2E7D32">${fmt(desconto)}</div>
+      </div>
+      <div class="kpi" style="background:#E8F5E9;border-color:#A5D6A7">
+        <div class="kl" style="color:#2E7D32">% Saving</div>
+        <div style="font-size:28px;font-weight:700;color:#2E7D32">${pct}%</div>
+      </div>
+    </div>
+    ${dr('Forma de Pagamento',ped?.forma_pagamento_oc||'—')}
+    ${dr('Data da Compra',fmtD(ped?.data_compra||s.comprado_em))}
+    ${dr('Executado por',s.comprado_por||'—')}
+    ${dr('Previsão de Entrega',fmtD(ped?.prev_entrega))}
+    ${ped?.centro_custo?dr('Centro de Custo',ped.centro_custo):''}
+    ${ped?.obs_compra?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">OBSERVAÇÕES</div><div style="font-size:13px;color:#555">${ped.obs_compra}</div>`:''}
+  </div>
+  <div class="mf"><button class="btn bsc" onclick="closeModal()">Fechar</button></div>
+  </div>`);
+}
+
+async function mdVerEntrega(id){
+  const s=S.sol.find(x=>x.id===id);
+  if(!s)return;
+  let ped=S.ped.find(p=>p.solicitacao_id===id);
+  if(!ped){
+    const {data}=await sb.from('pedidos').select('*').eq('solicitacao_id',id).single();
+    if(data){ped=data;S.ped=[...S.ped,data];}
+  }
+  if(!ped&&s.status!=='Entregue')return alert('Pedido não encontrado.');
+  openModal(`<div class="modal" style="max-width:460px">
+  <div class="mh"><span>📦 Dados da Entrega — ${s.numero}</span><button class="xb" onclick="closeModal()">✕</button></div>
+  <div class="mb">
+    <div style="background:#E8F5E9;border-radius:10px;padding:16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+      <div style="font-size:32px">✅</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#1B5E20">Item Entregue com Sucesso</div>
+        <div style="font-size:12px;color:#2E7D32;margin-top:2px">${s.fornecedor||'—'} · ${fmt(s.valor_final||ped?.valor_final_compra||0)}</div>
+      </div>
+    </div>
+    ${dr('Data de Entrega',fmtD(ped?.data_entrega||s.entregue_em))}
+    ${dr('Nota Fiscal',ped?.nf||'—')}
+    ${dr('Recebido por',ped?.recebido_por||s.entregue_por||'—')}
+    ${dr('Condição',ped?.condicao_entrega||'—')}
+    ${dr('Pedido',ped?.numero||'—')}
+    ${ped?.obs_entrega?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">OBSERVAÇÕES</div><div style="font-size:13px;color:#555">${ped.obs_entrega}</div>`:''}
+  </div>
+  <div class="mf"><button class="btn bsc" onclick="closeModal()">Fechar</button></div>
+  </div>`);
 }
 
 
