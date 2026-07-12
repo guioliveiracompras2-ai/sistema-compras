@@ -203,7 +203,17 @@ async function loadSol(){
 async function loadForn(){const {data}=await sb.from('fornecedores').select('*').order('nome');S.forn=data||[];}
 async function loadCot(){const {data}=await sb.from('cotacoes').select('*').order('data_criacao',{ascending:false});S.cot=data||[];}
 async function loadPed(){const {data}=await sb.from('pedidos').select('*').order('created_at',{ascending:false});S.ped=data||[];}
-async function loadUsers(){const {data}=await sb.from('usuarios').select('*,loja:lojas(nome)').order('nome');S.users=data||[];}
+async function loadUsers(){
+  const {data,error}=await sb.from('usuarios').select('*').order('nome');
+  if(error){console.error('loadUsers:',error);S.users=[];return;}
+  S.users=data||[];
+  // Carrega nomes das lojas separadamente
+  if(S.lojas.length===0)await loadLojas();
+  S.users=S.users.map(u=>({
+    ...u,
+    loja_nome:S.lojas.find(l=>l.id===u.loja_id)?.nome||null
+  }));
+}
 
 async function loadPage(page){
   S.loading=true;render();
@@ -2093,11 +2103,11 @@ function pgUsers(){
         ${!u.ativo?'<span class="chip" style="background:#F5F5F5;color:#9E9E9E;font-size:10px">Inativo</span>':''}
       </div>
       <div style="font-family:monospace;font-size:12px;color:#1565C0;margin-top:3px">${u.login}</div>
-      <div style="font-size:11px;color:#9E9E9E;margin-top:2px">${u.area||'—'} · ${u.grupo||'—'} · ${u.loja?.nome||'Sem loja'}</div>
+      <div style="font-size:11px;color:#9E9E9E;margin-top:2px">${u.area||'—'} · ${u.grupo||'—'} · ${u.loja_nome||'Sem loja'}</div>
     </div>
     <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap">
       <button class="sm bl" onclick="mdEditUser('${u.id}')">Editar</button>
-      <button class="sm pu" onclick="mdSenha('${u.id}','${u.nome} ${u.sobrenome}')">Senha</button>
+      <button class="sm pu" onclick="mdSenha('${u.id}','${u.nome} ${u.sobrenome}','${u.login}')">Senha</button>
       <button class="sm ${u.ativo?'no':'ok'}" onclick="hToggle('${u.id}',${!u.ativo})">${u.ativo?'Desativar':'Ativar'}</button>
     </div>
   </div>`).join('')}
@@ -2188,28 +2198,62 @@ async function hCriarUser(){
   }
 }
 
-function mdSenha(id,nome){
-  openModal(`<div class="modal" style="max-width:420px">
-  <div class="mh"><span>🔑 Redefinir Senha — ${nome}</span><button class="xb" onclick="closeModal()">✕</button></div>
+function mdSenha(id,nome,loginAtual){
+  openModal(`<div class="modal" style="max-width:480px">
+  <div class="mh"><span>🔑 Alterar Acesso — ${nome}</span><button class="xb" onclick="closeModal()">✕</button></div>
   <div class="mb">
+    <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px 14px;margin-bottom:16px">
+      <div style="font-size:11px;color:#1e40af;margin-bottom:2px">Login atual</div>
+      <div style="font-family:monospace;font-size:15px;font-weight:600;color:#1565C0">${loginAtual}</div>
+    </div>
+    <div class="f">
+      <label>Novo Login (deixe em branco para não alterar)</label>
+      <input class="inp" id="nl" placeholder="${loginAtual}" value="">
+      <span style="font-size:11px;color:#9E9E9E;margin-top:3px">Formato: nome.sobrenome (sem espaços, sem acentos)</span>
+    </div>
+    <hr class="hdiv">
     <div class="fg2">
-      <div class="f"><label>Nova Senha *</label><input class="inp" id="ns1" type="password" placeholder="Mínimo 6 caracteres"></div>
-      <div class="f"><label>Confirmar *</label><input class="inp" id="ns2" type="password" placeholder="Repita a senha"></div>
+      <div class="f"><label>Nova Senha (deixe em branco para não alterar)</label><input class="inp" id="ns1" type="password" placeholder="Mínimo 6 caracteres"></div>
+      <div class="f"><label>Confirmar Nova Senha</label><input class="inp" id="ns2" type="password" placeholder="Repita a senha"></div>
     </div>
   </div>
-  <div class="mf"><button class="btn bsc" onclick="closeModal()">Cancelar</button><button class="btn bp" onclick="hSenha('${id}')">Salvar Nova Senha</button></div>
+  <div class="mf">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    <button class="btn bp" onclick="hSenha('${id}','${loginAtual}')">Salvar Alterações</button>
+  </div>
   </div>`);
 }
 
-async function hSenha(id){
+async function hSenha(id,loginAtual){
+  const novoLogin=V('nl').trim().toLowerCase();
   const s1=V('ns1'),s2=V('ns2');
-  if(!s1||s1.length<6)return alert('Senha deve ter mínimo 6 caracteres.');
-  if(s1!==s2)return alert('As senhas não coincidem.');
+  // Valida
+  if(!novoLogin&&!s1)return alert('Preencha ao menos o novo login ou a nova senha.');
+  if(s1&&s1.length<6)return alert('Senha deve ter mínimo 6 caracteres.');
+  if(s1&&s1!==s2)return alert('As senhas não coincidem.');
+  if(novoLogin&&novoLogin===loginAtual)return alert('O novo login é igual ao atual.');
+  if(novoLogin&&!/^[a-z0-9.]+$/.test(novoLogin))return alert('Login inválido. Use apenas letras, números e ponto.');
   try{
-    const hash=await hashSenha(s1);
-    const {error}=await sb.from('usuarios').update({senha_hash:hash}).eq('id',id);
+    const upd={};
+    if(novoLogin){
+      // Verifica se login já existe
+      const {data:exist}=await sb.from('usuarios').select('id').eq('login',novoLogin).single();
+      if(exist)return alert(`Login "${novoLogin}" já está em uso.`);
+      upd.login=novoLogin;
+    }
+    if(s1){
+      upd.senha_hash=await hashSenha(s1);
+    }
+    const {error}=await sb.from('usuarios').update(upd).eq('id',id);
     if(error)throw new Error(error.message);
-    closeModal();alert('✅ Senha redefinida com sucesso!');
+    closeModal();
+    await loadUsers();render();
+    const msgs=[];
+    if(novoLogin)msgs.push(`Login: ${novoLogin}`);
+    if(s1)msgs.push('Senha atualizada');
+    alert('✅ Alterações salvas!
+'+msgs.join('
+'));
   }catch(e){alert(e.message);}
 }
 
