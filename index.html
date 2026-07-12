@@ -591,7 +591,8 @@ ${!S.sol.length?`<div class="card" style="text-align:center;padding:48px;color:#
       ${isDiretoria()&&s.status==='Aguardando Diretoria'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar</button>`:''}
       ${isDiretoria()&&s.status==='Aguardando Aprovação Diretoria'?`<button class="sm ok" onclick="vSOL('${s.id}')">📋 Ver Orçamentos</button>`:''}
       ${isGerente()&&s.status==='Aguardando Aprovação Gerente'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar Final</button>`:''}
-      ${isCompras()&&s.status==='Aprovada'?`<button class="sm or" onclick="vSOL('${s.id}')">🛒 Executar Compra</button>`:''}
+      ${isCompras()&&s.status==='Aprovada'?`<button class="sm or" onclick="vSOL('${s.id}')">🛒 Gerar Ordem de Compra</button>`:''}
+      ${isCompras()&&s.status==='Comprada'?`<button class="sm ok" onclick="mdEntSol('${s.id}')">📦 Confirmar Entrega</button>`:''}
     </div>
   </div>`).join('')}
 </div>`}`;
@@ -868,6 +869,38 @@ async function vSOL(id){
     <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aguardando Orçamento')">Aprovar</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">Reprovar</button></div>`;
   }
 
+  // Entrega — compras pode confirmar quando status é Comprada
+  const pEntrega=isCompras()&&s.status==='Comprada';
+  let entregaHtml='';
+  if(pEntrega){
+    const pedVenc=S.ped.find(p=>p.solicitacao_id===s.id)||null;
+    entregaHtml=`<hr class="hdiv">
+    <div style="background:#E0F2F1;border-radius:8px;padding:16px;margin-bottom:14px">
+      <div style="font-size:12px;color:#004D40;font-weight:600;margin-bottom:6px">🛒 COMPRA REALIZADA</div>
+      <div style="font-size:15px;font-weight:700">${s.fornecedor||'—'}</div>
+      <div style="font-size:18px;font-weight:700;color:#1565C0;margin-top:4px">${fmt(s.valor_final||0)}</div>
+      <div style="font-size:11px;color:#9E9E9E;margin-top:6px">Comprado por: ${s.comprado_por||'—'}</div>
+      ${pedVenc?`<div style="font-size:11px;color:#9E9E9E">Pedido: ${pedVenc.numero} · Prev. entrega: ${fmtD(pedVenc.prev_entrega)}</div>`:''}
+    </div>
+    <div class="ib ibg">Confirme o recebimento para finalizar a esteira desta solicitação.</div>
+    <div class="fg2" style="margin-bottom:10px">
+      <div class="f" style="margin:0"><label>Nota Fiscal *</label><input class="inp" id="ent-nf" placeholder="NF-000000"></div>
+      <div class="f" style="margin:0"><label>Data de Recebimento</label><input class="inp" type="date" id="ent-dt" value="${new Date().toISOString().slice(0,10)}"></div>
+    </div>
+    <div class="f" style="margin-bottom:10px"><label>Recebido por *</label><input class="inp" id="ent-rec" value="${S.user.nome} ${S.user.sobrenome}" placeholder="Nome de quem recebeu"></div>
+    <div class="f" style="margin-bottom:14px">
+      <label>Condição do item</label>
+      <select class="inp" id="ent-cond">
+        <option>✅ Conforme — item recebido em perfeitas condições</option>
+        <option>⚠️ Parcial — entrega incompleta, aguardando restante</option>
+        <option>❌ Com avaria — item com danos, registrar ocorrência</option>
+      </select>
+    </div>
+    <button class="btn bs" style="width:100%;padding:12px;font-size:14px" onclick="hEntSol('${s.id}','${pedVenc?.id||''}')">
+      📦 Confirmar Entrega e Finalizar
+    </button>`;
+  }
+
   openModal(`<div class="modal" style="max-width:600px">
   <div class="mh"><span>${s.numero}</span><button class="xb" onclick="closeModal()">x</button></div>
   <div class="mb">
@@ -923,8 +956,74 @@ async function vSOL(id){
     <div style="font-size:13px;line-height:1.6;color:#424242">${s.justificativa||'-'}</div>
     ${s.anexos?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">ANEXOS</div><div style="font-size:12px;color:#1565C0">📎 ${s.anexos}</div>`:''}
     ${s.observacoes?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">OBSERVACOES</div><div style="font-size:13px">${s.observacoes}</div>`:''}
-    ${dirHtml}${cotHtml}${gerenteHtml}${comprasHtml}
+    ${dirHtml}${cotHtml}${gerenteHtml}${comprasHtml}${entregaHtml}
   </div></div>`);
+}
+
+async function mdEntSol(solId){
+  // Load pedido for this solicitacao
+  let pedId='';
+  const pedLocal=S.ped.find(p=>p.solicitacao_id===solId);
+  if(pedLocal){pedId=pedLocal.id;}
+  else{
+    const {data}=await sb.from('pedidos').select('id,numero,fornecedor,valor_final_compra,valor,prev_entrega').eq('solicitacao_id',solId).single();
+    if(data){pedId=data.id;S.ped=[...S.ped.filter(p=>p.solicitacao_id!==solId),data];}
+  }
+  const sol=S.sol.find(s=>s.id===solId);
+  const ped=S.ped.find(p=>p.solicitacao_id===solId);
+  openModal(`<div class="modal" style="max-width:480px">
+  <div class="mh"><span>📦 Confirmar Entrega</span><button class="xb" onclick="closeModal()">✕</button></div>
+  <div class="mb">
+    <div class="ib ibg">Confirme o recebimento para finalizar a esteira desta solicitação.</div>
+    <div style="background:#F8F9FA;border-radius:8px;padding:14px;margin-bottom:16px">
+      <div style="font-size:12px;color:#9E9E9E;margin-bottom:4px">Solicitação</div>
+      <div style="font-weight:600;font-size:14px">${sol?.numero||solId}</div>
+      <div style="font-size:12px;color:#555;margin-top:2px">${sol?.fornecedor||'—'} · ${fmt(sol?.valor_final||0)}</div>
+      ${ped?`<div style="font-size:11px;color:#9E9E9E;margin-top:2px">Pedido: ${ped.numero} · Prev: ${fmtD(ped.prev_entrega)}</div>`:''}
+    </div>
+    <div class="fg2">
+      <div class="f"><label>Nota Fiscal *</label><input class="inp" id="ent-nf" placeholder="NF-000000"></div>
+      <div class="f"><label>Data de Recebimento</label><input class="inp" type="date" id="ent-dt" value="${new Date().toISOString().slice(0,10)}"></div>
+    </div>
+    <div class="f"><label>Recebido por *</label><input class="inp" id="ent-rec" value="${S.user.nome} ${S.user.sobrenome}"></div>
+    <div class="f">
+      <label>Condição do item</label>
+      <select class="inp" id="ent-cond">
+        <option>✅ Conforme — item recebido em perfeitas condições</option>
+        <option>⚠️ Parcial — entrega incompleta, aguardando restante</option>
+        <option>❌ Com avaria — item com danos, registrar ocorrência</option>
+      </select>
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    <button class="btn bs" onclick="hEntSol('${solId}','${pedId}')">📦 Confirmar Entrega</button>
+  </div>
+  </div>`);
+}
+
+async function hEntSol(solId,pedId){
+  const nf=document.getElementById('ent-nf')?.value?.trim();
+  const dt=document.getElementById('ent-dt')?.value;
+  const rec=document.getElementById('ent-rec')?.value?.trim();
+  const cond=document.getElementById('ent-cond')?.value||'';
+  if(!nf)return alert('Informe o número da Nota Fiscal.');
+  if(!rec)return alert('Informe quem recebeu o item.');
+  const agora=new Date().toISOString();
+  const nome=`${S.user.nome} ${S.user.sobrenome}`;
+  try{
+    // Atualiza solicitação
+    await sb.from('solicitacoes').update({status:'Entregue'}).eq('id',solId);
+    await sb.from('solicitacoes').update({entregue_por:nome,entregue_em:agora}).eq('id',solId).then(()=>{}).catch(()=>{});
+    // Atualiza pedido se existir
+    if(pedId){
+      await sb.from('pedidos').update({status:'Entregue',data_entrega:dt||agora.slice(0,10),nf}).eq('id',pedId);
+      await sb.from('pedidos').update({recebido_por:rec,condicao_entrega:cond}).eq('id',pedId).then(()=>{}).catch(()=>{});
+    }
+    closeModal();
+    await loadSol();await loadPed();render();
+    alert('✅ Entrega confirmada!\nNF: '+nf+'\nRecebido por: '+rec+'\n\nSolicitação finalizada com sucesso!');
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 async function hExecutarCompra(solId,cotId,forn,val){
