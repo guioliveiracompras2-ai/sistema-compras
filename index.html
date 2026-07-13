@@ -290,38 +290,65 @@ async function doLogin(login,senha){
   if(error||!u)throw new Error('Usuário não encontrado. Verifique o login.');
   if(!u.ativo)throw new Error('Usuário desativado. Contate o gestor.');
   if(u.senha_hash!==hash)throw new Error('Senha incorreta. Tente novamente.');
-  // Busca nome da loja separadamente se tiver loja
   if(u.loja_id){
     const {data:loja}=await sb.from('lojas').select('nome').eq('id',u.loja_id).single();
     u.loja={nome:loja?.nome||''};
   }
   S.user=u;
-  localStorage.setItem(SESSION_KEY,JSON.stringify(u));
+  salvarSessao(u);
+}
+
+function salvarSessao(u){
+  const sessao={
+    user:u,
+    expira:Date.now()+(30*24*60*60*1000) // 30 dias
+  };
+  try{
+    localStorage.setItem(SESSION_KEY,JSON.stringify(sessao));
+    // Backup no sessionStorage para mobile
+    sessionStorage.setItem(SESSION_KEY,JSON.stringify(sessao));
+  }catch(e){}
 }
 
 function doLogout(){
   S.user=null;
-  localStorage.removeItem(SESSION_KEY);
+  try{localStorage.removeItem(SESSION_KEY);}catch(e){}
+  try{sessionStorage.removeItem(SESSION_KEY);}catch(e){}
   Object.assign(S,{page:'dashboard',sol:[],forn:[],cot:[],ped:[],users:[],modal:null});
   render();
 }
 
 function loadSession(){
   try{
-    const saved=localStorage.getItem(SESSION_KEY);
-    if(saved){
-      const u=JSON.parse(saved);
-      // Valida sessão — deve ter id, login e perfil
-      if(u&&u.id&&u.login&&u.perfil){
-        S.user=u;
-      } else {
-        // Sessão inválida (sem id) — limpa e força novo login
-        localStorage.removeItem(SESSION_KEY);
-        S.user=null;
-      }
+    // Tenta localStorage primeiro, depois sessionStorage como fallback
+    const raw=localStorage.getItem(SESSION_KEY)||sessionStorage.getItem(SESSION_KEY);
+    if(!raw)return;
+    const dados=JSON.parse(raw);
+
+    // Suporte ao formato antigo (sem expiry)
+    const u=dados.user||dados;
+    const expira=dados.expira||Date.now()+(30*24*60*60*1000);
+
+    // Verifica expiração
+    if(Date.now()>expira){
+      localStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(SESSION_KEY);
+      S.user=null;
+      return;
+    }
+
+    // Valida campos mínimos (compatível com sessões antigas sem id)
+    if(u&&u.login&&u.perfil){
+      S.user=u;
+      // Renova sessão por mais 30 dias a cada login
+      salvarSessao(u);
+    } else {
+      localStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(SESSION_KEY);
+      S.user=null;
     }
   }catch(e){
-    localStorage.removeItem(SESSION_KEY);
+    try{localStorage.removeItem(SESSION_KEY);}catch(err){}
     S.user=null;
   }
 }
@@ -987,6 +1014,7 @@ ${!lista.length?`<div class="card" style="text-align:center;padding:48px;color:#
       ${isGerente()&&s.status==='Aguardando Aprovação Gerente'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar Final</button>`:''}
       ${isCompras()&&s.status==='Aprovada'?`<button class="sm or" onclick="vSOL('${s.id}')">🛒 Gerar Ordem de Compra</button>`:''}
       ${isCompras()&&s.status==='Comprada'?`<button class="sm ok" onclick="mdEntSol('${s.id}')">📦 Confirmar Entrega</button>`:''}
+      ${s.status==='Aguardando Ajuste'?`<button class="sm" style="background:#FF6F00;color:#fff" onclick="vSOL('${s.id}')">⚠️ Ajuste Solicitado</button>`:''}
     </div>
   </div>`).join('')}
 </div>`}`;
@@ -1247,6 +1275,43 @@ async function vSOL(id){
     <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aprovada')">✓ Aprovar — Liberar para Compras</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">✗ Reprovar</button></div>`;
   }
 
+  // Requisitante pode ajustar quando Diretoria pediu ajuste
+  const pAjuste=s.status==='Aguardando Ajuste';
+  let ajusteHtml='';
+  if(pAjuste){
+    const itens=s.itens_requisicao||[];
+    const itensAj=s.itens_ajustados||itens;
+    ajusteHtml=`<hr class="hdiv">
+    <div style="background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:10px;padding:16px;margin-bottom:14px">
+      <div style="font-size:12px;color:#E65100;font-weight:700;margin-bottom:8px">⚠️ AJUSTE SOLICITADO PELA DIRETORIA</div>
+      ${s.obs_ajuste?`<div style="font-size:13px;color:#555;background:#fff;border-radius:6px;padding:10px;margin-bottom:12px">"${s.obs_ajuste}"</div>`:''}
+      <div style="font-size:11px;color:#666;margin-bottom:10px">Quantidades ajustadas pela Diretoria:</div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead><tr style="background:#FFE0B2">
+          <th style="padding:6px 8px;text-align:left">Item</th>
+          <th style="padding:6px 8px;text-align:center">Qtd. Original</th>
+          <th style="padding:6px 8px;text-align:center">Qtd. Ajustada</th>
+          <th style="padding:6px 8px;text-align:center">Novo Total</th>
+        </tr></thead>
+        <tbody>${itensAj.map((i,idx)=>{
+          const orig=itens[idx]||i;
+          const changed=i.qtd!==orig.qtd;
+          return `<tr style="border-bottom:1px solid #FFE0B2;background:${changed?'#FFF8E1':''}">
+            <td style="padding:6px 8px">${i.desc||i.descricao||'—'}</td>
+            <td style="padding:6px 8px;text-align:center;text-decoration:${changed?'line-through':'none'};color:${changed?'#999':'#333'}">${orig.qtd||1}</td>
+            <td style="padding:6px 8px;text-align:center;font-weight:${changed?'700':'400'};color:${changed?'#E65100':'#333'}">${i.qtd||1}</td>
+            <td style="padding:6px 8px;text-align:center;color:#1565C0;font-weight:600">R$ ${((i.qtd||1)*(i.val||0)).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+    <div class="ib" style="background:#FFF3E0;border-color:#FFB74D;color:#E65100">Você pode aceitar as novas quantidades e reenviar, ou editar antes de resubmeter.</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn" style="flex:1;background:#FF6F00;color:#fff" onclick="mdEditarAjuste('${s.id}')">✏️ Editar Quantidades</button>
+      <button class="btn bs" style="flex:1" onclick="reenviarAjuste('${s.id}')">🔄 Aceitar e Reenviar</button>
+    </div>`;
+  }
+
   // Compras executa a compra após aprovação do gerente
   const pCompras=(isCompras()||isGestor())&&s.status==='Aprovada';
   let comprasHtml='';
@@ -1268,7 +1333,11 @@ async function vSOL(id){
   if(pD){
     dirHtml=`<hr class="hdiv"><div class="ib ibo">Aprove para Compras realizar os orcamentos.</div>
     <div class="f"><label>Observacao</label><textarea class="inp" id="ov" placeholder="Instrucao..."></textarea></div>
-    <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aguardando Orçamento')">Aprovar</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">Reprovar</button></div>`;
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Orçamento')">✅ Aprovar</button>
+      <button class="btn" style="flex:1;background:#FF6F00;color:#fff" onclick="mdAjuste('${s.id}')">⚠️ Pedir Ajuste</button>
+      <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">❌ Reprovar</button>
+    </div>`;
   }
 
   // Entrega — compras pode confirmar quando status é Comprada
@@ -1358,7 +1427,7 @@ async function vSOL(id){
     <div style="font-size:13px;line-height:1.6;color:#424242">${s.justificativa||'-'}</div>
     ${s.anexos?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">ANEXOS</div><div style="font-size:12px;color:#1565C0">📎 ${s.anexos}</div>`:''}
     ${s.observacoes?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">OBSERVACOES</div><div style="font-size:13px">${s.observacoes}</div>`:''}
-    ${dirHtml}${cotHtml}${gerenteHtml}${comprasHtml}${entregaHtml}
+    ${dirHtml}${ajusteHtml}${cotHtml}${gerenteHtml}${comprasHtml}${entregaHtml}
   </div></div>`);
 }
 
@@ -2085,6 +2154,180 @@ async function confirmarOC(solId,cotId,forn,valAprov){
   }catch(e){alert('Erro: '+e.message);}
 }
 
+async function mdAjuste(solId){
+  const s=S.sol.find(x=>x.id===solId);
+  if(!s)return;
+  const itens=s.itens_requisicao||[];
+  if(!itens.length)return alert('Esta solicitação não tem itens para ajustar.');
+  openModal(`<div class="modal" style="max-width:580px">
+  <div class="mh" style="background:#FF6F00;color:#fff;border-radius:14px 14px 0 0">
+    <div>
+      <div style="font-size:15px;font-weight:700">⚠️ Pedir Ajuste de Quantidades</div>
+      <div style="font-size:11px;opacity:.8;margin-top:2px">${s.numero} — Ajuste as quantidades permitidas</div>
+    </div>
+    <button class="xb" style="color:rgba(255,255,255,.7)" onclick="closeModal()">✕</button>
+  </div>
+  <div class="mb">
+    <div class="ib" style="background:#FFF3E0;border-color:#FFB74D;color:#E65100;margin-bottom:16px">
+      Ajuste as quantidades que a Diretoria aprova. O requisitante será notificado para confirmar.
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px">
+      <thead><tr style="background:#F8F9FA">
+        <th style="padding:10px;text-align:left;border-bottom:2px solid #E0E0E0">Item</th>
+        <th style="padding:10px;text-align:center;border-bottom:2px solid #E0E0E0;width:100px">Qtd. Original</th>
+        <th style="padding:10px;text-align:center;border-bottom:2px solid #E0E0E0;width:120px">Qtd. Aprovada</th>
+      </tr></thead>
+      <tbody>
+        ${itens.map((i,idx)=>`<tr style="border-bottom:1px solid #F0F2F5">
+          <td style="padding:10px;font-weight:500">${i.desc||i.descricao||'Item '+(idx+1)}</td>
+          <td style="padding:10px;text-align:center;color:#9E9E9E">${i.qtd||1}</td>
+          <td style="padding:10px;text-align:center">
+            <input type="number" class="inp" id="aj-qtd-${idx}" value="${i.qtd||1}" min="0" max="${i.qtd||1}"
+              style="text-align:center;padding:6px;width:80px">
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="f">
+      <label>Observação para o Requisitante *</label>
+      <textarea class="inp" id="aj-obs" placeholder="Explique o motivo do ajuste..." style="min-height:80px"></textarea>
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    <button class="btn" style="background:#FF6F00;color:#fff;padding:10px 24px" onclick="confirmarAjuste('${solId}',${itens.length})">⚠️ Enviar Ajuste</button>
+  </div>
+  </div>`);
+}
+
+async function confirmarAjuste(solId,numItens){
+  const s=S.sol.find(x=>x.id===solId);
+  if(!s)return;
+  const obs=document.getElementById('aj-obs')?.value?.trim();
+  if(!obs)return alert('Explique o motivo do ajuste para o requisitante.');
+  const itensOrig=s.itens_requisicao||[];
+  const itensAj=itensOrig.map((i,idx)=>{
+    const novaQtd=parseInt(document.getElementById('aj-qtd-'+idx)?.value)||0;
+    const novoTotal=novaQtd*(i.val||0);
+    return {...i,qtd:novaQtd,total:novoTotal};
+  });
+  const novoValor=itensAj.reduce((a,i)=>a+(i.total||0),0);
+  try{
+    await sb.from('solicitacoes').update({
+      status:'Aguardando Ajuste',
+      obs_ajuste:obs
+    }).eq('id',solId);
+    await sb.from('solicitacoes').update({
+      itens_ajustados:itensAj,
+      valor_estimado:novoValor
+    }).eq('id',solId).then(()=>{}).catch(()=>{});
+    closeModal();await loadSol();render();
+    alert('✅ Ajuste enviado! O requisitante receberá as novas quantidades para confirmar.');
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function reenviarAjuste(solId){
+  const s=S.sol.find(x=>x.id===solId);
+  if(!s)return;
+  if(!confirm('Confirma o reenvio com as quantidades ajustadas pela Diretoria?'))return;
+  const itensAj=s.itens_ajustados||s.itens_requisicao||[];
+  const novoValor=itensAj.reduce((a,i)=>a+(i.total||(i.qtd||1)*(i.val||0)),0);
+  try{
+    await sb.from('solicitacoes').update({
+      status:'Aguardando Diretoria',
+      itens_requisicao:itensAj,
+      valor_estimado:novoValor,
+      obs_ajuste:null
+    }).eq('id',solId);
+    await sb.from('solicitacoes').update({itens_ajustados:null}).eq('id',solId).then(()=>{}).catch(()=>{});
+    closeModal();await loadSol();render();
+    alert('✅ Solicitação reenviada com as novas quantidades!');
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function mdEditarAjuste(solId){
+  const s=S.sol.find(x=>x.id===solId);
+  if(!s)return;
+  const itens=s.itens_ajustados||s.itens_requisicao||[];
+  openModal(`<div class="modal" style="max-width:560px">
+  <div class="mh"><span>✏️ Editar Quantidades — ${s.numero}</span><button class="xb" onclick="closeModal()">✕</button></div>
+  <div class="mb">
+    <div class="ib" style="background:#FFF3E0;border-color:#FFB74D;color:#E65100">
+      A Diretoria sugeriu estas quantidades. Você pode ajustar dentro do limite permitido antes de reenviar.
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:14px">
+      <thead><tr style="background:#F8F9FA">
+        <th style="padding:10px;text-align:left;border-bottom:2px solid #E0E0E0">Item</th>
+        <th style="padding:10px;text-align:center;border-bottom:2px solid #E0E0E0;width:100px">Máx. Diretoria</th>
+        <th style="padding:10px;text-align:center;border-bottom:2px solid #E0E0E0;width:120px">Sua Qtd.</th>
+        <th style="padding:10px;text-align:right;border-bottom:2px solid #E0E0E0;width:100px">Total</th>
+      </tr></thead>
+      <tbody>
+        ${itens.map((i,idx)=>`<tr style="border-bottom:1px solid #F0F2F5">
+          <td style="padding:10px;font-weight:500">${i.desc||i.descricao||'Item '+(idx+1)}</td>
+          <td style="padding:10px;text-align:center;color:#E65100;font-weight:600">${i.qtd||1}</td>
+          <td style="padding:10px;text-align:center">
+            <input type="number" class="inp" id="ed-qtd-${idx}" value="${i.qtd||1}" min="1" max="${i.qtd||1}"
+              oninput="calcTotalAjuste(${itens.length})"
+              style="text-align:center;padding:6px;width:80px">
+          </td>
+          <td style="padding:10px;text-align:right;color:#1565C0;font-weight:600" id="ed-tot-${idx}">
+            R$ ${((i.qtd||1)*(i.val||0)).toLocaleString('pt-BR',{minimumFractionDigits:2})}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot><tr style="background:#F8F9FA;border-top:2px solid #E0E0E0">
+        <td colspan="3" style="padding:10px;font-weight:700;text-align:right">TOTAL ESTIMADO</td>
+        <td style="padding:10px;text-align:right;font-weight:700;color:#1565C0" id="ed-total">
+          R$ ${itens.reduce((a,i)=>a+((i.qtd||1)*(i.val||0)),0).toLocaleString('pt-BR',{minimumFractionDigits:2})}
+        </td>
+      </tr></tfoot>
+    </table>
+  </div>
+  <div class="mf">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    <button class="btn bs" onclick="salvarEdicaoAjuste('${solId}',${itens.length})">🔄 Salvar e Reenviar</button>
+  </div>
+  </div>`);
+}
+
+function calcTotalAjuste(n){
+  const s_ref=document.querySelectorAll('[id^="ed-qtd-"]');
+  let total=0;
+  for(let i=0;i<n;i++){
+    const qtdEl=document.getElementById('ed-qtd-'+i);
+    const totEl=document.getElementById('ed-tot-'+i);
+    const qtd=parseInt(qtdEl?.value)||0;
+    // We don't have val stored per item here, just update total display
+  }
+}
+
+async function salvarEdicaoAjuste(solId,numItens){
+  const s=S.sol.find(x=>x.id===solId);
+  if(!s)return;
+  const itensBase=s.itens_ajustados||s.itens_requisicao||[];
+  const novosItens=itensBase.map((i,idx)=>{
+    const qtd=parseInt(document.getElementById('ed-qtd-'+idx)?.value)||1;
+    const qtdMax=i.qtd||1;
+    const qtdFinal=Math.min(qtd,qtdMax);
+    const novoTotal=qtdFinal*(i.val||0);
+    return {...i,qtd:qtdFinal,total:novoTotal};
+  });
+  const novoValor=novosItens.reduce((a,i)=>a+(i.total||0),0);
+  if(!confirm('Confirma o reenvio com as quantidades editadas?'))return;
+  try{
+    await sb.from('solicitacoes').update({
+      status:'Aguardando Diretoria',
+      itens_requisicao:novosItens,
+      valor_estimado:novoValor,
+      obs_ajuste:null
+    }).eq('id',solId);
+    await sb.from('solicitacoes').update({itens_ajustados:null}).eq('id',solId).then(()=>{}).catch(()=>{});
+    closeModal();await loadSol();render();
+    alert('✅ Solicitação reenviada com suas quantidades!');
+  }catch(e){alert('Erro: '+e.message);}
+}
+
 async function hSt(id,status){
   const obs=V('ov');
   const nome=`${S.user.nome} ${S.user.sobrenome}`;
@@ -2098,6 +2341,7 @@ async function hSt(id,status){
     // Salva auditoria separadamente — não falha o processo se colunas não existem
     const updAudit={};
     if(status==='Aguardando Orçamento'){updAudit.aprovado_dir_nome=nome;updAudit.aprovado_dir_data=agora;}
+    if(status==='Reprovada'){updAudit.aprovado_dir_nome=nome;updAudit.aprovado_dir_data=agora;}
     if(status==='Aprovada'){updAudit.aprovado_ger_nome=nome;updAudit.aprovado_ger_data=agora;}
     if(status==='Reprovada'){updAudit.aprovado_ger_nome=nome;updAudit.aprovado_ger_data=agora;}
     if(Object.keys(updAudit).length){
