@@ -88,6 +88,16 @@ textarea.inp{min-height:80px;resize:vertical}
 .hdiv{border:none;border-top:1px solid #F0F2F5;margin:14px 0}
 .uc{background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:16px 18px;display:flex;align-items:center;gap:14px;margin-bottom:10px}
 .uc:hover{box-shadow:0 2px 12px rgba(0,0,0,.07)}
+<style>
+@media(max-width:768px){
+  .sb{width:56px!important;min-width:56px!important}
+  .sb-logo,.sb-user,.sb-logo-s,.sb-name,.sb-role{display:none!important}
+  .ni span:last-of-type{display:none!important}
+  .main{margin-left:56px!important}
+  .fg2{grid-template-columns:1fr!important}
+  .kpi-grid{grid-template-columns:1fr 1fr!important}
+  .tw{overflow-x:auto}
+}
 </style>
 </head>
 <body>
@@ -763,26 +773,64 @@ function pgDash(){
 }
 
 // ── SOLICITAÇÕES ──────────────────────────────────────────────────────────
+let solFiltro={q:'',status:'',loja:''};
 function pgSol(){
   const pD=S.sol.filter(s=>s.status==='Aguardando Diretoria').length;
   const pAD=S.sol.filter(s=>s.status==='Aguardando Aprovação Diretoria').length;
   const pG=S.sol.filter(s=>s.status==='Aguardando Aprovação Gerente').length;
   const pO=S.sol.filter(s=>s.status==='Aguardando Orçamento').length;
+
+  // Aplica filtros
+  const q=(solFiltro.q||'').toLowerCase();
+  const lista=S.sol.filter(s=>{
+    if(solFiltro.status&&s.status!==solFiltro.status)return false;
+    if(solFiltro.loja&&s.loja_id!==solFiltro.loja)return false;
+    if(q&&![s.numero,s.descricao,s.solicitante_nome,s.loja_nome,s.area,s.fornecedor].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
+    return true;
+  });
+
+  const STATUS=['Aguardando Diretoria','Aguardando Orçamento','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue','Reprovada'];
+  const lojaOpts=S.lojas.map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
+  const temFiltro=solFiltro.q||solFiltro.status||solFiltro.loja;
+
   return `
-<div class="tb">
+<!-- BARRA DE FILTROS -->
+<div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+  <input class="inp" placeholder="🔍 Buscar por número, descrição, loja, solicitante..."
+    style="flex:1;min-width:220px;padding:8px 12px;font-size:13px"
+    value="${solFiltro.q}"
+    oninput="solFiltro.q=this.value;render()">
+  <select class="inp" style="width:210px;padding:8px 12px;font-size:13px"
+    onchange="solFiltro.status=this.value;render()">
+    <option value="">Todos os Status</option>
+    ${STATUS.map(st=>`<option value="${st}"${solFiltro.status===st?' selected':''}>${st}</option>`).join('')}
+  </select>
+  <select class="inp" style="width:190px;padding:8px 12px;font-size:13px"
+    onchange="solFiltro.loja=this.value;render()">
+    <option value="">Todas as Lojas</option>
+    ${lojaOpts}
+  </select>
+  ${temFiltro?`<button class="btn bsc" onclick="solFiltro={q:'',status:'',loja:''};render()" style="padding:8px 14px;font-size:12px">↺ Limpar</button>`:''}
+  <span style="font-size:12px;color:#9E9E9E;white-space:nowrap;margin-left:auto">${lista.length} de ${S.sol.length}</span>
+  <button class="btn bsc" onclick="imprimirLista()" style="padding:8px 14px;font-size:12px">🖨️ Imprimir</button>
+</div>
+
+<!-- BOTOES DE ACAO -->
+<div class="tb" style="margin-bottom:14px">
   <button class="btn bp" onclick="mdNovaSOL()">+ Nova Solicitação</button>
   ${isDiretoria()&&pD?`<span style="font-size:12px;background:#FFF3E0;color:#E65100;padding:6px 12px;border-radius:20px;font-weight:600">${pD} aguardando sua aprovação</span>`:''}
   ${isDiretoria()&&pAD?`<span style="font-size:12px;background:#FFF8E1;color:#F57F17;padding:6px 12px;border-radius:20px;font-weight:600">${pAD} orçamento para aprovar</span>`:''}
   ${isGerente()&&!isDiretoria()&&pG?`<span style="font-size:12px;background:#E8EAF6;color:#3949AB;padding:6px 12px;border-radius:20px;font-weight:600">${pG} aguardando sua aprovação final</span>`:''}
   ${isCompras()&&pO?`<span style="font-size:12px;background:#FFF3E0;color:#E65100;padding:6px 12px;border-radius:20px;font-weight:600">${pO} aguardando orçamento</span>`:''}
 </div>
-${!S.sol.length?`<div class="card" style="text-align:center;padding:48px;color:#ccc">
-  <div style="font-size:40px;margin-bottom:12px">📋</div>
-  <div style="font-size:15px;font-weight:500;margin-bottom:6px">Nenhuma solicitação</div>
-  <div style="font-size:13px">Clique em "+ Nova Solicitação" para começar</div>
+
+${!lista.length?`<div class="card" style="text-align:center;padding:48px;color:#ccc">
+  <div style="font-size:40px;margin-bottom:12px">${temFiltro?'🔍':'📋'}</div>
+  <div style="font-size:15px;font-weight:500;margin-bottom:6px">${temFiltro?'Nenhum resultado para este filtro':'Nenhuma solicitação'}</div>
+  <div style="font-size:13px">${temFiltro?'Tente outros filtros ou <a href="#" onclick="solFiltro={q:\'\',status:\'\',loja:\'\'};render();return false" style="color:#1565C0">limpe os filtros</a>':'Clique em "+ Nova Solicitação" para começar'}</div>
 </div>`:`
 <div style="display:grid;gap:14px">
-  ${S.sol.map(s=>`
+  ${lista.map(s=>`
   <div class="card" style="padding:20px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
       <div>
@@ -1969,10 +2017,14 @@ function mdForn(id){
   openModal(`<div class="modal" style="max-width:560px">
   <div class="mh"><span>${f?'Editar':'Novo'} Fornecedor</span><button class="xb" onclick="closeModal()">✕</button></div>
   <div class="mb">
-    <div class="f"><label>Nome *</label><input class="inp" id="fn" value="${f?.nome||''}"></div>
+    <div class="f"><label>Razão Social *</label><input class="inp" id="fn" value="${f?.nome||''}" placeholder="Razão Social"></div>
     <div class="fg2">
-      <div class="f"><label>CNPJ</label><input class="inp" id="fc" value="${f?.cnpj||''}" placeholder="00.000.000/0000-00"></div>
-      <div class="f"><label>Contato</label><input class="inp" id="fct" value="${f?.contato||''}"></div>
+      <div class="f"><label>CNPJ</label><input class="inp" id="fc" value="${f?.cnpj||''}" placeholder="00.000.000/0000-00" oninput="fmtCNPJ(this)"></div>
+      <div class="f"><label>Insc. Estadual</label><input class="inp" id="fie" value="${f?.inscricao_estadual||''}" placeholder="000.000.000.000"></div>
+    </div>
+    <div class="fg2">
+      <div class="f"><label>Contato / Responsável</label><input class="inp" id="fct" value="${f?.contato||''}" placeholder="Nome do responsável"></div>
+      <div class="f"><label>Cargo</label><input class="inp" id="fcargo" value="${f?.cargo||''}" placeholder="Gerente Comercial"></div>
       <div class="f"><label>Telefone</label><input class="inp" id="ft" value="${f?.telefone||''}" placeholder="(14) 99999-9999"></div>
       <div class="f"><label>E-mail</label><input class="inp" id="fe" value="${f?.email||''}"></div>
     </div>
