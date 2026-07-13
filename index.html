@@ -904,13 +904,13 @@ function mdNovaSOL(){
     <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:18px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:#0F2236;margin-bottom:14px">Informacoes da Requisicao</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
-        <div class="f" style="margin:0"><label>1. Loja *</label><select class="inp" id="sl">${lo}</select></div>
-        <div class="f" style="margin:0"><label>2. Departamento *</label><select class="inp" id="sa">${AREAS.map(a=>`<option${S.user?.area===a?' selected':''}>${a}</option>`).join('')}</select></div>
-        <div class="f" style="margin:0"><label>3. Tipo de Compra *</label><select class="inp" id="sti" onchange="atualizarCats()">${TIPOS.map(t=>`<option value="${t.v}">${t.l}</option>`).join('')}</select></div>
+        <div class="f" style="margin:0"><label>1. Loja *</label><select class="inp" id="sl"><option value="">— Selecionar —</option>${lo}</select></div>
+        <div class="f" style="margin:0"><label>2. Departamento *</label><select class="inp" id="sa"><option value="">— Selecionar —</option>${AREAS.map(a=>`<option${S.user?.area===a?' selected':''}>${a}</option>`).join('')}</select></div>
+        <div class="f" style="margin:0"><label>3. Tipo de Compra *</label><select class="inp" id="sti" onchange="atualizarCats()"><option value="">— Selecionar —</option>${TIPOS.map(t=>`<option value="${t.v}">${t.l}</option>`).join('')}</select></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
-        <div class="f" style="margin:0"><label>4. Categoria *</label><select class="inp" id="sc">${(CATS_MAP['Servico']||[]).map(c=>`<option>${c}</option>`).join('')}</select></div>
-        <div class="f" style="margin:0"><label>5. Prioridade</label><select class="inp" id="su"><option value="Baixa">Baixa</option><option value="Media">Media</option><option value="Alta">Alta</option></select></div>
+        <div class="f" style="margin:0"><label>4. Categoria *</label><select class="inp" id="sc"><option value="">— Selecionar —</option>${(CATS_MAP['Servico']||[]).map(c=>`<option>${c}</option>`).join('')}</select></div>
+        <div class="f" style="margin:0"><label>5. Prioridade</label><select class="inp" id="su"><option value="">— Selecionar —</option><option value="Baixa">Baixa</option><option value="Media">Media</option><option value="Alta">Alta</option></select></div>
         <div class="f" style="margin:0"><label>6. Data Estimada</label><input class="inp" type="date" id="sdt"></div>
       </div>
       <div class="f" style="margin:0">
