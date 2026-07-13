@@ -773,7 +773,7 @@ function pgDash(){
 }
 
 // ── SOLICITAÇÕES ──────────────────────────────────────────────────────────
-let solFiltro={q:'',status:'',loja:''};
+let solFiltro={q:'',status:'',loja:'',grupo:'',solicitante:''};
 function pgSol(){
   const pD=S.sol.filter(s=>s.status==='Aguardando Diretoria').length;
   const pAD=S.sol.filter(s=>s.status==='Aguardando Aprovação Diretoria').length;
@@ -785,44 +785,57 @@ function pgSol(){
   const lista=S.sol.filter(s=>{
     if(solFiltro.status&&s.status!==solFiltro.status)return false;
     if(solFiltro.loja&&s.loja_id!==solFiltro.loja)return false;
+    if(solFiltro.grupo&&s.grupo!==solFiltro.grupo)return false;
+    if(solFiltro.solicitante&&!(s.solicitante_nome||'').toLowerCase().includes(solFiltro.solicitante.toLowerCase()))return false;
     if(q&&![s.numero,s.descricao,s.solicitante_nome,s.loja_nome,s.area,s.fornecedor].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
     return true;
   });
 
   const STATUS=['Aguardando Diretoria','Aguardando Orçamento','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue','Reprovada'];
   const lojaOpts=S.lojas.map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
-  const temFiltro=solFiltro.q||solFiltro.status||solFiltro.loja;
+  const temFiltro=solFiltro.q||solFiltro.status||solFiltro.loja||solFiltro.grupo||solFiltro.solicitante;
+  const solicitantes=[...new Set(S.sol.map(s=>s.solicitante_nome).filter(Boolean))].sort();
 
   return `
-<!-- BARRA DE FILTROS -->
-<div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-  <input class="inp" placeholder="🔍 Buscar por número, descrição, loja, solicitante..."
-    style="flex:1;min-width:220px;padding:8px 12px;font-size:13px"
-    value="${solFiltro.q}"
-    oninput="solFiltro.q=this.value;render()">
-  <select class="inp" style="width:210px;padding:8px 12px;font-size:13px"
-    onchange="solFiltro.status=this.value;render()">
-    <option value="">Todos os Status</option>
-    ${STATUS.map(st=>`<option value="${st}"${solFiltro.status===st?' selected':''}>${st}</option>`).join('')}
-  </select>
-  <select class="inp" style="width:190px;padding:8px 12px;font-size:13px"
-    onchange="solFiltro.loja=this.value;render()">
-    <option value="">Todas as Lojas</option>
-    ${lojaOpts}
-  </select>
-  ${temFiltro?`<button class="btn bsc" onclick="solFiltro={q:'',status:'',loja:''};render()" style="padding:8px 14px;font-size:12px">↺ Limpar</button>`:''}
-  <span style="font-size:12px;color:#9E9E9E;white-space:nowrap;margin-left:auto">${lista.length} de ${S.sol.length}</span>
-  <button class="btn bsc" onclick="imprimirLista()" style="padding:8px 14px;font-size:12px">🖨️ Imprimir</button>
+<!-- BARRA DE FILTROS SOLICITAÇÕES -->
+<div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+    <input class="inp" placeholder="🔍 Número, descrição, loja, área..."
+      style="flex:1;min-width:200px;padding:8px 12px;font-size:13px"
+      value="${solFiltro.q}" oninput="solFiltro.q=this.value;render()">
+    <select class="inp" style="width:95px;padding:8px 10px;font-size:13px" onchange="solFiltro.grupo=this.value;render()">
+      <option value="">Grupos</option>
+      <option value="DHG"${solFiltro.grupo==='DHG'?' selected':''}>DHG</option>
+      <option value="BMMOT"${solFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+    </select>
+    <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="solFiltro.loja=this.value;render()">
+      <option value="">Todas as Lojas</option>
+      ${lojaOpts}
+    </select>
+    <select class="inp" style="width:195px;padding:8px 10px;font-size:13px" onchange="solFiltro.status=this.value;render()">
+      <option value="">Todos os Status</option>
+      ${STATUS.map(st=>`<option value="${st}"${solFiltro.status===st?' selected':''}>${st}</option>`).join('')}
+    </select>
+    <select class="inp" style="width:170px;padding:8px 10px;font-size:13px" onchange="solFiltro.solicitante=this.value;render()">
+      <option value="">Todos Solicitantes</option>
+      ${solicitantes.map(s=>`<option value="${s}"${solFiltro.solicitante===s?' selected':''}>${s}</option>`).join('')}
+    </select>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    ${temFiltro?`<button class="btn bsc" onclick="solFiltro={q:'',status:'',loja:'',grupo:'',solicitante:''};render()" style="padding:6px 14px;font-size:12px">↺ Limpar filtros</button>`:''}
+    <span style="font-size:12px;color:#9E9E9E">${lista.length} de ${S.sol.length} solicitações</span>
+    <button class="btn bsc" onclick="imprimirLista()" style="padding:6px 14px;font-size:12px;margin-left:auto">🖨️ Imprimir lista</button>
+    <button class="btn bp" onclick="mdNovaSOL()" style="padding:6px 16px;font-size:13px">+ Nova Solicitação</button>
+  </div>
 </div>
 
-<!-- BOTOES DE ACAO -->
-<div class="tb" style="margin-bottom:14px">
-  <button class="btn bp" onclick="mdNovaSOL()">+ Nova Solicitação</button>
-  ${isDiretoria()&&pD?`<span style="font-size:12px;background:#FFF3E0;color:#E65100;padding:6px 12px;border-radius:20px;font-weight:600">${pD} aguardando sua aprovação</span>`:''}
-  ${isDiretoria()&&pAD?`<span style="font-size:12px;background:#FFF8E1;color:#F57F17;padding:6px 12px;border-radius:20px;font-weight:600">${pAD} orçamento para aprovar</span>`:''}
-  ${isGerente()&&!isDiretoria()&&pG?`<span style="font-size:12px;background:#E8EAF6;color:#3949AB;padding:6px 12px;border-radius:20px;font-weight:600">${pG} aguardando sua aprovação final</span>`:''}
-  ${isCompras()&&pO?`<span style="font-size:12px;background:#FFF3E0;color:#E65100;padding:6px 12px;border-radius:20px;font-weight:600">${pO} aguardando orçamento</span>`:''}
-</div>
+${isDiretoria()&&(pD||pAD)||isGerente()&&!isDiretoria()&&pG||isCompras()&&pO?`
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+  ${isDiretoria()&&pD?`<span style="font-size:12px;background:#FFF3E0;color:#E65100;padding:6px 12px;border-radius:20px;font-weight:600">⏳ ${pD} aguardando aprovação</span>`:''}
+  ${isDiretoria()&&pAD?`<span style="font-size:12px;background:#FFF8E1;color:#F57F17;padding:6px 12px;border-radius:20px;font-weight:600">📋 ${pAD} orçamento para aprovar</span>`:''}
+  ${isGerente()&&!isDiretoria()&&pG?`<span style="font-size:12px;background:#E8EAF6;color:#3949AB;padding:6px 12px;border-radius:20px;font-weight:600">✅ ${pG} aguardando sua aprovação</span>`:''}
+  ${isCompras()&&pO?`<span style="font-size:12px;background:#FFF3E0;color:#E65100;padding:6px 12px;border-radius:20px;font-weight:600">📝 ${pO} aguardando orçamento</span>`:''}
+</div>`:''}
 
 ${!lista.length?`<div class="card" style="text-align:center;padding:48px;color:#ccc">
   <div style="font-size:40px;margin-bottom:12px">${temFiltro?'🔍':'📋'}</div>
@@ -1993,12 +2006,41 @@ async function qSt(id,status){
 }
 
 // ── FORNECEDORES ──────────────────────────────────────────────────────────
+let fornFiltro={q:'',grupo:'',status:''};
 function pgForn(){
-  return `<div class="tb"><button class="btn bp" onclick="mdForn()">+ Novo Fornecedor</button></div>
+  const q=(fornFiltro.q||'').toLowerCase();
+  const lista=S.forn.filter(f=>{
+    if(fornFiltro.grupo&&f.grupo!==fornFiltro.grupo)return false;
+    if(fornFiltro.status==='ativo'&&!f.ativo)return false;
+    if(fornFiltro.status==='inativo'&&f.ativo)return false;
+    if(q&&![f.nome,f.cnpj,f.contato,f.email,(f.categorias||[]).join(' ')].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
+    return true;
+  });
+  const temFiltro=fornFiltro.q||fornFiltro.grupo||fornFiltro.status;
+  return `<div>
+  <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input class="inp" placeholder="🔍 Nome, CNPJ, contato, e-mail..."
+      style="flex:1;min-width:200px;padding:8px 12px;font-size:13px"
+      value="${fornFiltro.q}" oninput="fornFiltro.q=this.value;render()">
+    <select class="inp" style="width:120px;padding:8px 10px;font-size:13px" onchange="fornFiltro.grupo=this.value;render()">
+      <option value="">Todos Grupos</option>
+      <option value="DHG"${fornFiltro.grupo==='DHG'?' selected':''}>DHG</option>
+      <option value="BMMOT"${fornFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+      <option value="TODOS"${fornFiltro.grupo==='TODOS'?' selected':''}>Todos</option>
+    </select>
+    <select class="inp" style="width:130px;padding:8px 10px;font-size:13px" onchange="fornFiltro.status=this.value;render()">
+      <option value="">Todos</option>
+      <option value="ativo"${fornFiltro.status==='ativo'?' selected':''}>Ativos</option>
+      <option value="inativo"${fornFiltro.status==='inativo'?' selected':''}>Inativos</option>
+    </select>
+    ${temFiltro?`<button class="btn bsc" onclick="fornFiltro={q:'',grupo:'',status:''};render()" style="padding:8px 14px;font-size:12px">↺ Limpar</button>`:''}
+    <span style="font-size:12px;color:#9E9E9E">${lista.length} de ${S.forn.length}</span>
+    <button class="btn bp" onclick="mdForn()" style="padding:8px 16px;margin-left:auto">+ Novo Fornecedor</button>
+  </div>
   <div class="card"><div class="tw"><table>
   <thead><tr><th>Nome</th><th>CNPJ</th><th>Contato</th><th>Telefone</th><th>Categorias</th><th>Aval.</th><th>Status</th><th>Ações</th></tr></thead>
   <tbody>
-  ${S.forn.map(f=>`<tr>
+  ${lista.map(f=>`<tr>
     <td style="font-weight:500">${f.nome}</td>
     <td style="font-size:11px;color:#9E9E9E">${f.cnpj||'—'}</td>
     <td style="font-size:12px">${f.contato||'—'}</td>
@@ -2008,8 +2050,8 @@ function pgForn(){
     <td>${f.ativo?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">Ativo</span>':'<span class="chip" style="background:#F5F5F5;color:#9E9E9E">Inativo</span>'}</td>
     <td><button class="sm" onclick="mdForn('${f.id}')">Editar</button></td>
   </tr>`).join('')}
-  ${!S.forn.length?`<tr><td colspan="8" style="text-align:center;padding:40px;color:#ccc">Nenhum fornecedor</td></tr>`:''}
-  </tbody></table></div></div>`;
+  ${!lista.length?`<tr><td colspan="8" style="text-align:center;padding:40px;color:#ccc">${temFiltro?'Nenhum resultado':'Nenhum fornecedor cadastrado'}</td></tr>`:''}
+  </tbody></table></div></div></div>`;
 }
 
 function mdForn(id){
@@ -2049,38 +2091,78 @@ async function hForn(id){
 }
 
 // ── COTAÇÕES ──────────────────────────────────────────────────────────────
+let cotFiltro={q:'',status:'',grupo:''};
 function pgCot(){
   const ag=S.sol.filter(s=>s.status==='Aguardando Orçamento');
-  return `<div class="tb">
-  <button class="btn bp" onclick="mdCot()">+ Registrar Orçamentos</button>
-  ${ag.length?`<span style="font-size:12px;background:#FFF3E0;color:#E65100;padding:6px 14px;border-radius:20px;font-weight:600">📋 ${ag.length} aguardando orçamento</span>`:''}
+  const q=(cotFiltro.q||'').toLowerCase();
+  const listaC=S.cot.filter(c=>{
+    if(cotFiltro.status&&c.status!==cotFiltro.status)return false;
+    if(cotFiltro.grupo){const s=S.sol.find(x=>x.id===c.solicitacao_id);if(!s||s.grupo!==cotFiltro.grupo)return false;}
+    if(q&&![c.numero,c.descricao,c.vencedor].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
+    return true;
+  });
+  const temFiltroC=cotFiltro.q||cotFiltro.status||cotFiltro.grupo;
+  return `<div>
+  <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input class="inp" placeholder="🔍 Número, solicitação, fornecedor..."
+      style="flex:1;min-width:180px;padding:8px 12px;font-size:13px"
+      value="${cotFiltro.q}" oninput="cotFiltro.q=this.value;render()">
+    <select class="inp" style="width:120px;padding:8px 10px;font-size:13px" onchange="cotFiltro.grupo=this.value;render()">
+      <option value="">Grupos</option>
+      <option value="DHG"${cotFiltro.grupo==='DHG'?' selected':''}>DHG</option>
+      <option value="BMMOT"${cotFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+    </select>
+    <select class="inp" style="width:160px;padding:8px 10px;font-size:13px" onchange="cotFiltro.status=this.value;render()">
+      <option value="">Todos os Status</option>
+      <option value="Aberta"${cotFiltro.status==='Aberta'?' selected':''}>Aberta</option>
+      <option value="Encerrada"${cotFiltro.status==='Encerrada'?' selected':''}>Encerrada</option>
+    </select>
+    ${temFiltroC?`<button class="btn bsc" onclick="cotFiltro={q:'',status:'',grupo:''};render()" style="padding:8px 14px;font-size:12px">↺ Limpar</button>`:''}
+    <span style="font-size:12px;color:#9E9E9E">${listaC.length} de ${S.cot.length}</span>
+    <button class="btn bp" onclick="mdCot()" style="padding:8px 16px;margin-left:auto">+ Registrar Orçamentos</button>
   </div>
-  ${!S.cot.length?`<div class="card" style="text-align:center;padding:48px;color:#ccc">Nenhuma cotação</div>`:`
-  <div style="display:grid;gap:14px">
-  ${S.cot.map(c=>{
+  ${ag.length?`<div style="background:#FFF3E0;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#E65100;font-weight:600">📝 ${ag.length} solicitação(ões) aguardando orçamento</div>`:''}
+  <div class="card"><div style="display:grid;gap:14px">
+  ${!listaC.length?`<div style="text-align:center;padding:40px;color:#ccc"><div style="font-size:40px;margin-bottom:12px">📋</div><div style="font-size:15px">${temFiltroC?'Nenhuma cotação encontrada':'Nenhuma cotação registrada'}</div></div>`:''}
+  ${listaC.map(c=>{
     const it=typeof c.itens==='string'?JSON.parse(c.itens||'[]'):(c.itens||[]);
     const best=it.length?it.reduce((a,b)=>a.val<b.val?a:b,it[0]):null;
-    return `<div class="card">
-    <div style="padding:14px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #F0F2F5">
-      <div><div style="font-weight:600">${c.numero} · ${c.descricao||'—'}</div>
-      <div style="font-size:11px;color:#9E9E9E;margin-top:2px">Sol: ${c.solicitacao_numero||'—'} · ${fmtD(c.data_criacao)}</div></div>
+    const sol=S.sol.find(s=>s.id===c.solicitacao_id);
+    return `<div style="border:1px solid #E0E0E0;border-radius:10px;padding:16px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-family:monospace;font-size:13px;font-weight:600;color:#1565C0">${c.numero}</div>
+        <div style="font-size:14px;font-weight:600;color:#0F2236;margin-top:2px">${c.descricao||sol?.descricao||'—'}</div>
+        <div style="font-size:11px;color:#9E9E9E;margin-top:2px">Sol: ${c.solicitacao_numero||sol?.numero||'—'} · ${fmtD(c.data_criacao)}</div>
+      </div>
       ${c.status==='Encerrada'?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">Compra Executada</span>':c.vencedor?'<span class="chip" style="background:#E8EAF6;color:#3949AB">Fornecedor Escolhido</span>':'<span class="chip" style="background:#FFF8E1;color:#E65100">Aguardando Diretoria</span>'}
     </div>
-    <div class="tw"><table>
-    <thead><tr><th>Fornecedor</th><th>CNPJ</th><th>Valor</th><th>Prazo</th><th>Pagamento</th><th>Obs</th><th>Status</th></tr></thead>
+    <div class="tw"><table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:#F8F9FA">
+      <th style="padding:8px 10px;text-align:left;color:#9E9E9E;border-bottom:1px solid #E0E0E0">Fornecedor</th>
+      <th style="padding:8px 10px;text-align:left;color:#9E9E9E;border-bottom:1px solid #E0E0E0">CNPJ</th>
+      <th style="padding:8px 10px;text-align:right;color:#9E9E9E;border-bottom:1px solid #E0E0E0">Valor</th>
+      <th style="padding:8px 10px;text-align:center;color:#9E9E9E;border-bottom:1px solid #E0E0E0">Prazo</th>
+      <th style="padding:8px 10px;text-align:left;color:#9E9E9E;border-bottom:1px solid #E0E0E0">Pagamento</th>
+      <th style="padding:8px 10px;text-align:left;color:#9E9E9E;border-bottom:1px solid #E0E0E0">Obs</th>
+      <th style="padding:8px 10px;text-align:center;color:#9E9E9E;border-bottom:1px solid #E0E0E0">Status</th>
+    </tr></thead>
     <tbody>${it.map(i=>`<tr style="${i.forn===best?.forn?'background:#F1F8E9':''}">
-      <td style="font-weight:${i.forn===best?.forn?'600':'400'}">
+      <td style="padding:8px 10px;font-weight:${i.forn===best?.forn?'600':'400'}">
         ${i.forn}${i.forn===best?.forn?' <span class="chip" style="background:#E8F5E9;color:#2E7D32;font-size:10px">✓ Menor preço</span>':''}
       </td>
-      <td style="font-size:11px;color:#9E9E9E">${i.cnpj||'—'}</td>
-      <td style="font-weight:600;color:${i.forn===best?.forn?'#2E7D32':'#333'}">${fmt(i.val)}</td>
-      <td style="font-size:12px">${i.prazo?i.prazo+' dias':'—'}</td>
-      <td style="font-size:11px">${i.pgto||'—'}</td>
-      <td style="font-size:11px;color:#9E9E9E">${i.obs||'—'}</td>
-      <td>${c.status==='Encerrada'&&c.vencedor===i.forn?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">✓ Comprado</span>':c.vencedor===i.forn?'<span class="chip" style="background:#E8EAF6;color:#3949AB">✓ Escolhido</span>':c.vencedor?'<span style="color:#ccc;font-size:12px">—</span>':'<span class="chip" style="background:#FFF3E0;color:#E65100">Aguard. Diretoria</span>'}</td>
+      <td style="font-size:11px;color:#9E9E9E;padding:8px 10px">${i.cnpj||'—'}</td>
+      <td style="font-weight:600;color:${i.forn===best?.forn?'#2E7D32':'#333'};text-align:right;padding:8px 10px">${fmt(i.val)}</td>
+      <td style="font-size:12px;text-align:center;padding:8px 10px">${i.prazo?i.prazo+' dias':'—'}</td>
+      <td style="font-size:11px;padding:8px 10px">${i.pgto||'—'}</td>
+      <td style="font-size:11px;color:#9E9E9E;padding:8px 10px">${i.obs||'—'}</td>
+      <td style="text-align:center;padding:8px 10px">${c.status==='Encerrada'&&c.vencedor===i.forn?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">✓ Comprado</span>':c.vencedor===i.forn?'<span class="chip" style="background:#E8EAF6;color:#3949AB">✓ Escolhido</span>':c.vencedor?'<span style="color:#ccc;font-size:12px">—</span>':'<span class="chip" style="background:#FFF3E0;color:#E65100">Aguard. Diretoria</span>'}</td>
     </tr>`).join('')}
-    </tbody></table></div></div>`;
-  }).join('')}</div>`}`;
+    </tbody></table></div>
+    </div>`;
+  }).join('')}
+  </div></div>
+  </div>`;
 }
 
 function mdCot(){
@@ -2452,11 +2534,45 @@ Após confirmar, irá para aprovação do Gerente.`))return;
 }
 
 // ── PEDIDOS ───────────────────────────────────────────────────────────────
+let pedFiltro={q:'',status:'',grupo:'',loja:''};
 function pgPed(){
-  return `<div class="card"><div class="tw"><table>
+  const q=(pedFiltro.q||'').toLowerCase();
+  const listaP=S.ped.filter(p=>{
+    if(pedFiltro.status&&p.status!==pedFiltro.status)return false;
+    if(pedFiltro.grupo&&p.grupo!==pedFiltro.grupo)return false;
+    if(pedFiltro.loja&&p.loja_nome!==pedFiltro.loja)return false;
+    if(q&&![p.numero,p.fornecedor,p.solicitacao_numero,p.loja_nome,p.descricao].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
+    return true;
+  });
+  const temFiltroP=pedFiltro.q||pedFiltro.status||pedFiltro.grupo||pedFiltro.loja;
+  const lojasPed=[...new Set(S.ped.map(p=>p.loja_nome).filter(Boolean))].sort();
+  return `<div>
+  <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input class="inp" placeholder="🔍 Número, fornecedor, solicitação..."
+      style="flex:1;min-width:200px;padding:8px 12px;font-size:13px"
+      value="${pedFiltro.q}" oninput="pedFiltro.q=this.value;render()">
+    <select class="inp" style="width:110px;padding:8px 10px;font-size:13px" onchange="pedFiltro.grupo=this.value;render()">
+      <option value="">Grupos</option>
+      <option value="DHG"${pedFiltro.grupo==='DHG'?' selected':''}>DHG</option>
+      <option value="BMMOT"${pedFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+    </select>
+    <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="pedFiltro.loja=this.value;render()">
+      <option value="">Todas as Lojas</option>
+      ${lojasPed.map(l=>`<option value="${l}"${pedFiltro.loja===l?' selected':''}>${l}</option>`).join('')}
+    </select>
+    <select class="inp" style="width:155px;padding:8px 10px;font-size:13px" onchange="pedFiltro.status=this.value;render()">
+      <option value="">Todos os Status</option>
+      <option value="Em Trânsito"${pedFiltro.status==='Em Trânsito'?' selected':''}>Em Trânsito</option>
+      <option value="Entregue"${pedFiltro.status==='Entregue'?' selected':''}>Entregue</option>
+    </select>
+    ${temFiltroP?`<button class="btn bsc" onclick="pedFiltro={q:'',status:'',grupo:'',loja:''};render()" style="padding:8px 14px;font-size:12px">↺ Limpar</button>`:''}
+    <span style="font-size:12px;color:#9E9E9E">${listaP.length} de ${S.ped.length}</span>
+    ${isCompras()?`<span style="font-size:12px;color:#E65100;font-weight:600;margin-left:4px">⚠️ ${S.ped.filter(p=>p.status!=='Entregue'&&isLate(p.prev_entrega)).length} atrasados</span>`:''}
+  </div>
+  <div class="card"><div class="tw"><table>
   <thead><tr><th>Número</th><th>Sol.</th><th>Loja</th><th>Fornecedor</th><th>Valor Aprov.</th><th>Valor Final</th><th>Saving</th><th>Prev. Entrega</th><th>Status</th><th>NF</th><th>Ações</th></tr></thead>
   <tbody>
-  ${S.ped.map(p=>`<tr>
+  ${listaP.map(p=>`<tr>
     <td><span style="font-family:monospace;font-size:12px">${p.numero}</span></td>
     <td style="font-size:11px">${p.solicitacao_numero||'—'}</td>
     <td style="font-size:12px">${p.loja_nome||'—'}</td>
@@ -2472,7 +2588,7 @@ function pgPed(){
       ${p.status!=='Entregue'?`<button class="sm ok" onclick="mdEnt('${p.id}','${p.solicitacao_id||''}')">✓ Entrega</button>`:'<span style="color:#2E7D32;font-size:13px">✅</span>'}
     </td>
   </tr>`).join('')}
-  ${!S.ped.length?`<tr><td colspan="11" style="text-align:center;padding:40px;color:#ccc">Nenhum pedido</td></tr>`:''}
+  ${!listaP.length?`<tr><td colspan="11" style="text-align:center;padding:40px;color:#ccc">${temFiltroP?'Nenhum pedido encontrado com esses filtros':'Nenhum pedido'}</td></tr>`:''}
   </tbody></table></div></div>`;
 }
 
