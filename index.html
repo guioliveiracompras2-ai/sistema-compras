@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>Sistema de Compras · DHG & BMMOT</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -90,13 +90,116 @@ textarea.inp{min-height:80px;resize:vertical}
 .uc:hover{box-shadow:0 2px 12px rgba(0,0,0,.07)}
 <style>
 @media(max-width:768px){
-  .sb{width:56px!important;min-width:56px!important}
-  .sb-logo,.sb-user,.sb-logo-s,.sb-name,.sb-role{display:none!important}
-  .ni span:last-of-type{display:none!important}
-  .main{margin-left:56px!important}
+  /* ── LAYOUT ── */
+  body{font-size:14px}
+  .app{flex-direction:column!important}
+
+  /* ── SIDEBAR vira bottom nav ── */
+  .sb{
+    width:100%!important;min-width:100%!important;
+    flex-direction:row!important;
+    position:fixed!important;bottom:0;left:0;right:0;z-index:200;
+    height:60px!important;padding:0!important;
+    border-top:1px solid rgba(255,255,255,.12);
+    box-shadow:0 -4px 20px rgba(0,0,0,.3)
+  }
+  .sb-logo,.sb-user,.sb-logo-s,.sb-name,.sb-role,.sb-foot{display:none!important}
+  .sb-nav{
+    flex:1!important;display:flex!important;flex-direction:row!important;
+    align-items:center!important;justify-content:space-around!important;
+    padding:0!important;overflow:visible!important
+  }
+  .ni{
+    flex-direction:column!important;gap:2px!important;
+    padding:6px 4px!important;border-left:none!important;
+    border-top:3px solid transparent;font-size:9px!important;
+    flex:1!important;justify-content:center!important;align-items:center!important;
+    min-width:0!important;text-align:center
+  }
+  .ni.on{border-left-color:transparent!important;border-top-color:#1E88E5!important;background:rgba(30,136,229,.15)!important}
+  .ni>span:first-of-type{font-size:18px!important}
+  .ni>span:last-of-type{display:block!important;font-size:9px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56px}
+  .ni>span[style*="position:absolute"]{top:2px!important;right:2px!important;font-size:8px!important;padding:0 4px!important}
+
+  /* ── MAIN CONTENT ── */
+  .main{
+    margin-left:0!important;margin-bottom:64px!important;
+    overflow-y:auto!important
+  }
+  .pg{padding:12px 10px!important}
+
+  /* ── HEADER ── */
+  .ph{padding:12px 14px 6px!important;flex-wrap:wrap!important}
+  .ph-title{font-size:16px!important}
+  .ph-date{font-size:10px!important}
+
+  /* ── CARDS ── */
+  .card{border-radius:8px!important;padding:12px!important}
+
+  /* ── GRIDS ── */
   .fg2{grid-template-columns:1fr!important}
-  .kpi-grid{grid-template-columns:1fr 1fr!important}
-  .tw{overflow-x:auto}
+  .kpi-grid,.kg{grid-template-columns:1fr 1fr!important;gap:8px!important}
+
+  /* ── BUTTONS ── */
+  .btn{padding:10px 14px!important;font-size:13px!important;min-height:44px}
+  .sm{padding:6px 10px!important;font-size:11px!important}
+  .tb{flex-wrap:wrap!important;gap:8px!important}
+
+  /* ── INPUTS ── */
+  .inp{padding:10px 12px!important;font-size:14px!important;min-height:44px}
+  select.inp{min-height:44px!important}
+  textarea.inp{min-height:80px!important}
+
+  /* ── MODAL ── */
+  .ov{padding:0!important;align-items:flex-end!important}
+  .modal{
+    border-radius:16px 16px 0 0!important;
+    max-height:95vh!important;
+    width:100%!important;max-width:100%!important
+  }
+  .mh{padding:14px 16px!important}
+  .mb{padding:14px 16px!important}
+  .mf{padding:10px 16px!important;gap:8px!important}
+  .mf .btn{flex:1!important}
+
+  /* ── TABLES ── */
+  .tw{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+  table{min-width:500px}
+
+  /* ── TIMELINE ── */
+  div[style*="display:flex;align-items:flex-start;overflow-x:auto"]{
+    padding-bottom:12px!important
+  }
+
+  /* ── FILTROS ── */
+  div[style*="display:flex;gap:10px;flex-wrap:wrap;align-items:center"]{
+    flex-direction:column!important
+  }
+  div[style*="display:flex;gap:10px;flex-wrap:wrap;align-items:center"] .inp,
+  div[style*="display:flex;gap:10px;flex-wrap:wrap;align-items:center"] select{
+    width:100%!important;max-width:100%!important
+  }
+
+  /* ── KPI CARDS ── */
+  .kpi{padding:12px!important}
+  .kpi .kv{font-size:20px!important}
+
+  /* ── NOVA SOLICITAÇÃO ── */
+  div[style*="grid-template-columns:1fr 1fr 1fr"]{
+    grid-template-columns:1fr!important
+  }
+  div[style*="grid-template-columns:1.6fr"]{
+    grid-template-columns:1fr!important
+  }
+  div[style*="grid-template-columns:1fr 320px"]{
+    grid-template-columns:1fr!important
+  }
+  div[style*="grid-template-columns:1.1fr 1fr 1fr"]{
+    grid-template-columns:1fr!important
+  }
+  div[style*="grid-template-columns:1fr 1fr;gap:16px"]{
+    grid-template-columns:1fr!important
+  }
 }
 </style>
 </head>
