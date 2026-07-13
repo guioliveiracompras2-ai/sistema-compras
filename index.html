@@ -579,7 +579,7 @@ async function mdVerSol(id){
     <div style="font-size:13px;line-height:1.6;color:#424242;margin-bottom:12px">${s.descricao||'—'}</div>`}
     <div style="font-size:12px;font-weight:700;color:#0F2236;margin-bottom:6px">JUSTIFICATIVA</div>
     <div style="font-size:13px;line-height:1.6;color:#555;background:#F8F9FA;border-radius:8px;padding:10px 14px">${s.justificativa||'—'}</div>
-    ${s.anexos?`<hr class="hdiv"><div style="font-size:12px;color:#1565C0;margin-top:4px">📎 ${s.anexos}</div>`:''}
+    ${s.anexos?`<hr class="hdiv">${renderAnexo(s.anexos,'Anexo da Solicitação')}`:''}
   </div>
   <div class="mf"><button class="btn bsc" onclick="closeModal()">Fechar</button></div>
   </div>`);
@@ -616,7 +616,7 @@ async function mdVerCot(id){
           ${i.prazo?`<span>⏱ <strong>${i.prazo} dias</strong></span>`:''}
           ${i.pgto?`<span>💳 <strong>${i.pgto}</strong></span>`:''}
           ${i.obs?`<span>📝 ${i.obs}</span>`:''}
-          ${i.arquivo?`<span>📎 ${i.arquivo}</span>`:''}
+          ${i.arquivo?renderAnexo(i.arquivo,'Orçamento'):''}
         </div>
         ${i.itens&&i.itens.length?`
         <div style="margin-top:10px;border-top:1px solid #E0E0E0;padding-top:10px">
@@ -1933,7 +1933,9 @@ async function confirmarOC(solId,cotId,forn,valAprov){
   const cc=document.getElementById('oc-cc')?.value||'';
   const obs=document.getElementById('oc-obs')?.value||'';
   const fileEl=document.getElementById('oc-file');
-  const arquivo=fileEl?.files?.[0]?.name||'';
+  const fileObj3=fileEl?.files?.[0]||null;
+  let arquivo='';
+  if(fileObj3){const up=await uploadAnexo(fileObj3);arquivo=up?JSON.stringify(up):fileObj3.name||'';}
   if(!vf||vf<=0)return alert('Informe o valor final da compra.');
   if(!pgto)return alert('Selecione a forma de pagamento.');
   const desc=parseFloat(valAprov)-vf;
@@ -2455,6 +2457,36 @@ function prevFile(input,lblId){
 function prevArq(input,lblId){
   const lbl=document.getElementById(lblId);
   if(lbl&&input.files&&input.files[0])lbl.textContent=input.files[0].name;
+}
+
+async function uploadAnexo(file){
+  if(!file)return null;
+  try{
+    const nome=`${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+    const {data,error}=await sb.storage.from('anexos').upload(nome,file,{
+      cacheControl:'3600',upsert:false,contentType:file.type
+    });
+    if(error)throw error;
+    const {data:url}=sb.storage.from('anexos').getPublicUrl(nome);
+    return {nome:file.name,url:url.publicUrl};
+  }catch(e){
+    console.warn('Upload falhou:',e.message);
+    return {nome:file.name,url:null};
+  }
+}
+
+function renderAnexo(anexo,label){
+  if(!anexo)return '';
+  let nome='',url=null;
+  try{
+    const obj=typeof anexo==='string'&&anexo.startsWith('{')?JSON.parse(anexo):null;
+    if(obj){nome=obj.nome||'';url=obj.url||null;}
+    else{nome=typeof anexo==='string'?anexo:'';}
+  }catch(e){nome=typeof anexo==='string'?anexo:'';}
+  if(!nome)return '';
+  return url
+    ?`<a href="${url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;color:#1565C0;font-size:12px;text-decoration:none;background:#E3F2FD;padding:8px 12px;border-radius:8px;margin-top:8px;font-weight:500">📎 ${nome} <span style="font-size:10px;opacity:.7">↗ abrir</span></a>`
+    :`<div style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#9E9E9E;background:#F5F5F5;padding:8px 12px;border-radius:8px;margin-top:8px">📎 ${nome}</div>`;
 }
 
 async function showFornSug(n,val){
