@@ -717,6 +717,34 @@ function pgDash(){
     ${Object.entries(sc).map(([s,n])=>`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">${cs(s)}<span style="font-weight:600;font-size:13px">${n}</span></div>`).join('')}
     ${!Object.keys(sc).length?'<div style="text-align:center;color:#ccc;padding:20px;font-size:13px">Nenhuma solicitação</div>':''}
   </div>
+
+  <!-- PENDÊNCIAS DO USUÁRIO -->
+  ${(()=>{
+    const pends=[];
+    if(isDiretoria()){
+      const pd=S.sol.filter(s=>s.status==='Aguardando Diretoria').length;
+      const po=S.sol.filter(s=>s.status==='Aguardando Aprovação Diretoria').length;
+      if(pd)pends.push({icon:'👔',txt:pd+' solicitação(ões) aguardando sua aprovação',pg:'solicitacoes',alert:false});
+      if(po)pends.push({icon:'📋',txt:po+' cotação(ões) aguardando escolha do fornecedor',pg:'solicitacoes',alert:false});
+    }
+    if(isGerente()){
+      const pg=S.sol.filter(s=>s.status==='Aguardando Aprovação Gerente').length;
+      if(pg)pends.push({icon:'✅',txt:pg+' compra(s) aguardando sua aprovação final',pg:'solicitacoes',alert:false});
+    }
+    if(isCompras()){
+      const pc=S.sol.filter(s=>s.status==='Aguardando Orçamento').length;
+      const pa=S.sol.filter(s=>s.status==='Aprovada').length;
+      const lat=S.ped.filter(p=>p.status!=='Entregue'&&isLate(p.prev_entrega)).length;
+      const pe=S.ped.filter(p=>p.status!=='Entregue').length;
+      if(pc)pends.push({icon:'📝',txt:pc+' solicitação(ões) aguardando orçamento',pg:'cotacoes',alert:false});
+      if(pa)pends.push({icon:'🛒',txt:pa+' compra(s) aprovada(s) aguardando OC',pg:'solicitacoes',alert:false});
+      if(lat)pends.push({icon:'⚠️',txt:lat+' entrega(s) em ATRASO',pg:'pedidos',alert:true});
+      if(pe&&!lat)pends.push({icon:'📦',txt:pe+' pedido(s) aguardando entrega',pg:'pedidos',alert:false});
+    }
+    if(!pends.length)return '<div class="card" style="border-left:4px solid #2E7D32;padding:16px;margin-bottom:16px;display:flex;align-items:center;gap:14px"><span style="font-size:28px">✅</span><div><div style="font-size:14px;font-weight:700;color:#2E7D32">Tudo em dia!</div><div style="font-size:12px;color:#9E9E9E;margin-top:2px">Nenhuma pendência aguardando sua ação.</div></div></div>';
+    return '<div class="card" style="border-left:4px solid #1565C0;padding:16px;margin-bottom:16px"><div style="font-size:14px;font-weight:700;color:#0F2236;margin-bottom:12px">⚡ Suas Pendências Hoje</div><div style="display:flex;flex-direction:column;gap:8px">'+pends.map(p=>'<div onclick="goTo(\''+p.pg+'\')" style="display:flex;align-items:center;gap:12px;background:'+(p.alert?'#FFEBEE':'#F0F7FF')+';border:1px solid '+(p.alert?'#FFCDD2':'#BBDEFB')+';border-radius:8px;padding:10px 14px;cursor:pointer"><span style="font-size:18px">'+p.icon+'</span><span style="font-size:13px;font-weight:'+(p.alert?'700':'500')+';color:'+(p.alert?'#C62828':'#1565C0')+'">'+p.txt+'</span><span style="margin-left:auto;color:#9E9E9E">›</span></div>').join('')+'</div></div>';
+  })()}
+
   <div class="card" style="padding:18px">
     <div style="font-size:12px;font-weight:600;color:#9E9E9E;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px">Lojas mais ativas</div>
     ${tops.map(([l,n])=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>${l}</span><span style="font-weight:600">${n}</span></div><div class="bw2"><div class="bf" style="width:${Math.round(n/mxL*100)}%"></div></div></div>`).join('')}
@@ -1146,6 +1174,48 @@ async function vSOL(id){
   </div></div>`);
 }
 
+function imprimirLista(){
+  const q=(solFiltro.q||'').toLowerCase();
+  const lista=S.sol.filter(s=>{
+    if(solFiltro.status&&s.status!==solFiltro.status)return false;
+    if(solFiltro.urgencia&&s.urgencia!==solFiltro.urgencia)return false;
+    if(q&&![s.numero,s.descricao,s.solicitante_nome,s.loja_nome].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
+    return true;
+  });
+  const hoje=new Date().toLocaleDateString('pt-BR');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Solicitações</title>
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;padding:20px}
+  h1{font-size:16px;font-weight:700;margin-bottom:4px}
+  .sub{font-size:11px;color:#666;margin-bottom:16px}
+  table{width:100%;border-collapse:collapse}
+  th{background:#0F2236;color:#fff;padding:7px 10px;text-align:left;font-size:10px}
+  td{padding:6px 10px;border-bottom:1px solid #eee;font-size:10px}
+  tr:nth-child(even)td{background:#F8F9FA}
+  .chip{padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700}
+  @media print{@page{margin:1cm;size:A4 landscape}}</style></head>
+  <body>
+  <h1>📋 Lista de Solicitações — ${solFiltro.status||'Todos os Status'}</h1>
+  <div class="sub">Gerado em ${hoje} por ${S.user.nome} ${S.user.sobrenome} · ${lista.length} registros${solFiltro.q?' · Filtro: "'+solFiltro.q+'"':''}</div>
+  <table><thead><tr>
+    <th>Número</th><th>Descrição</th><th>Loja</th><th>Área</th>
+    <th>Solicitante</th><th>Valor Est.</th><th>Status</th><th>Data</th>
+  </tr></thead><tbody>
+  ${lista.map(s=>`<tr>
+    <td style="font-family:monospace;font-weight:600">${s.numero}</td>
+    <td>${s.descricao||'—'}</td>
+    <td>${s.loja_nome||'—'}</td>
+    <td>${s.area||'—'}</td>
+    <td>${s.solicitante_nome||'—'}</td>
+    <td style="text-align:right">${s.valor_estimado?'R$ '+parseFloat(s.valor_estimado).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td>
+    <td>${s.status}</td>
+    <td>${fmtD(s.data_criacao)}</td>
+  </tr>`).join('')}
+  </tbody></table>
+  </body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();
+  setTimeout(()=>w.print(),500);
+}
+
 async function mdEntSol(solId){
   // Load pedido for this solicitacao
   let pedId='';
@@ -1405,158 +1475,238 @@ async function hExecutarCompra(solId,cotId,forn,val){
 async function gerarOCPed(pedId){
   const p=S.ped.find(x=>x.id===pedId);
   if(!p)return alert('Pedido não encontrado.');
-  // Busca solicitação se necessário
   let sol=S.sol.find(s=>s.id===p.solicitacao_id);
   if(!sol){
     const {data}=await sb.from('solicitacoes').select('*').eq('id',p.solicitacao_id).single();
     sol=data;
   }
-  if(!sol)return alert('Dados da solicitação não encontrados.');
-  const vf=p.valor_final_compra||p.valor;
-  const valAprov=p.valor||vf;
-  const desc=valAprov-vf;
+  // Busca dados da cotação para preencher fornecedor
+  let cot=null;
+  try{
+    const {data}=await sb.from('cotacoes').select('*').eq('solicitacao_id',p.solicitacao_id).single();
+    cot=data;
+  }catch(e){}
+  const cotItens=cot?(typeof cot.itens==='string'?JSON.parse(cot.itens||'[]'):(cot.itens||[])):[];
+  const fornCot=cotItens.find(i=>i.forn===p.fornecedor)||cotItens[0]||{};
+  const vf=p.valor_final_compra||sol?.valor_final||p.valor||0;
+  const valAprov=p.valor||sol?.valor_estimado||0;
+  const desc=p.desconto||(valAprov>vf?valAprov-vf:0);
   const pct=valAprov>0?((desc/valAprov)*100).toFixed(1):0;
-  const itens=sol.itens_requisicao||[];
-  const num='OC-'+sol.numero.replace(/[^0-9]/g,'');
+  const itens=sol?.itens_requisicao||[];
+  const num='OC-2026-'+String(p.numero||'').replace(/[^0-9]/g,'').padStart(6,'0');
   const hoje=new Date().toLocaleDateString('pt-BR');
+  const validOC=new Date();validOC.setDate(validOC.getDate()+30);
+  const loja=S.lojas.find(l=>l.id===sol?.loja_id)||{};
+  const grp=sol?.grupo||'DHG';
+  const grpNome=grp==='BMMOT'?'Grupo BMMOT':'Grupo DHG';
 
   const html=`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Ordem de Compra ${num}</title>
+<title>Ordem de Compra — ${num}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:Arial,sans-serif;font-size:12px;color:#333;padding:24px;max-width:800px;margin:0 auto}
-  .header{background:#0F2236;color:#fff;padding:20px 24px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
-  .header h1{font-size:20px;font-weight:700}
-  .header p{font-size:12px;opacity:.7;margin-top:4px}
-  .badge{background:#1565C0;color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700}
-  .section{background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:16px;margin-bottom:14px}
-  .section h2{font-size:13px;font-weight:700;color:#0F2236;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #F0F2F5}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-  .field{margin-bottom:4px}
-  .field label{font-size:10px;color:#9E9E9E;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em}
-  .field span{font-size:13px;font-weight:600;color:#333}
-  table{width:100%;border-collapse:collapse}
-  th{padding:8px 10px;background:#F8F9FA;text-align:left;font-size:11px;color:#666;border-bottom:2px solid #E0E0E0;font-weight:600}
-  td{padding:8px 10px;border-bottom:1px solid #F5F5F5;font-size:12px}
-  .total-row td{font-weight:700;background:#F8F9FA;border-top:2px solid #E0E0E0;font-size:13px}
-  .saving{background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:8px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;margin-bottom:14px}
-  .saving .val{font-size:18px;font-weight:700;margin-top:4px}
-  .saving .lbl{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.05em}
-  .footer{text-align:center;margin-top:20px;padding-top:14px;border-top:1px solid #E0E0E0;color:#9E9E9E;font-size:11px}
-  .assinaturas{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:30px}
-  .ass{text-align:center;padding-top:36px;border-top:1.5px solid #333}
-  .ass .nome{font-weight:600;font-size:12px}
-  .ass .cargo{font-size:10px;color:#666;margin-top:3px}
+  body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:18px;max-width:900px;margin:0 auto}
+  .no-print{background:#1565C0;color:#fff;padding:10px 18px;border-radius:6px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+  .no-print button{background:#fff;color:#1565C0;border:none;border-radius:5px;padding:7px 18px;font-weight:700;cursor:pointer;font-size:12px}
+  /* HEADER */
+  .hdr{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border:1.5px solid #111;margin-bottom:0}
+  .hdr-logo{padding:12px 16px;border-right:1.5px solid #111}
+  .hdr-logo .logo-m{font-size:32px;font-weight:900;color:#111;font-style:italic;line-height:1}
+  .hdr-logo .co-name{font-size:16px;font-weight:700;margin-top:2px}
+  .hdr-logo .co-addr{font-size:9px;color:#444;line-height:1.5;margin-top:3px}
+  .hdr-title{text-align:center;padding:12px 20px;border-right:1.5px solid #111}
+  .hdr-title h1{font-size:18px;font-weight:900;letter-spacing:1px}
+  .hdr-title .oc-num{font-size:13px;font-weight:600;margin-top:6px}
+  .hdr-info{padding:0}
+  .hdr-info table{width:100%;border-collapse:collapse}
+  .hdr-info tr{border-bottom:1px solid #ddd}
+  .hdr-info tr:last-child{border-bottom:none}
+  .hdr-info td{padding:5px 10px;font-size:10px}
+  .hdr-info td:first-child{font-weight:700;width:110px;background:#f5f5f5}
+  /* SECTIONS */
+  .sec-hdr{background:#ddd;text-align:center;font-weight:700;font-size:10px;padding:5px;letter-spacing:.5px;border:1.5px solid #111;border-top:none}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid #111;border-top:none}
+  .col-box{padding:10px 14px}
+  .col-box:first-child{border-right:1px solid #ccc}
+  .field-row{display:flex;gap:6px;padding:3px 0;border-bottom:1px solid #f0f0f0}
+  .field-row:last-child{border-bottom:none}
+  .field-lbl{font-weight:700;min-width:110px;flex-shrink:0;font-size:10px}
+  .field-val{font-size:10px;color:#222}
+  /* ITEMS TABLE */
+  .items-wrap{border:1.5px solid #111;border-top:none}
+  .items-wrap table{width:100%;border-collapse:collapse}
+  .items-wrap th{background:#ddd;padding:6px 8px;font-size:10px;font-weight:700;border-bottom:1.5px solid #111;border-right:1px solid #ccc;text-align:center}
+  .items-wrap td{padding:6px 8px;font-size:10px;border-bottom:1px solid #eee;border-right:1px solid #eee;text-align:center}
+  .items-wrap td.desc{text-align:left}
+  .items-wrap td.val{text-align:right;font-weight:600}
+  .items-wrap tr.total-row td{background:#f5f5f5;font-weight:700;border-top:1.5px solid #111}
+  /* BOTTOM 3 COLS */
+  .three-col{display:grid;grid-template-columns:1.1fr 1fr 1fr;border:1.5px solid #111;border-top:none}
+  .three-col .col-box:not(:last-child){border-right:1px solid #ccc}
+  .col-box h3{font-size:10px;font-weight:700;text-align:center;background:#ddd;padding:5px;margin:-10px -14px 10px;letter-spacing:.5px}
+  .fin-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f0f0f0;font-size:10px}
+  .fin-row.total{font-weight:700;font-size:12px;border-top:1.5px solid #111;border-bottom:none;padding-top:6px;margin-top:4px}
+  /* APPROVALS */
+  .aprov{border:1.5px solid #111;border-top:none;padding:14px 20px}
+  .aprov h3{font-size:10px;font-weight:700;text-align:center;background:#ddd;padding:5px;margin:-14px -20px 16px;letter-spacing:.5px}
+  .aprov-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .aprov-item{text-align:center}
+  .aprov-item .nome{font-weight:700;font-size:11px}
+  .aprov-item .cargo{font-size:10px;color:#555;margin-bottom:8px}
+  .aprov-item .data{font-size:10px;margin-bottom:12px}
+  .aprov-item .linha{border-top:1.5px solid #111;margin-top:8px;padding-top:4px;font-size:9px;color:#555}
+  .footer-note{border:1px solid #ccc;padding:8px 14px;font-size:9px;color:#555;margin-top:0;border-top:none;font-style:italic}
   @media print{
-    body{padding:12px}
-    .no-print{display:none}
-    @page{margin:1.5cm}
+    .no-print{display:none!important}
+    body{padding:8px}
+    @page{margin:1cm;size:A4}
   }
 </style>
 </head>
 <body>
-<div class="no-print" style="background:#1565C0;color:#fff;padding:12px 20px;border-radius:8px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+<div class="no-print">
   <span style="font-weight:600">📄 Ordem de Compra — ${num}</span>
-  <button onclick="window.print()" style="background:#fff;color:#1565C0;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer;font-size:13px">🖨️ Imprimir / Salvar PDF</button>
+  <button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
 </div>
 
-<div class="header">
-  <div>
-    <h1>ORDEM DE COMPRA — ${num}</h1>
-    <p>Grupo DHG & BMMOT · Pedido: ${p.numero} · Emitida em ${hoje}</p>
+<!-- CABEÇALHO -->
+<div class="hdr">
+  <div class="hdr-logo">
+    <div class="logo-m">M</div>
+    <div class="co-name">${grpNome.toUpperCase()}</div>
+    <div class="co-addr">
+      ${loja.nome?loja.nome+' — ':''}<br>
+      Bauru / SP — CNPJ: 14.200.166/0001-00
+    </div>
   </div>
-  <div class="badge">OC APROVADA</div>
-</div>
-
-<div class="section">
-  <h2>Informações da Ordem</h2>
-  <div class="grid3">
-    <div class="field"><label>Número OC</label><span>${num}</span></div>
-    <div class="field"><label>Número Pedido</label><span>${p.numero}</span></div>
-    <div class="field"><label>Solicitação</label><span>${sol.numero}</span></div>
-    <div class="field"><label>Loja</label><span>${sol.loja_nome||'—'}</span></div>
-    <div class="field"><label>Área / Departamento</label><span>${sol.area||'—'}</span></div>
-    <div class="field"><label>Data da Compra</label><span>${fmtD(p.data_compra)}</span></div>
-    <div class="field"><label>Solicitante</label><span>${sol.solicitante_nome||'—'}</span></div>
-    <div class="field"><label>Executado por</label><span>${sol.comprado_por||'—'}</span></div>
-    <div class="field"><label>Centro de Custo</label><span>${p.centro_custo||sol.area||'—'}</span></div>
+  <div class="hdr-title">
+    <h1>ORDEM DE COMPRA</h1>
+    <div class="oc-num">Nº ${num}</div>
   </div>
-</div>
-
-<div class="section">
-  <h2>Fornecedor Selecionado</h2>
-  <div class="grid3">
-    <div class="field"><label>Nome</label><span>${p.fornecedor}</span></div>
-    <div class="field"><label>Forma de Pagamento</label><span>${p.forma_pagamento_oc||'—'}</span></div>
-    <div class="field"><label>Previsão de Entrega</label><span>${fmtD(p.prev_entrega)}</span></div>
+  <div class="hdr-info">
+    <table>
+      <tr><td>Data da Emissão:</td><td>${hoje}</td></tr>
+      <tr><td>Nº da Requisição:</td><td>${sol?.numero||p.solicitacao_numero||'—'}</td></tr>
+      <tr><td>Centro de Custo:</td><td>${p.centro_custo||sol?.area||'—'}</td></tr>
+      <tr><td>Comprador:</td><td>${sol?.comprado_por||S.user.nome+' '+S.user.sobrenome}</td></tr>
+      <tr><td>Prioridade:</td><td>${sol?.urgencia||'—'}</td></tr>
+      <tr><td>Validade:</td><td>${validOC.toLocaleDateString('pt-BR')}</td></tr>
+    </table>
   </div>
 </div>
 
-${itens.length?`<div class="section">
-  <h2>Itens da Requisição</h2>
+<!-- FORNECEDOR + ENTREGA -->
+<div class="sec-hdr" style="display:grid;grid-template-columns:1fr 1fr"><span>DADOS DO FORNECEDOR</span><span style="border-left:1px solid #999">ENDEREÇO DE ENTREGA</span></div>
+<div class="two-col">
+  <div class="col-box">
+    <div class="field-row"><span class="field-lbl">Razão Social:</span><span class="field-val">${p.fornecedor||'—'}</span></div>
+    ${fornCot.cnpj?`<div class="field-row"><span class="field-lbl">CNPJ:</span><span class="field-val">${fornCot.cnpj}</span></div>`:''}
+    <div class="field-row"><span class="field-lbl">Forma de Pgto:</span><span class="field-val">${p.forma_pagamento_oc||fornCot.pgto||'—'}</span></div>
+    <div class="field-row"><span class="field-lbl">Prazo Entrega:</span><span class="field-val">${fornCot.prazo?fornCot.prazo+' dias úteis':'—'}</span></div>
+    ${fornCot.obs?`<div class="field-row"><span class="field-lbl">Observações:</span><span class="field-val">${fornCot.obs}</span></div>`:''}
+  </div>
+  <div class="col-box">
+    <div class="field-row"><span class="field-lbl">Destinatário:</span><span class="field-val">${(loja.nome||grpNome).toUpperCase()}</span></div>
+    <div class="field-row"><span class="field-lbl">Cidade / UF:</span><span class="field-val">Bauru / SP</span></div>
+    <div class="field-row"><span class="field-lbl">Responsável:</span><span class="field-val">${sol?.comprado_por||'—'}</span></div>
+    <div class="field-row"><span class="field-lbl">Horário:</span><span class="field-val">Segunda à Sexta, 08h às 17h</span></div>
+    <div class="field-row"><span class="field-lbl">Prev. Entrega:</span><span class="field-val">${fmtD(p.prev_entrega)}</span></div>
+  </div>
+</div>
+
+<!-- ITENS -->
+<div class="sec-hdr">ITENS DA ORDEM DE COMPRA</div>
+<div class="items-wrap">
   <table>
-    <thead><tr><th>Nº</th><th>Descrição</th><th>Qtd.</th><th style="text-align:right">Valor Unit.</th><th style="text-align:right">Total</th></tr></thead>
+    <thead><tr>
+      <th style="width:40px">Item</th>
+      <th style="width:80px">Código</th>
+      <th>Descrição</th>
+      <th style="width:60px">Unidade</th>
+      <th style="width:80px">Quantidade</th>
+      <th style="width:110px">Valor Unit. (R$)</th>
+      <th style="width:110px">Valor Total (R$)</th>
+    </tr></thead>
     <tbody>
-      ${itens.map((i,idx)=>`<tr>
-        <td style="color:#9E9E9E;text-align:center;width:40px">${idx+1}</td>
-        <td>${i.desc||i.descricao||'—'}</td>
-        <td style="text-align:center;width:60px">${i.qtd||1}</td>
-        <td style="text-align:right;width:120px">${i.val>0?'R$ '+parseFloat(i.val).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td>
-        <td style="text-align:right;width:120px;font-weight:600">R$ ${(parseFloat(i.total)||((i.qtd||1)*(i.val||0))).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-      </tr>`).join('')}
+      ${itens.length?itens.map((i,idx)=>`<tr>
+        <td>${idx+1}</td>
+        <td>${i.cod||i.codigo||('ITEM'+String(idx+1).padStart(3,'0'))}</td>
+        <td class="desc">${i.desc||i.descricao||'—'}</td>
+        <td>${i.un||i.unidade||'UN'}</td>
+        <td>${i.qtd||1}</td>
+        <td class="val">${(i.val||(i.qtd?vf/itens.length:0)).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+        <td class="val">${(i.total||(i.qtd||1)*(i.val||0)||(vf/itens.length)).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+      </tr>`).join(''):`<tr><td></td><td></td><td class="desc">${sol?.descricao||p.descricao||'Conforme solicitação'}</td><td>UN</td><td>${sol?.quantidade||1}</td><td class="val">${vf.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td class="val">${vf.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td></tr>`}
     </tbody>
-    <tfoot><tr class="total-row">
-      <td colspan="4" style="text-align:right;padding:10px">VALOR TOTAL DA COMPRA</td>
-      <td style="text-align:right;padding:10px;color:#1565C0;font-size:15px">R$ ${vf.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-    </tr></tfoot>
+    <tfoot>
+      <tr class="total-row">
+        <td colspan="5" style="text-align:right;padding-right:12px">VALOR TOTAL DA ORDEM DE COMPRA:</td>
+        <td></td>
+        <td class="val" style="font-size:12px;color:#1565C0">R$ ${vf.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+      </tr>
+    </tfoot>
   </table>
-</div>`:''}
-
-<div class="saving">
-  <div><div class="lbl">Valor Aprovado</div><div class="val" style="color:#333">R$ ${parseFloat(valAprov).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div></div>
-  <div><div class="lbl">Valor Final Pago</div><div class="val" style="color:#1565C0">R$ ${parseFloat(vf).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div></div>
-  <div><div class="lbl">Saving / Economia</div><div class="val" style="color:#2E7D32">R$ ${parseFloat(desc).toLocaleString('pt-BR',{minimumFractionDigits:2})}<br><span style="font-size:14px">(${pct}%)</span></div></div>
 </div>
 
-<div class="section">
-  <h2>Histórico de Aprovações</h2>
-  <div class="grid3">
-    <div class="field"><label>👔 Aprovado — Diretoria</label><span>${sol.aprovado_dir_nome||'—'}</span><br><span style="font-size:11px;color:#9E9E9E">${fmtD(sol.aprovado_dir_data)}</span></div>
-    <div class="field"><label>✅ Aprovado — Gerente</label><span>${sol.aprovado_ger_nome||'—'}</span><br><span style="font-size:11px;color:#9E9E9E">${fmtD(sol.aprovado_ger_data)}</span></div>
-    <div class="field"><label>🛒 Compra Executada</label><span>${sol.comprado_por||'—'}</span><br><span style="font-size:11px;color:#9E9E9E">${fmtD(sol.comprado_em)}</span></div>
+<!-- CONDIÇÕES + RESUMO FINANCEIRO + COTAÇÃO -->
+<div class="three-col">
+  <div class="col-box">
+    <h3>CONDIÇÕES DE PAGAMENTO E ENTREGA</h3>
+    <div class="field-row"><span class="field-lbl">Forma de Pagamento:</span><span class="field-val">${p.forma_pagamento_oc||fornCot.pgto||'—'}</span></div>
+    <div class="field-row"><span class="field-lbl">Prazo de Entrega:</span><span class="field-val">${fornCot.prazo?fornCot.prazo+' dias úteis':'—'}</span></div>
+    <div class="field-row"><span class="field-lbl">Validade da Ordem:</span><span class="field-val">${validOC.toLocaleDateString('pt-BR')}</span></div>
+    ${p.obs_compra?`<div class="field-row" style="align-items:flex-start"><span class="field-lbl">Observações:</span><span class="field-val">${p.obs_compra}</span></div>`:''}
   </div>
-</div>
-
-${p.obs_compra?`<div class="section"><h2>Observações</h2><p style="line-height:1.7">${p.obs_compra}</p></div>`:''}
-
-<div class="assinaturas">
-  <div class="ass">
-    <div class="nome">${sol.solicitante_nome||'—'}</div>
-    <div class="cargo">Solicitante</div>
+  <div class="col-box">
+    <h3>RESUMO FINANCEIRO</h3>
+    <div class="fin-row"><span>Subtotal:</span><span>R$ ${vf.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>
+    <div class="fin-row"><span>Desconto:</span><span>R$ ${desc.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>
+    <div class="fin-row"><span>Frete:</span><span>R$ 0,00</span></div>
+    <div class="fin-row"><span>Impostos (est.):</span><span>R$ 0,00</span></div>
+    <div class="fin-row total"><span>VALOR TOTAL:</span><span>R$ ${vf.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>
   </div>
-  <div class="ass">
-    <div class="nome">${sol.aprovado_dir_nome||'—'}</div>
-    <div class="cargo">Diretoria</div>
-  </div>
-  <div class="ass">
-    <div class="nome">${sol.aprovado_ger_nome||'—'}</div>
-    <div class="cargo">Gerente de Setor</div>
+  <div class="col-box">
+    <h3>DADOS DA COTAÇÃO</h3>
+    <div class="fin-row"><span>Fornecedor Escolhido:</span><span style="text-align:right;max-width:100px">${p.fornecedor||'—'}</span></div>
+    <div class="fin-row"><span>Nº da Cotação:</span><span>${cot?.numero||'—'}</span></div>
+    <div class="fin-row"><span>Data da Cotação:</span><span>${fmtD(cot?.data_criacao)}</span></div>
+    <div class="fin-row"><span>Economia obtida:</span><span style="color:#2E7D32;font-weight:600">R$ ${desc.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>
+    <div class="fin-row"><span>Saving (%):</span><span style="color:#2E7D32;font-weight:600">${pct}%</span></div>
+    <div class="fin-row"><span>Fornecedores consult.:</span><span>${cotItens.length||'—'}</span></div>
   </div>
 </div>
 
-<div class="footer">
-  Sistema de Compras · Grupo DHG & BMMOT · Documento gerado em ${hoje}
+<!-- APROVAÇÕES -->
+<div class="aprov">
+  <h3>APROVAÇÕES</h3>
+  <div class="aprov-grid">
+    <div class="aprov-item">
+      <div class="cargo">Comprador</div>
+      <div class="nome">${sol?.comprado_por||S.user.nome+' '+S.user.sobrenome}</div>
+      <div class="data">${fmtD(p.data_compra||sol?.comprado_em)}</div>
+      <div class="linha">Assinatura</div>
+    </div>
+    <div class="aprov-item">
+      <div class="cargo">Gestor de Compras</div>
+      <div class="nome">Guilherme Oliveira</div>
+      <div class="data">${hoje}</div>
+      <div class="linha">Assinatura</div>
+    </div>
+  </div>
+</div>
+<div class="footer-note">
+  Esta Ordem de Compra só terá validade após aprovação da diretoria e envio ao fornecedor. 
+  Qualquer alteração nos valores, prazos ou condições deverá ser comunicada previamente ao departamento de compras.
 </div>
 </body></html>`;
 
-  const win=window.open('','_blank','width=900,height=700');
+  const win=window.open('','_blank','width=960,height=800');
   win.document.write(html);
   win.document.close();
 }
+
 
 function calcSaving(valAprov){
   const vf=parseFloat(document.getElementById('oc-valfinal')?.value)||0;
@@ -2263,7 +2413,7 @@ function pgPed(){
     <td style="font-size:12px;font-weight:600;color:#1565C0">${p.valor_final_compra?fmt(p.valor_final_compra):'—'}</td>
     <td style="font-size:11px">${p.saving_pct?`<span class="chip" style="background:#E8F5E9;color:#2E7D32">${p.saving_pct}%</span>`:'—'}</td>
     <td style="font-size:12px">${fmtD(p.prev_entrega)}</td>
-    <td>${p.status==='Entregue'?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">Entregue</span>':'<span class="chip" style="background:#FFF3E0;color:#E65100">Em Trânsito</span>'}</td>
+    <td>${p.status==='Entregue'?'<span class="chip" style="background:#E8F5E9;color:#2E7D32">Entregue</span>':isLate(p.prev_entrega)?'<span class="chip" style="background:#FFEBEE;color:#C62828">⚠️ ATRASADO</span>':'<span class="chip" style="background:#FFF3E0;color:#E65100">Em Trânsito</span>'}</td>
     <td style="font-size:11px;color:#9E9E9E">${p.nf||'—'}</td>
     <td style="white-space:nowrap">
       <button class="sm bl" onclick="gerarOCPed('${p.id}')">📄 OC</button>
@@ -2992,6 +3142,24 @@ async function hLogin(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────
+function getBadge(page){
+  let n=0;
+  if(page==='solicitacoes'){
+    if(isDiretoria())n=S.sol.filter(s=>s.status==='Aguardando Diretoria'||s.status==='Aguardando Aprovação Diretoria').length;
+    if(isGerente()&&!isDiretoria())n=S.sol.filter(s=>s.status==='Aguardando Aprovação Gerente').length;
+    if(isCompras()&&!isDiretoria())n=S.sol.filter(s=>s.status==='Aprovada'||s.status==='Comprada').length;
+  }
+  if(page==='cotacoes'&&isCompras())n=S.sol.filter(s=>s.status==='Aguardando Orçamento').length;
+  if(page==='pedidos'&&isCompras())n=S.ped.filter(p=>p.status!=='Entregue').length;
+  return n>0?`<span style="background:#E53935;color:#fff;border-radius:10px;font-size:9px;font-weight:700;padding:1px 6px;min-width:16px;text-align:center;position:absolute;right:8px;top:50%;transform:translateY(-50%)">${n}</span>`:'';
+}
+
+// ── LATE DELIVERY CHECK ────────────────────────────────────────────────────
+function isLate(dateStr){
+  if(!dateStr)return false;
+  return new Date(dateStr)<new Date();
+}
+
 async function init(){
   loadSession();
   try{await loadLojas();}catch(e){}
