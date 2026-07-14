@@ -214,42 +214,28 @@ const SESSION_KEY='compras_session';
 
 // Dados completos das lojas (endereço, CNPJ, grupo)
 const LOJAS_INFO={
-  // ── DHC ──────────────────────────────────────────────────────────────────
-  'hyundai bauru':              {cnpj:'09.524.129/0001-73',end:'Av Nuno de Assis',num:'18-55',cep:'17.020-310',cidade:'Bauru',uf:'SP',grupo:'DHG'},
-  'hyundai botucatu':           {cnpj:'09.524.129/0003-35',end:'Av Deputado Dante Delmanto',num:'3073',cep:'18.608-393',cidade:'Botucatu',uf:'SP',grupo:'DHG'},
-  'hyundai jaú':                {cnpj:'09.524.129/0004-16',end:'Av Deputado Zien Nassif',num:'1220',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHG'},
-  'hyundai jau':                {cnpj:'09.524.129/0004-16',end:'Av Deputado Zien Nassif',num:'1220',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHG'},
-  'hyundai marília':            {cnpj:'09.524.129/0007-69',end:'R Doutor Reinaldo Machado',num:'30',cep:'17519-080',cidade:'Marilia',uf:'SP',grupo:'DHG'},
-  'hyundai marilia':            {cnpj:'09.524.129/0007-69',end:'R Doutor Reinaldo Machado',num:'30',cep:'17519-080',cidade:'Marilia',uf:'SP',grupo:'DHG'},
-  'hyundai ourinhos':           {cnpj:'09.524.129/0006-88',end:'Av Luiz Saldanha Rodrigues',num:'2640',cep:'19.907-510',cidade:'Ourinhos',uf:'SP',grupo:'DHG'},
-  'toyota bauru':               {cnpj:'08.159.178/0001-91',end:'Av Nuno de Assis',num:'13-60',cep:'17.020-310',cidade:'Bauru',uf:'SP',grupo:'DHG'},
-  'toyota jaú':                 {cnpj:'08.159.178/0002-72',end:'Av Deputado Zien Nassif',num:'1200',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHG'},
-  'toyota jau':                 {cnpj:'08.159.178/0002-72',end:'Av Deputado Zien Nassif',num:'1200',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHG'},
-  't-service':                  {cnpj:'08.159.178/0003-53',end:'Av Comendador Jose da Silva Martha',num:'22-18',cep:'17.054-511',cidade:'Bauru',uf:'SP',grupo:'DHG'},
-  'chery marília':              {cnpj:'61.711.683/0001-80',end:'R Doutor Reinaldo Machado',num:'40',cep:'17.519-080',cidade:'Marilia',uf:'SP',grupo:'DHG'},
-  'chery marilia':              {cnpj:'61.711.683/0001-80',end:'R Doutor Reinaldo Machado',num:'40',cep:'17.519-080',cidade:'Marilia',uf:'SP',grupo:'DHG'},
-  'triumph bauru':              {cnpj:'59.003.379/0001-36',end:'Av Comendador Jose da Silva Martha',num:'22-18',cep:'17.054-511',cidade:'Bauru',uf:'SP',grupo:'DHG'},
-  'triumph araçatuba':          {cnpj:'59.003.379/0002-17',end:'Av Brasilia',num:'2722',cep:'16.018-000',cidade:'Aracatuba',uf:'SP',grupo:'DHG'},
-  'triumph aracatuba':          {cnpj:'59.003.379/0002-17',end:'Av Brasilia',num:'2722',cep:'16.018-000',cidade:'Aracatuba',uf:'SP',grupo:'DHG'},
-  // ── BMMOT ─────────────────────────────────────────────────────────────────
-  'byd ribeirão preto — botânico':{cnpj:'27.103.347/0001-16',end:'Av Carlos Eduardo de Gasperi Consoni',num:'1562',cep:'14.021-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'byd ribeirao preto — botanico':{cnpj:'27.103.347/0001-16',end:'Av Carlos Eduardo de Gasperi Consoni',num:'1562',cep:'14.021-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'botanico':                   {cnpj:'27.103.347/0001-16',end:'Av Carlos Eduardo de Gasperi Consoni',num:'1562',cep:'14.021-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'byd ribeirão preto — nova aliança':{cnpj:'27.103.347/0007-01',end:'R Augusto Domingos Pereira',num:'177',cep:'14.026-564',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'nova aliança':               {cnpj:'27.103.347/0007-01',end:'R Augusto Domingos Pereira',num:'177',cep:'14.026-564',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'nova alianca':               {cnpj:'27.103.347/0007-01',end:'R Augusto Domingos Pereira',num:'177',cep:'14.026-564',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'kia ribeirão preto':         {cnpj:'57.307.172/0001-20',end:'Av Braz Olaia Acosta',num:'2010',cep:'14.026-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'kia ribeirao preto':         {cnpj:'57.307.172/0001-20',end:'Av Braz Olaia Acosta',num:'2010',cep:'14.026-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'kia rp':                     {cnpj:'57.307.172/0001-20',end:'Av Braz Olaia Acosta',num:'2010',cep:'14.026-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'byd araraquara':             {cnpj:'27.103.347/0009-73',end:'R Miguel Ciomino',num:'54',cep:'14.802-339',cidade:'Araraquara',uf:'SP',grupo:'BMMOT'},
-  'byd franca':                 {cnpj:'27.103.347/0013-50',end:'R Mauro Antonio Comparini',num:'50',cep:'14.403-123',cidade:'Franca',uf:'SP',grupo:'BMMOT'},
-  'byd são carlos':             {cnpj:'27.103.347/0010-07',end:'Av Getulio Vargas',num:'1850',cep:'13570-672',cidade:'Sao Carlos',uf:'SP',grupo:'BMMOT'},
-  'byd sao carlos':             {cnpj:'27.103.347/0010-07',end:'Av Getulio Vargas',num:'1850',cep:'13570-672',cidade:'Sao Carlos',uf:'SP',grupo:'BMMOT'},
-  'byd barretos':               {cnpj:'27.103.347/0014-30',end:'Av 43',num:'1186',cep:'14780-536',cidade:'Barretos',uf:'SP',grupo:'BMMOT'},
+  // ── DHG (nomes exatos do banco) ───────────────────────────────────────────
+  'chery marília':                      {cnpj:'61.711.683/0001-80',end:'R Doutor Reinaldo Machado',num:'40',cep:'17.519-080',cidade:'Marilia',uf:'SP',grupo:'DHG'},
+  'hyundai bauru':                      {cnpj:'09.524.129/0001-73',end:'Av Nuno de Assis',num:'18-55',cep:'17.020-310',cidade:'Bauru',uf:'SP',grupo:'DHG'},
+  'hyundai botucatu':                   {cnpj:'09.524.129/0003-35',end:'Av Deputado Dante Delmanto',num:'3073',cep:'18.608-393',cidade:'Botucatu',uf:'SP',grupo:'DHG'},
+  'hyundai jaú':                        {cnpj:'09.524.129/0004-16',end:'Av Deputado Zien Nassif',num:'1220',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHG'},
+  'hyundai marília':                    {cnpj:'09.524.129/0007-69',end:'R Doutor Reinaldo Machado',num:'30',cep:'17519-080',cidade:'Marilia',uf:'SP',grupo:'DHG'},
+  'hyundai ourinhos':                   {cnpj:'09.524.129/0006-88',end:'Av Luiz Saldanha Rodrigues',num:'2640',cep:'19.907-510',cidade:'Ourinhos',uf:'SP',grupo:'DHG'},
+  't-service':                          {cnpj:'08.159.178/0003-53',end:'Av Comendador Jose da Silva Martha',num:'22-18',cep:'17.054-511',cidade:'Bauru',uf:'SP',grupo:'DHG'},
+  'toyota bauru':                       {cnpj:'08.159.178/0001-91',end:'Av Nuno de Assis',num:'13-60',cep:'17.020-310',cidade:'Bauru',uf:'SP',grupo:'DHG'},
+  'toyota jaú':                         {cnpj:'08.159.178/0002-72',end:'Av Deputado Zien Nassif',num:'1200',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHG'},
+  'triumph araçatuba':                  {cnpj:'59.003.379/0002-17',end:'Av Brasilia',num:'2722',cep:'16.018-000',cidade:'Aracatuba',uf:'SP',grupo:'DHG'},
+  'triumph bauru':                      {cnpj:'59.003.379/0001-36',end:'Av Comendador Jose da Silva Martha',num:'22-18',cep:'17.054-511',cidade:'Bauru',uf:'SP',grupo:'DHG'},
+  // ── BMMOT (nomes exatos do banco) ─────────────────────────────────────────
+  'byd araraquara':                     {cnpj:'27.103.347/0009-73',end:'R Miguel Ciomino',num:'54',cep:'14.802-339',cidade:'Araraquara',uf:'SP',grupo:'BMMOT'},
+  'byd barretos':                       {cnpj:'27.103.347/0014-30',end:'Av 43',num:'1186',cep:'14780-536',cidade:'Barretos',uf:'SP',grupo:'BMMOT'},
+  'byd franca':                         {cnpj:'27.103.347/0013-50',end:'R Mauro Antonio Comparini',num:'50',cep:'14.403-123',cidade:'Franca',uf:'SP',grupo:'BMMOT'},
+  'byd ribeirão preto — botânico':      {cnpj:'27.103.347/0001-16',end:'Av Carlos Eduardo de Gasperi Consoni',num:'1562',cep:'14.021-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'byd ribeirão preto — nova aliança':  {cnpj:'27.103.347/0007-01',end:'R Augusto Domingos Pereira',num:'177',cep:'14.026-564',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'byd são carlos':                     {cnpj:'27.103.347/0010-07',end:'Av Getulio Vargas',num:'1850',cep:'13570-672',cidade:'Sao Carlos',uf:'SP',grupo:'BMMOT'},
+  'kia ribeirão preto':                 {cnpj:'57.307.172/0001-20',end:'Av Braz Olaia Acosta',num:'2010',cep:'14.026-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
   // ── UNIC ──────────────────────────────────────────────────────────────────
-  'byd são paulo':              {cnpj:'56.955.667/0001-00',end:'Av dos Bandeirantes',num:'3301',cep:'04071-010',cidade:'Sao Paulo',uf:'SP',grupo:'UNIC'},
-  'byd sao paulo':              {cnpj:'56.955.667/0001-00',end:'Av dos Bandeirantes',num:'3301',cep:'04071-010',cidade:'Sao Paulo',uf:'SP',grupo:'UNIC'},
-  'unic':                       {cnpj:'56.955.667/0001-00',end:'Av dos Bandeirantes',num:'3301',cep:'04071-010',cidade:'Sao Paulo',uf:'SP',grupo:'UNIC'},
+  'byd são paulo':                      {cnpj:'56.955.667/0001-00',end:'Av dos Bandeirantes',num:'3301',cep:'04071-010',cidade:'Sao Paulo',uf:'SP',grupo:'UNIC'},
 };
 // ── CONTROLE DE ACESSO POR GRUPO E LOJA ─────────────────────────────────
 function userGrupos(){
