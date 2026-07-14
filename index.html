@@ -212,6 +212,38 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 const sb=supabase.createClient(SB_URL,SB_KEY);
 const SESSION_KEY='compras_session';
 
+// Dados completos das lojas (endereço, CNPJ, grupo)
+const LOJAS_INFO={
+  'mori bauru':      {cnpj:'08.159.178/0001-91',end:'Av Nuno de Assis',num:'13-60',cep:'17.020-310',cidade:'Bauru',uf:'SP',grupo:'DHC'},
+  't-service':       {cnpj:'08.159.178/0003-53',end:'Av Comendador Jose da Silva Martha',num:'22-18',cep:'17.054-511',cidade:'Bauru',uf:'SP',grupo:'DHC'},
+  'mori jau':        {cnpj:'08.159.178/0002-72',end:'Av Deputado Zien Nassif',num:'1200',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHC'},
+  'dhc bauru':       {cnpj:'09.524.129/0001-73',end:'Av Nuno de Assis',num:'18-55',cep:'17.020-310',cidade:'Bauru',uf:'SP',grupo:'DHC'},
+  'dhc jau':         {cnpj:'09.524.129/0004-16',end:'Av Deputado Zien Nassif',num:'1220',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHC'},
+  'dhc botucatu':    {cnpj:'09.524.129/0003-35',end:'Av Dante Delmanto',num:'3073',cep:'18.608-393',cidade:'Botucatu',uf:'SP',grupo:'DHC'},
+  'dhc ourinhos':    {cnpj:'09.524.129/0006-88',end:'Av Luiz Saldanha Rodrigues',num:'2640',cep:'19.907-510',cidade:'Ourinhos',uf:'SP',grupo:'DHC'},
+  'dhc marilia':     {cnpj:'09.524.129/0007-69',end:'R Doutor Reinaldo Machado',num:'30',cep:'17519-080',cidade:'Marilia',uf:'SP',grupo:'DHC'},
+  'chery marilia':   {cnpj:'61.711.683/0001-80',end:'R Doutor Reinaldo Machado',num:'40',cep:'17519-080',cidade:'Marilia',uf:'SP',grupo:'DHC'},
+  'triumph bauru':   {cnpj:'59.003.379/0001-36',end:'Av Comendador Jose da Silva Martha',num:'22-18',cep:'17.054-511',cidade:'Bauru',uf:'SP',grupo:'DHC'},
+  'triumph aracatuba':{cnpj:'59.003.379/0002-17',end:'Av Brasilia',num:'2722',cep:'16.018-000',cidade:'Aracatuba',uf:'SP',grupo:'DHC'},
+  'botanico':        {cnpj:'27.103.347/0001-16',end:'Av Carlos Eduardo de Gasperi Consoni',num:'1562',cep:'14.021-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'nova alianca':    {cnpj:'27.103.347/0007-01',end:'R Augusto Domingos Pereira',num:'177',cep:'14.026-564',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'kia rp':          {cnpj:'57.307.172/0001-20',end:'Av Braz Olaia Acosta',num:'2010',cep:'14.026-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'byd araraquara':  {cnpj:'27.103.347/0009-73',end:'R Miguel Ciomino',num:'54',cep:'14.802-339',cidade:'Araraquara',uf:'SP',grupo:'BMMOT'},
+  'byd franca':      {cnpj:'27.103.347/0013-50',end:'R Mauro Antonio Comparini',num:'50',cep:'14.403-123',cidade:'Franca',uf:'SP',grupo:'BMMOT'},
+  'byd sao carlos':  {cnpj:'27.103.347/0010-07',end:'Av Getulio Vargas',num:'1850',cep:'13570-672',cidade:'Sao Carlos',uf:'SP',grupo:'BMMOT'},
+  'byd barretos':    {cnpj:'27.103.347/0014-30',end:'Av 43',num:'1186',cep:'14780-536',cidade:'Barretos',uf:'SP',grupo:'BMMOT'},
+  'unic':            {cnpj:'56.955.667/0001-00',end:'Av dos Bandeirantes',num:'3301',cep:'04071-010',cidade:'Sao Paulo',uf:'SP',grupo:'R&C'},
+};
+function getLojaDados(nomeOuId){
+  // Busca dados da loja pelo nome (busca parcial case-insensitive)
+  const key=Object.keys(LOJAS_INFO).find(k=>(nomeOuId||'').toLowerCase().includes(k));
+  if(key)return LOJAS_INFO[key];
+  // Tenta pelo objeto loja do Supabase
+  const loja=S.lojas.find(l=>l.id===nomeOuId||l.nome===nomeOuId);
+  if(loja)return {cnpj:loja.cnpj||'',end:loja.endereco||'',num:loja.numero||'',cep:loja.cep||'',cidade:loja.cidade||'Bauru',uf:loja.uf||'SP',grupo:loja.grupo||''};
+  return {cnpj:'',end:'',num:'',cep:'',cidade:'Bauru',uf:'SP',grupo:''};
+}
+
 // ── HASH ──────────────────────────────────────────────────────────────────
 async function hashSenha(senha){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(senha));
@@ -401,7 +433,7 @@ async function loadPage(page){
 // ── NUMBERS ───────────────────────────────────────────────────────────────
 async function genNum(tipo,grupo){
   const tab={SOL:'solicitacoes',COT:'cotacoes',PED:'pedidos'}[tipo];
-  const pref=tipo==='SOL'?(grupo==='BMMOT'?'BMM':'DHG'):tipo;
+  const pref=tipo==='SOL'?(grupo==='BMMOT'?'BMM':grupo==='R&C'?'RC':'DHC'):tipo;
   const {count}=await sb.from(tab).select('*',{count:'exact',head:true});
   return `${pref}-${String((count||0)+1).padStart(4,'0')}`;
 }
@@ -951,8 +983,9 @@ function pgSol(){
       value="${solFiltro.q}" oninput="solFiltro.q=this.value;render()">
     <select class="inp" style="width:95px;padding:8px 10px;font-size:13px" onchange="solFiltro.grupo=this.value;render()">
       <option value="">Grupos</option>
-      <option value="DHG"${solFiltro.grupo==='DHG'?' selected':''}>DHG</option>
+      <option value="DHG"${solFiltro.grupo==='DHC'?' selected':''}>DHG</option>
       <option value="BMMOT"${solFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+      <option value="R&C"${solFiltro.grupo==='R&C'?' selected':''}>R&amp;C</option>
     </select>
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="solFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
@@ -1994,8 +2027,7 @@ async function gerarOCPed(pedId){
     <div class="logo-m">M</div>
     <div class="co-name">${grpNome.toUpperCase()}</div>
     <div class="co-addr">
-      ${loja.nome?loja.nome+' — ':''}<br>
-      Bauru / SP — CNPJ: 14.200.166/0001-00
+      ${(()=>{const d=getLojaDados(sol?.loja_nome||loja?.nome||'');return `${d.end||''}, ${d.num||''}<br>CEP: ${d.cep||''} — ${d.cidade||'Bauru'} / ${d.uf||'SP'}<br>CNPJ: ${d.cnpj||'—'}`})()}
     </div>
   </div>
   <div class="hdr-title">
@@ -2025,8 +2057,13 @@ async function gerarOCPed(pedId){
     ${fornCot.obs?`<div class="field-row"><span class="field-lbl">Observações:</span><span class="field-val">${fornCot.obs}</span></div>`:''}
   </div>
   <div class="col-box">
-    <div class="field-row"><span class="field-lbl">Destinatário:</span><span class="field-val">${(loja.nome||grpNome).toUpperCase()}</span></div>
-    <div class="field-row"><span class="field-lbl">Cidade / UF:</span><span class="field-val">Bauru / SP</span></div>
+    ${(()=>{const d=getLojaDados(sol?.loja_nome||loja?.nome||'');return `
+    <div class="field-row"><span class="field-lbl">Destinatário:</span><span class="field-val">${(sol?.loja_nome||loja?.nome||grpNome).toUpperCase()}</span></div>
+    <div class="field-row"><span class="field-lbl">Endereço:</span><span class="field-val">${d.end||'—'}, ${d.num||''}</span></div>
+    <div class="field-row"><span class="field-lbl">CEP:</span><span class="field-val">${d.cep||'—'}</span></div>
+    <div class="field-row"><span class="field-lbl">Cidade / UF:</span><span class="field-val">${d.cidade||'Bauru'} / ${d.uf||'SP'}</span></div>
+    <div class="field-row"><span class="field-lbl">CNPJ:</span><span class="field-val">${d.cnpj||'—'}</span></div>
+    `})()}
     <div class="field-row"><span class="field-lbl">Responsável:</span><span class="field-val">${sol?.comprado_por||'—'}</span></div>
     <div class="field-row"><span class="field-lbl">Horário:</span><span class="field-val">Segunda à Sexta, 08h às 17h</span></div>
     <div class="field-row"><span class="field-lbl">Prev. Entrega:</span><span class="field-val">${fmtD(p.prev_entrega)}</span></div>
@@ -2580,8 +2617,9 @@ function pgForn(){
       value="${fornFiltro.q}" oninput="fornFiltro.q=this.value;render()">
     <select class="inp" style="width:120px;padding:8px 10px;font-size:13px" onchange="fornFiltro.grupo=this.value;render()">
       <option value="">Todos Grupos</option>
-      <option value="DHG"${fornFiltro.grupo==='DHG'?' selected':''}>DHG</option>
+      <option value="DHG"${fornFiltro.grupo==='DHC'?' selected':''}>DHG</option>
       <option value="BMMOT"${fornFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+      <option value="R&C"${fornFiltro.grupo==='R&C'?' selected':''}>R&amp;C</option>
       <option value="TODOS"${fornFiltro.grupo==='TODOS'?' selected':''}>Todos</option>
     </select>
     <select class="inp" style="width:130px;padding:8px 10px;font-size:13px" onchange="fornFiltro.status=this.value;render()">
@@ -2665,8 +2703,9 @@ function pgCot(){
       value="${cotFiltro.q}" oninput="cotFiltro.q=this.value;render()">
     <select class="inp" style="width:120px;padding:8px 10px;font-size:13px" onchange="cotFiltro.grupo=this.value;render()">
       <option value="">Grupos</option>
-      <option value="DHG"${cotFiltro.grupo==='DHG'?' selected':''}>DHG</option>
+      <option value="DHG"${cotFiltro.grupo==='DHC'?' selected':''}>DHG</option>
       <option value="BMMOT"${cotFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+      <option value="R&C"${cotFiltro.grupo==='R&C'?' selected':''}>R&amp;C</option>
     </select>
     <select class="inp" style="width:160px;padding:8px 10px;font-size:13px" onchange="cotFiltro.status=this.value;render()">
       <option value="">Todos os Status</option>
@@ -3139,8 +3178,9 @@ function pgPed(){
       value="${pedFiltro.q}" oninput="pedFiltro.q=this.value;render()">
     <select class="inp" style="width:110px;padding:8px 10px;font-size:13px" onchange="pedFiltro.grupo=this.value;render()">
       <option value="">Grupos</option>
-      <option value="DHG"${pedFiltro.grupo==='DHG'?' selected':''}>DHG</option>
+      <option value="DHG"${pedFiltro.grupo==='DHC'?' selected':''}>DHG</option>
       <option value="BMMOT"${pedFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+      <option value="R&C"${pedFiltro.grupo==='R&C'?' selected':''}>R&amp;C</option>
     </select>
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="pedFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
@@ -3274,7 +3314,7 @@ function pgRel(){
   <input type="month" class="inp" style="width:160px;padding:7px 12px" id="rf-ate" value="${relFiltros.ate}" onchange="relFiltros.ate=this.value;renderRel()">
   <select class="inp" style="width:160px;padding:7px 12px" id="rf-grupo" onchange="relFiltros.grupo=this.value;renderRel()">
     <option value="">Todos os Grupos</option>
-    <option value="DHG"${relFiltros.grupo==='DHG'?' selected':''}>DHG</option>
+    <option value="DHG"${relFiltros.grupo==='DHC'?' selected':''}>DHG</option>
     <option value="BMMOT"${relFiltros.grupo==='BMMOT'?' selected':''}>BMMOT</option>
   </select>
   <select class="inp" style="width:200px;padding:7px 12px" id="rf-loja" onchange="relFiltros.loja=this.value;renderRel()">
@@ -3304,7 +3344,7 @@ function aplicarFiltroBase(s){
   }
   if(relFiltros.grupo){
     // Determina o grupo pela solicitação: campo grupo OU prefixo do número
-    const grpSol=s.grupo||(s.numero?.startsWith('BMM')?'BMMOT':'DHG');
+    const grpSol=s.grupo||(s.numero?.startsWith('BMM')?'BMMOT':s.numero?.startsWith('RC')?'R&C':'DHC');
     if(grpSol!==relFiltros.grupo)return false;
   }
   if(relFiltros.loja&&s.loja_id!==relFiltros.loja)return false;
