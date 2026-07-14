@@ -1052,13 +1052,19 @@ function pgSol(){
     <input class="inp" placeholder="🔍 Número, descrição, loja, área..."
       style="flex:1;min-width:200px;padding:8px 12px;font-size:13px"
       value="${solFiltro.q}" oninput="solFiltro.q=this.value;render()">
-    <select class="inp" style="width:95px;padding:8px 10px;font-size:13px" onchange="solFiltro.grupo=this.value;render()">
+    <select class="inp" style="width:95px;padding:8px 10px;font-size:13px" onchange="solFiltro.grupo=this.value;solFiltro.loja='';render()">
       <option value="">Grupos</option>
       ${grupoOptsHtml}
     </select>
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="solFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
-      ${(isGestor()?S.lojas:S.lojas.filter(l=>podeVerGrupo(l.grupo))).map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('')}
+      ${(()=>{
+      // Filtra lojas pelo grupo selecionado no filtro OU pelo acesso do usuário
+      let lojasFiltro=S.lojas;
+      if(!isGestor())lojasFiltro=lojasFiltro.filter(l=>podeVerGrupo(l.grupo));
+      if(solFiltro.grupo)lojasFiltro=lojasFiltro.filter(l=>l.grupo===solFiltro.grupo);
+      return lojasFiltro.map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
+    })()}
     </select>
     <select class="inp" style="width:195px;padding:8px 10px;font-size:13px" onchange="solFiltro.status=this.value;render()">
       <option value="">Todos os Status</option>
@@ -3266,7 +3272,7 @@ function pgPed(){
     <input class="inp" placeholder="🔍 Número, fornecedor, solicitação..."
       style="flex:1;min-width:200px;padding:8px 12px;font-size:13px"
       value="${pedFiltro.q}" oninput="pedFiltro.q=this.value;render()">
-    <select class="inp" style="width:110px;padding:8px 10px;font-size:13px" onchange="pedFiltro.grupo=this.value;render()">
+    <select class="inp" style="width:110px;padding:8px 10px;font-size:13px" onchange="pedFiltro.grupo=this.value;pedFiltro.loja='';render()">
       <option value="">Grupos</option>
       <option value="DHG"${pedFiltro.grupo==='DHC'?' selected':''}>DHG</option>
       <option value="BMMOT"${pedFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
@@ -3274,7 +3280,13 @@ function pgPed(){
     </select>
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="pedFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
-      ${lojasPed.map(l=>`<option value="${l}"${pedFiltro.loja===l?' selected':''}>${l}</option>`).join('')}
+      ${(()=>{
+      // Filtra lojas de pedidos pelo grupo selecionado
+      let lojasP=lojasPed;
+      if(pedFiltro.grupo)lojasP=S.ped.filter(p=>p.grupo===pedFiltro.grupo).map(p=>p.loja_nome).filter(Boolean);
+      lojasP=[...new Set(lojasP)].sort();
+      return lojasP.map(l=>`<option value="${l}"${pedFiltro.loja===l?' selected':''}>${l}</option>`).join('');
+    })()}
     </select>
     <select class="inp" style="width:155px;padding:8px 10px;font-size:13px" onchange="pedFiltro.status=this.value;render()">
       <option value="">Todos os Status</option>
@@ -3402,14 +3414,19 @@ function pgRel(){
   <input type="month" class="inp" style="width:160px;padding:7px 12px" id="rf-de" value="${relFiltros.de}" onchange="relFiltros.de=this.value;renderRel()">
   <span style="color:#9E9E9E">até</span>
   <input type="month" class="inp" style="width:160px;padding:7px 12px" id="rf-ate" value="${relFiltros.ate}" onchange="relFiltros.ate=this.value;renderRel()">
-  <select class="inp" style="width:160px;padding:7px 12px" id="rf-grupo" onchange="relFiltros.grupo=this.value;renderRel()">
+  <select class="inp" style="width:160px;padding:7px 12px" id="rf-grupo" onchange="relFiltros.grupo=this.value;relFiltros.loja='';renderRel()">
     <option value="">Todos os Grupos</option>
     <option value="DHG"${relFiltros.grupo==='DHG'?' selected':''}>DHG</option>
     <option value="BMMOT"${relFiltros.grupo==='BMMOT'?' selected':''}>BMMOT</option>
   </select>
   <select class="inp" style="width:200px;padding:7px 12px" id="rf-loja" onchange="relFiltros.loja=this.value;renderRel()">
     <option value="">Todas as Lojas</option>
-    ${lojaOpts}
+    ${(()=>{
+      let ljs=S.lojas;
+      if(!isGestor())ljs=ljs.filter(l=>podeVerGrupo(l.grupo));
+      if(relFiltros.grupo)ljs=ljs.filter(l=>l.grupo===relFiltros.grupo);
+      return ljs.map(l=>`<option value="${l.id}"${relFiltros.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
+    })()}
   </select>
   <select class="inp" style="width:180px;padding:7px 12px" id="rf-area" onchange="relFiltros.area=this.value;renderRel()">
     <option value="">Todos os Departamentos</option>
