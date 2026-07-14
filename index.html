@@ -1732,6 +1732,59 @@ async function hExecutarCompra(solId,cotId,forn,val){
   </div>`);
 }
 
+async function sincronizarPedidos(){
+  // Busca solicitações Comprada/Entregue sem pedido
+  const solCompradas=S.sol.filter(s=>['Comprada','Entregue'].includes(s.status));
+  const pedSolIds=new Set(S.ped.map(p=>p.solicitacao_id).filter(Boolean));
+  const semPedido=solCompradas.filter(s=>!pedSolIds.has(s.id));
+
+  if(!semPedido.length){
+    return alert('✅ Tudo sincronizado! Não há solicitações sem pedido.');
+  }
+
+  if(!confirm(`Encontrei ${semPedido.length} solicitação(ões) sem pedido:\n\n${semPedido.map(s=>s.numero+' — '+s.fornecedor).join('\n')}\n\nDeseja criar os pedidos faltantes?`))return;
+
+  let criados=0, erros=0;
+  for(const s of semPedido){
+    try{
+      const num=await genNum('PED');
+      const prev=new Date(s.comprado_em||s.data_criacao||Date.now());
+      prev.setDate(prev.getDate()+7);
+      const pedBase={
+        numero:num,
+        solicitacao_id:s.id,
+        solicitacao_numero:s.numero,
+        fornecedor:s.fornecedor||'—',
+        loja_nome:s.loja_nome,
+        descricao:s.descricao,
+        valor:s.valor_final||s.valor_estimado||0,
+        data_compra:(s.comprado_em||new Date().toISOString()).slice(0,10),
+        prev_entrega:prev.toISOString().slice(0,10),
+        status:s.status==='Entregue'?'Entregue':'Em Trânsito',
+        grupo:s.grupo
+      };
+      const {data:pedData,error}=await sb.from('pedidos').insert(pedBase).select().single();
+      if(error)throw error;
+      // Tenta salvar campos extras
+      if(pedData?.id){
+        await sb.from('pedidos').update({
+          valor_final_compra:s.valor_final||null,
+          desconto:s.desconto||null,
+          saving_pct:s.saving_pct||null,
+          cotacao_id:s.cotacao_id||null,
+          nf:s.nf||null
+        }).eq('id',pedData.id).then(()=>{}).catch(()=>{});
+      }
+      criados++;
+    }catch(e){
+      console.error('Erro ao criar pedido para '+s.numero+':',e);
+      erros++;
+    }
+  }
+  await loadPed();render();
+  alert(`✅ Sincronização concluída!\n${criados} pedido(s) criado(s)${erros?'\n⚠️ '+erros+' erro(s) — verifique o console':''}`);
+}
+
 async function mdEditValor(pedId){
   const p=S.ped.find(x=>x.id===pedId);
   if(!p)return;
@@ -3101,6 +3154,7 @@ function pgPed(){
     ${temFiltroP?`<button class="btn bsc" onclick="pedFiltro={q:'',status:'',grupo:'',loja:''};render()" style="padding:8px 14px;font-size:12px">↺ Limpar</button>`:''}
     <span style="font-size:12px;color:#9E9E9E">${listaP.length} de ${S.ped.length}</span>
     ${isCompras()?`<span style="font-size:12px;color:#E65100;font-weight:600;margin-left:4px">⚠️ ${S.ped.filter(p=>p.status!=='Entregue'&&isLate(p.prev_entrega)).length} atrasados</span>`:''}
+    ${isGestor()||isCompras()?`<button class="btn bsc" onclick="sincronizarPedidos()" style="padding:7px 14px;font-size:12px;margin-left:auto" title="Criar pedidos para solicitações compradas sem pedido">🔄 Sincronizar</button>`:''}
   </div>
   <div class="card"><div class="tw"><table>
   <thead><tr><th>Número</th><th>Sol.</th><th>Loja</th><th>Fornecedor</th><th>Valor Aprov.</th><th>Valor Final</th><th>Saving</th><th>Prev. Entrega</th><th>Status</th><th>NF</th><th>Ações</th></tr></thead>
@@ -3248,7 +3302,11 @@ function aplicarFiltroBase(s){
     if(relFiltros.de&&d<relFiltros.de)return false;
     if(relFiltros.ate&&d>relFiltros.ate)return false;
   }
-  if(relFiltros.grupo&&s.grupo!==relFiltros.grupo)return false;
+  if(relFiltros.grupo){
+    // Determina o grupo pela solicitação: campo grupo OU prefixo do número
+    const grpSol=s.grupo||(s.numero?.startsWith('BMM')?'BMMOT':'DHG');
+    if(grpSol!==relFiltros.grupo)return false;
+  }
   if(relFiltros.loja&&s.loja_id!==relFiltros.loja)return false;
   if(relFiltros.area&&s.area!==relFiltros.area)return false;
   return true;
