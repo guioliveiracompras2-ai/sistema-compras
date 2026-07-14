@@ -264,7 +264,8 @@ function userLojas(){
 }
 function podeVerGrupo(grupo){
   if(isGestor())return true;
-  return userGrupos().includes(grupo)||userGrupos().includes('TODOS');
+  const g=grupo==='DHC'?'DHG':grupo;
+  return userGrupos().includes(g)||userGrupos().includes('TODOS');
 }
 function podeVerLoja(lojaId){
   if(isGestor())return true;
@@ -281,11 +282,12 @@ function filtrarPorAcesso(lista){
   const todosGrps=grps.includes('TODOS');
   const todasLojas=lojas.includes('TODOS');
   return lista.filter(s=>{
-    // Determina grupo pelo campo ou pelo prefixo do número
-    const grp=s.grupo||(
+    const grpRaw=s.grupo||(
       (s.numero||s.solicitacao_numero||'').startsWith('BMM')?'BMMOT':
       (s.numero||s.solicitacao_numero||'').startsWith('RC')?'UNIC':'DHG'
     );
+    // DHC e DHG são o mesmo grupo
+    const grp=grpRaw==='DHC'?'DHG':grpRaw;
     if(!todosGrps&&!grps.includes(grp))return false;
     if(todasLojas)return true;
     return lojas.includes(s.loja_id)||lojas.includes(s.loja_nome);
@@ -1062,7 +1064,13 @@ function pgSol(){
       // Filtra lojas pelo grupo selecionado no filtro OU pelo acesso do usuário
       let lojasFiltro=S.lojas;
       if(!isGestor())lojasFiltro=lojasFiltro.filter(l=>podeVerGrupo(l.grupo));
-      if(solFiltro.grupo)lojasFiltro=lojasFiltro.filter(l=>l.grupo===solFiltro.grupo);
+      if(solFiltro.grupo){
+        const gf=solFiltro.grupo;
+        lojasFiltro=lojasFiltro.filter(l=>{
+          const lg=l.grupo==='DHC'?'DHG':l.grupo;
+          return lg===gf;
+        });
+      }
       return lojasFiltro.map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
     })()}
     </select>
@@ -3424,7 +3432,10 @@ function pgRel(){
     ${(()=>{
       let ljs=S.lojas;
       if(!isGestor())ljs=ljs.filter(l=>podeVerGrupo(l.grupo));
-      if(relFiltros.grupo)ljs=ljs.filter(l=>l.grupo===relFiltros.grupo);
+      if(relFiltros.grupo){
+        const gf=relFiltros.grupo;
+        ljs=ljs.filter(l=>(l.grupo==='DHC'?'DHG':l.grupo)===gf);
+      }
       return ljs.map(l=>`<option value="${l.id}"${relFiltros.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
     })()}
   </select>
