@@ -1543,6 +1543,9 @@ async function hExecutarCompra(solId,cotId,forn,val){
   if(!isCompras())return alert('⛔ Apenas o time de Compras pode executar a compra.');
   const sol=S.sol.find(s=>s.id===solId);
   if(!sol||sol.status!=='Aprovada')return alert('⛔ Esta compra ainda não foi aprovada pelo Gerente.');
+  // Pega o valor negociado e forma de pagamento do campo no modal
+  const vnFinal=parseFloat(document.getElementById('vn-final')?.value)||val;
+  const vnPgto=document.getElementById('vn-pgto')?.value||'';
   // Carrega cotacao com todos os fornecedores para comparativo
   const {data:cots}=await sb.from('cotacoes').select('*').eq('solicitacao_id',solId);
   const cotData=cots||[];
@@ -1649,11 +1652,11 @@ async function hExecutarCompra(solId,cotId,forn,val){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
         <div class="f" style="margin:0">
           <label>Valor Real Pago (R$) *</label>
-          <input class="inp" type="number" id="oc-valfinal" step="0.01" placeholder="0,00" value="${val}" oninput="calcSaving(${val})">
+          <input class="inp" type="number" id="oc-valfinal" step="0.01" placeholder="0,00" value="${vnFinal||val}" oninput="calcSaving(${val})">
         </div>
         <div class="f" style="margin:0">
           <label>Forma de Pagamento *</label>
-          <select class="inp" id="oc-pgto">${PGTO.map(p=>`<option${chosen?.pgto===p?' selected':''}>${p}</option>`).join('')}</select>
+          <select class="inp" id="oc-pgto">${PGTO.map(p=>`<option${(vnPgto||chosen?.pgto)===p?' selected':''}>${p}</option>`).join('')}</select>
         </div>
       </div>
       <div id="saving-box" style="background:#E8F5E9;border-radius:8px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -1727,6 +1730,110 @@ async function hExecutarCompra(solId,cotId,forn,val){
     </button>
   </div>
   </div>`);
+}
+
+async function mdEditValor(pedId){
+  const p=S.ped.find(x=>x.id===pedId);
+  if(!p)return;
+  const valAprov=p.valor||0;
+  const valFinalAtual=p.valor_final_compra||p.valor||0;
+  const PGTO=['À vista','Boleto 30 dias','Boleto 30/60 dias','Boleto 30/60/90 dias','Cartão de crédito','Pix','Transferência bancária','Outro'];
+  openModal(`<div class="modal" style="max-width:480px">
+  <div class="mh" style="background:#FF6F00;color:#fff;border-radius:14px 14px 0 0">
+    <div>
+      <div style="font-size:15px;font-weight:700">💰 Editar Valor Final — ${p.numero}</div>
+      <div style="font-size:11px;opacity:.8;margin-top:2px">${p.fornecedor||'—'} · Sol: ${p.solicitacao_numero||'—'}</div>
+    </div>
+    <button class="xb" style="color:rgba(255,255,255,.7)" onclick="closeModal()">✕</button>
+  </div>
+  <div class="mb">
+    <div style="background:#F8F9FA;border-radius:8px;padding:14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:11px;color:#9E9E9E">Valor Aprovado (cotação)</div>
+        <div style="font-size:20px;font-weight:700;color:#333">${fmt(valAprov)}</div>
+      </div>
+      <div style="font-size:28px">🎯</div>
+    </div>
+    <div class="fg2" style="margin-bottom:14px">
+      <div class="f" style="margin:0">
+        <label>Valor Final Negociado (R$) *</label>
+        <input class="inp" type="number" id="ev-final" step="0.01"
+          value="${valFinalAtual}"
+          oninput="calcSavingEdit(${valAprov})"
+          style="font-size:18px;font-weight:700;color:#1565C0;text-align:center">
+      </div>
+      <div class="f" style="margin:0">
+        <label>Forma de Pagamento</label>
+        <select class="inp" id="ev-pgto">
+          ${PGTO.map(pg=>`<option${(p.forma_pagamento_oc||'')=== pg?' selected':''}>${pg}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <!-- SAVING PREVIEW -->
+    <div id="ev-preview" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border-radius:10px;padding:14px;background:#E8F5E9;border:1px solid #A5D6A7;margin-bottom:14px">
+      <div style="text-align:center">
+        <div style="font-size:10px;color:#555;margin-bottom:3px">Valor Aprovado</div>
+        <div style="font-size:14px;font-weight:700;color:#333">${fmt(valAprov)}</div>
+      </div>
+      <div style="text-align:center;border-left:1px solid rgba(0,0,0,.1);border-right:1px solid rgba(0,0,0,.1)">
+        <div style="font-size:10px;color:#555;margin-bottom:3px">Valor Final</div>
+        <div style="font-size:14px;font-weight:700;color:#1565C0" id="ev-vf">${fmt(valFinalAtual)}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:10px;color:#555;margin-bottom:3px">Saving</div>
+        <div style="font-size:16px;font-weight:700;color:#2E7D32" id="ev-eco">${fmt(Math.max(0,valAprov-valFinalAtual))}</div>
+        <div style="font-size:12px;font-weight:700;color:#2E7D32" id="ev-pct">${valAprov>0?((Math.max(0,valAprov-valFinalAtual)/valAprov)*100).toFixed(1):0}%</div>
+      </div>
+    </div>
+
+    ${p.saving_pct?`<div style="font-size:12px;color:#9E9E9E;text-align:center">Saving atual registrado: ${p.saving_pct}% (R$ ${fmt(p.desconto||0)})</div>`:''}
+  </div>
+  <div class="mf">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    <button class="btn" style="background:#FF6F00;color:#fff;padding:10px 24px;flex:1" onclick="salvarEditValor('${pedId}',${valAprov})">
+      💾 Salvar Valor e Saving
+    </button>
+  </div>
+  </div>`);
+}
+
+function calcSavingEdit(valAprov){
+  const vf=parseFloat(document.getElementById('ev-final')?.value)||0;
+  const desc=valAprov-vf;
+  const pct=valAprov>0?((desc/valAprov)*100):0;
+  const elVf=document.getElementById('ev-vf');
+  const elEco=document.getElementById('ev-eco');
+  const elPct=document.getElementById('ev-pct');
+  const preview=document.getElementById('ev-preview');
+  if(elVf)elVf.textContent=fmt(vf);
+  if(elEco){elEco.textContent=fmt(Math.abs(desc));elEco.style.color=desc>=0?'#2E7D32':'#C62828';}
+  if(elPct){elPct.textContent=(desc>=0?'':'-')+Math.abs(pct).toFixed(1)+'%';elPct.style.color=desc>=0?'#2E7D32':'#C62828';}
+  if(preview){preview.style.background=desc>0?'#E8F5E9':desc<0?'#FFEBEE':'#F8F9FA';preview.style.borderColor=desc>0?'#A5D6A7':desc<0?'#FFCDD2':'#E0E0E0';}
+}
+
+async function salvarEditValor(pedId,valAprov){
+  const vf=parseFloat(document.getElementById('ev-final')?.value);
+  const pgto=document.getElementById('ev-pgto')?.value||'';
+  if(!vf||vf<=0)return alert('Informe o valor final corretamente.');
+  const desc=valAprov-vf;
+  const pct=valAprov>0?Math.round((desc/valAprov)*1000)/10:0;
+  try{
+    await sb.from('pedidos').update({
+      valor_final_compra:vf,
+      desconto:desc,
+      saving_pct:pct,
+      forma_pagamento_oc:pgto
+    }).eq('id',pedId);
+    // Atualiza solicitação também
+    const p=S.ped.find(x=>x.id===pedId);
+    if(p?.solicitacao_id){
+      await sb.from('solicitacoes').update({valor_final:vf}).eq('id',p.solicitacao_id).then(()=>{}).catch(()=>{});
+    }
+    closeModal();
+    await loadPed();render();
+    alert('✅ Valor salvo!\nValor Final: '+fmt(vf)+'\nSaving: '+fmt(desc)+' ('+pct+'%)');
+  }catch(e){alert('Erro: '+e.message);}
 }
 
 async function gerarOCPed(pedId){
@@ -1964,6 +2071,29 @@ async function gerarOCPed(pedId){
   win.document.close();
 }
 
+
+function calcSavingModal(valAprov){
+  const vf=parseFloat(document.getElementById('vn-final')?.value)||valAprov;
+  const desc=valAprov-vf;
+  const pct=valAprov>0?((desc/valAprov)*100):0;
+  const elFinal=document.getElementById('sv-final');
+  const elEco=document.getElementById('sv-eco');
+  const elPct=document.getElementById('sv-pct');
+  const preview=document.getElementById('saving-preview');
+  if(elFinal)elFinal.textContent=fmt(vf);
+  if(elEco){
+    elEco.textContent=fmt(Math.abs(desc));
+    elEco.style.color=desc>=0?'#2E7D32':'#C62828';
+  }
+  if(elPct){
+    elPct.textContent=(desc>=0?'':'-')+Math.abs(pct).toFixed(1)+'%';
+    elPct.style.color=desc>=0?'#2E7D32':'#C62828';
+  }
+  if(preview){
+    preview.style.background=desc>0?'#E8F5E9':desc<0?'#FFEBEE':'#fff';
+    preview.style.borderColor=desc>0?'#A5D6A7':desc<0?'#FFCDD2':'#E0E0E0';
+  }
+}
 
 function calcSaving(valAprov){
   const vf=parseFloat(document.getElementById('oc-valfinal')?.value)||0;
@@ -2988,6 +3118,7 @@ function pgPed(){
     <td style="font-size:11px;color:#9E9E9E">${p.nf||'—'}</td>
     <td style="white-space:nowrap">
       <button class="sm bl" onclick="gerarOCPed('${p.id}')">📄 OC</button>
+      <button class="sm" style="background:#FF6F00;color:#fff" onclick="mdEditValor('${p.id}')" title="Editar valor final / saving">💰</button>
       ${p.status!=='Entregue'?`<button class="sm ok" onclick="mdEnt('${p.id}','${p.solicitacao_id||''}')">✓ Entrega</button>`:'<span style="color:#2E7D32;font-size:13px">✅</span>'}
     </td>
   </tr>`).join('')}
