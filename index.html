@@ -273,13 +273,28 @@ function podeVerLoja(lojaId){
   return lojas.includes(lojaId);
 }
 function filtrarPorAcesso(lista){
+  if(!lista||!lista.length)return lista||[];
+  // Gestor vê tudo
   if(isGestor())return lista;
+  const grps=userGrupos();
+  const lojas=userLojas();
+  const todosGrps=grps.includes('TODOS');
+  const todasLojas=lojas.includes('TODOS');
   return lista.filter(s=>{
-    const grp=s.grupo||(s.numero?.startsWith('BMM')?'BMMOT':s.numero?.startsWith('RC')?'UNIC':'DHG');
-    if(!podeVerGrupo(grp))return false;
-    if(userLojas().includes('TODOS'))return true;
-    return podeVerLoja(s.loja_id);
+    // Determina grupo pelo campo ou pelo prefixo do número
+    const grp=s.grupo||(
+      (s.numero||s.solicitacao_numero||'').startsWith('BMM')?'BMMOT':
+      (s.numero||s.solicitacao_numero||'').startsWith('RC')?'UNIC':'DHG'
+    );
+    if(!todosGrps&&!grps.includes(grp))return false;
+    if(todasLojas)return true;
+    return lojas.includes(s.loja_id)||lojas.includes(s.loja_nome);
   });
+}
+
+// Filtra qualquer lista baseado no acesso do usuário (para pedidos/cotações)
+function solIdsAcesso(){
+  return new Set(filtrarPorAcesso(S.sol).map(s=>s.id));
 }
 
 function getLojaDados(nomeOuId){
@@ -937,7 +952,7 @@ async function mdVerEntrega(id){
 
 
 function pgDash(){
-  const sol=S.sol,ped=S.ped;
+  const sol=filtrarPorAcesso(S.sol),ped=filtrarPorAcesso(S.ped.filter(p=>!p.solicitacao_id||solIdsAcesso().has(p.solicitacao_id)));
   const total=sol.length,concl=sol.filter(s=>['Comprada','Entregue'].includes(s.status)).length;
   const valR=sol.reduce((a,b)=>a+(parseFloat(b.valor_final)||0),0);
   const transit=ped.filter(p=>p.status==='Em Trânsito').length;
@@ -1024,6 +1039,8 @@ function pgSol(){
   });
 
   const STATUS=['Aguardando Diretoria','Aguardando Orçamento','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue','Reprovada'];
+  const GRUPOS_USER=['DHG','BMMOT','UNIC'].filter(g=>podeVerGrupo(g));
+  const grupoOptsHtml=GRUPOS_USER.map(g=>`<option value="${g}"${solFiltro.grupo===g?' selected':''} >${g}</option>`).join('');
   const lojaOpts=S.lojas.map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
   const temFiltro=solFiltro.q||solFiltro.status||solFiltro.loja||solFiltro.grupo||solFiltro.solicitante;
   const solicitantes=[...new Set(S.sol.map(s=>s.solicitante_nome).filter(Boolean))].sort();
@@ -1037,13 +1054,11 @@ function pgSol(){
       value="${solFiltro.q}" oninput="solFiltro.q=this.value;render()">
     <select class="inp" style="width:95px;padding:8px 10px;font-size:13px" onchange="solFiltro.grupo=this.value;render()">
       <option value="">Grupos</option>
-      <option value="DHG"${solFiltro.grupo==='DHG'?' selected':''}>DHG</option>
-      <option value="BMMOT"${solFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
-      <option value="UNIC"${solFiltro.grupo==='UNIC'?' selected':''}>UNIC</option>
+      ${grupoOptsHtml}
     </select>
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="solFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
-      ${lojaOpts}
+      ${(isGestor()?S.lojas:S.lojas.filter(l=>podeVerGrupo(l.grupo))).map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('')}
     </select>
     <select class="inp" style="width:195px;padding:8px 10px;font-size:13px" onchange="solFiltro.status=this.value;render()">
       <option value="">Todos os Status</option>
@@ -3428,19 +3443,18 @@ function aplicarFiltroBase(s){
 }
 
 function filtrarSol(){
-  // Apenas solicitações finalizadas (Comprada ou Entregue)
-  return S.sol.filter(s=>['Comprada','Entregue'].includes(s.status)&&aplicarFiltroBase(s));
+  const base=filtrarPorAcesso(S.sol);
+  return base.filter(s=>['Comprada','Entregue'].includes(s.status)&&aplicarFiltroBase(s));
 }
 
 function filtrarAllSol(){
-  // Todas as solicitações do período (para indicadores gerais)
-  return S.sol.filter(s=>aplicarFiltroBase(s));
+  const base=filtrarPorAcesso(S.sol);
+  return base.filter(s=>aplicarFiltroBase(s));
 }
 
 function filtrarPed(){
-  // Pedidos vinculados às solicitações filtradas
   const solIds=new Set(filtrarSol().map(s=>s.id));
-  return S.ped.filter(p=>solIds.has(p.solicitacao_id)||
+  return filtrarPorAcesso(S.ped).filter(p=>solIds.has(p.solicitacao_id)||
     // Também inclui pedidos sem solicitacao_id mas do período
     (!p.solicitacao_id&&aplicarFiltroBase({
       data_criacao:p.data_compra,
@@ -3467,6 +3481,9 @@ function calcSavingRel(sol,ped){
 }
 
 function renderRel(){
+  // Aplica filtro de acesso por grupo/loja antes dos filtros de período
+  const _solAcesso=filtrarPorAcesso(S.sol);
+  const _pedAcesso=filtrarPorAcesso(S.ped.filter(p=>!p.solicitacao_id||_solAcesso.some(s=>s.id===p.solicitacao_id)));
   // Destroy old charts
   Object.values(relCharts).forEach(c=>{try{c.destroy();}catch(e){}});
   relCharts={};
@@ -3786,7 +3803,7 @@ function pgUsers(){
   </span>
 </div>
 <div style="display:grid;gap:10px">
-  ${S.users.filter(u=>u.id).map(u=>`
+  ${S.users.filter(u=>u.id&&(isGestor()||userGrupos().includes('TODOS')||userGrupos().some(g=>(u.grupos||[u.grupo]||[]).includes(g)))).map(u=>`
   <div class="uc" style="opacity:${u.ativo?1:.55}">
     <div class="av" style="background:${pColor(u.perfil)};width:42px;height:42px;font-size:14px;flex-shrink:0">${ini(u.nome,u.sobrenome)}</div>
     <div style="flex:1;min-width:0">
@@ -3809,7 +3826,8 @@ function pgUsers(){
 }
 
 function mdCriarUser(){
-  const lo=S.lojas.map(l=>`<option value="${l.id}">${l.nome} (${l.grupo})</option>`).join('');
+  const lojasVisiveis=isGestor()?S.lojas:S.lojas.filter(l=>podeVerGrupo(l.grupo));
+  const lo=lojasVisiveis.map(l=>`<option value="${l.id}">${l.nome} (${l.grupo||''})</option>`).join('');
   openModal(`<div class="modal" style="max-width:520px">
   <div class="mh"><span>➕ Criar Novo Usuário</span><button class="xb" onclick="closeModal()">✕</button></div>
   <div class="mb">
@@ -4037,13 +4055,15 @@ async function hLogin(){
 // ── INIT ──────────────────────────────────────────────────────────────────
 function getBadge(page){
   let n=0;
+  const mySol=filtrarPorAcesso(S.sol);
+  const myPed=S.ped.filter(p=>!p.solicitacao_id||solIdsAcesso().has(p.solicitacao_id));
   if(page==='solicitacoes'){
-    if(isDiretoria())n=S.sol.filter(s=>s.status==='Aguardando Diretoria'||s.status==='Aguardando Aprovação Diretoria').length;
-    if(isGerente()&&!isDiretoria())n=S.sol.filter(s=>s.status==='Aguardando Aprovação Gerente').length;
-    if(isCompras()&&!isDiretoria())n=S.sol.filter(s=>s.status==='Aprovada'||s.status==='Comprada').length;
+    if(isDiretoria())n=mySol.filter(s=>s.status==='Aguardando Diretoria'||s.status==='Aguardando Aprovação Diretoria').length;
+    if(isGerente()&&!isDiretoria())n=mySol.filter(s=>s.status==='Aguardando Aprovação Gerente').length;
+    if(isCompras()&&!isDiretoria())n=mySol.filter(s=>s.status==='Aprovada'||s.status==='Comprada').length;
   }
-  if(page==='cotacoes'&&isCompras())n=S.sol.filter(s=>s.status==='Aguardando Orçamento').length;
-  if(page==='pedidos'&&isCompras())n=S.ped.filter(p=>p.status!=='Entregue').length;
+  if(page==='cotacoes'&&isCompras())n=mySol.filter(s=>s.status==='Aguardando Orçamento').length;
+  if(page==='pedidos'&&isCompras())n=myPed.filter(p=>p.status!=='Entregue').length;
   return n>0?`<span style="background:#E53935;color:#fff;border-radius:10px;font-size:9px;font-weight:700;padding:1px 6px;min-width:16px;text-align:center;position:absolute;right:8px;top:50%;transform:translateY(-50%)">${n}</span>`:'';
 }
 
