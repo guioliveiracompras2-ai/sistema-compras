@@ -214,33 +214,86 @@ const SESSION_KEY='compras_session';
 
 // Dados completos das lojas (endereço, CNPJ, grupo)
 const LOJAS_INFO={
-  'mori bauru':      {cnpj:'08.159.178/0001-91',end:'Av Nuno de Assis',num:'13-60',cep:'17.020-310',cidade:'Bauru',uf:'SP',grupo:'DHC'},
-  't-service':       {cnpj:'08.159.178/0003-53',end:'Av Comendador Jose da Silva Martha',num:'22-18',cep:'17.054-511',cidade:'Bauru',uf:'SP',grupo:'DHC'},
-  'mori jau':        {cnpj:'08.159.178/0002-72',end:'Av Deputado Zien Nassif',num:'1200',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHC'},
-  'dhc bauru':       {cnpj:'09.524.129/0001-73',end:'Av Nuno de Assis',num:'18-55',cep:'17.020-310',cidade:'Bauru',uf:'SP',grupo:'DHC'},
-  'dhc jau':         {cnpj:'09.524.129/0004-16',end:'Av Deputado Zien Nassif',num:'1220',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHC'},
-  'dhc botucatu':    {cnpj:'09.524.129/0003-35',end:'Av Dante Delmanto',num:'3073',cep:'18.608-393',cidade:'Botucatu',uf:'SP',grupo:'DHC'},
-  'dhc ourinhos':    {cnpj:'09.524.129/0006-88',end:'Av Luiz Saldanha Rodrigues',num:'2640',cep:'19.907-510',cidade:'Ourinhos',uf:'SP',grupo:'DHC'},
-  'dhc marilia':     {cnpj:'09.524.129/0007-69',end:'R Doutor Reinaldo Machado',num:'30',cep:'17519-080',cidade:'Marilia',uf:'SP',grupo:'DHC'},
-  'chery marilia':   {cnpj:'61.711.683/0001-80',end:'R Doutor Reinaldo Machado',num:'40',cep:'17519-080',cidade:'Marilia',uf:'SP',grupo:'DHC'},
-  'triumph bauru':   {cnpj:'59.003.379/0001-36',end:'Av Comendador Jose da Silva Martha',num:'22-18',cep:'17.054-511',cidade:'Bauru',uf:'SP',grupo:'DHC'},
-  'triumph aracatuba':{cnpj:'59.003.379/0002-17',end:'Av Brasilia',num:'2722',cep:'16.018-000',cidade:'Aracatuba',uf:'SP',grupo:'DHC'},
-  'botanico':        {cnpj:'27.103.347/0001-16',end:'Av Carlos Eduardo de Gasperi Consoni',num:'1562',cep:'14.021-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'nova alianca':    {cnpj:'27.103.347/0007-01',end:'R Augusto Domingos Pereira',num:'177',cep:'14.026-564',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'kia rp':          {cnpj:'57.307.172/0001-20',end:'Av Braz Olaia Acosta',num:'2010',cep:'14.026-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
-  'byd araraquara':  {cnpj:'27.103.347/0009-73',end:'R Miguel Ciomino',num:'54',cep:'14.802-339',cidade:'Araraquara',uf:'SP',grupo:'BMMOT'},
-  'byd franca':      {cnpj:'27.103.347/0013-50',end:'R Mauro Antonio Comparini',num:'50',cep:'14.403-123',cidade:'Franca',uf:'SP',grupo:'BMMOT'},
-  'byd sao carlos':  {cnpj:'27.103.347/0010-07',end:'Av Getulio Vargas',num:'1850',cep:'13570-672',cidade:'Sao Carlos',uf:'SP',grupo:'BMMOT'},
-  'byd barretos':    {cnpj:'27.103.347/0014-30',end:'Av 43',num:'1186',cep:'14780-536',cidade:'Barretos',uf:'SP',grupo:'BMMOT'},
-  'unic':            {cnpj:'56.955.667/0001-00',end:'Av dos Bandeirantes',num:'3301',cep:'04071-010',cidade:'Sao Paulo',uf:'SP',grupo:'R&C'},
+  // ── DHC ──────────────────────────────────────────────────────────────────
+  'hyundai bauru':              {cnpj:'09.524.129/0001-73',end:'Av Nuno de Assis',num:'18-55',cep:'17.020-310',cidade:'Bauru',uf:'SP',grupo:'DHG'},
+  'hyundai botucatu':           {cnpj:'09.524.129/0003-35',end:'Av Deputado Dante Delmanto',num:'3073',cep:'18.608-393',cidade:'Botucatu',uf:'SP',grupo:'DHG'},
+  'hyundai jaú':                {cnpj:'09.524.129/0004-16',end:'Av Deputado Zien Nassif',num:'1220',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHG'},
+  'hyundai jau':                {cnpj:'09.524.129/0004-16',end:'Av Deputado Zien Nassif',num:'1220',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHG'},
+  'hyundai marília':            {cnpj:'09.524.129/0007-69',end:'R Doutor Reinaldo Machado',num:'30',cep:'17519-080',cidade:'Marilia',uf:'SP',grupo:'DHG'},
+  'hyundai marilia':            {cnpj:'09.524.129/0007-69',end:'R Doutor Reinaldo Machado',num:'30',cep:'17519-080',cidade:'Marilia',uf:'SP',grupo:'DHG'},
+  'hyundai ourinhos':           {cnpj:'09.524.129/0006-88',end:'Av Luiz Saldanha Rodrigues',num:'2640',cep:'19.907-510',cidade:'Ourinhos',uf:'SP',grupo:'DHG'},
+  'toyota bauru':               {cnpj:'08.159.178/0001-91',end:'Av Nuno de Assis',num:'13-60',cep:'17.020-310',cidade:'Bauru',uf:'SP',grupo:'DHG'},
+  'toyota jaú':                 {cnpj:'08.159.178/0002-72',end:'Av Deputado Zien Nassif',num:'1200',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHG'},
+  'toyota jau':                 {cnpj:'08.159.178/0002-72',end:'Av Deputado Zien Nassif',num:'1200',cep:'17.204-212',cidade:'Jau',uf:'SP',grupo:'DHG'},
+  't-service':                  {cnpj:'08.159.178/0003-53',end:'Av Comendador Jose da Silva Martha',num:'22-18',cep:'17.054-511',cidade:'Bauru',uf:'SP',grupo:'DHG'},
+  'chery marília':              {cnpj:'61.711.683/0001-80',end:'R Doutor Reinaldo Machado',num:'40',cep:'17.519-080',cidade:'Marilia',uf:'SP',grupo:'DHG'},
+  'chery marilia':              {cnpj:'61.711.683/0001-80',end:'R Doutor Reinaldo Machado',num:'40',cep:'17.519-080',cidade:'Marilia',uf:'SP',grupo:'DHG'},
+  'triumph bauru':              {cnpj:'59.003.379/0001-36',end:'Av Comendador Jose da Silva Martha',num:'22-18',cep:'17.054-511',cidade:'Bauru',uf:'SP',grupo:'DHG'},
+  'triumph araçatuba':          {cnpj:'59.003.379/0002-17',end:'Av Brasilia',num:'2722',cep:'16.018-000',cidade:'Aracatuba',uf:'SP',grupo:'DHG'},
+  'triumph aracatuba':          {cnpj:'59.003.379/0002-17',end:'Av Brasilia',num:'2722',cep:'16.018-000',cidade:'Aracatuba',uf:'SP',grupo:'DHG'},
+  // ── BMMOT ─────────────────────────────────────────────────────────────────
+  'byd ribeirão preto — botânico':{cnpj:'27.103.347/0001-16',end:'Av Carlos Eduardo de Gasperi Consoni',num:'1562',cep:'14.021-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'byd ribeirao preto — botanico':{cnpj:'27.103.347/0001-16',end:'Av Carlos Eduardo de Gasperi Consoni',num:'1562',cep:'14.021-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'botanico':                   {cnpj:'27.103.347/0001-16',end:'Av Carlos Eduardo de Gasperi Consoni',num:'1562',cep:'14.021-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'byd ribeirão preto — nova aliança':{cnpj:'27.103.347/0007-01',end:'R Augusto Domingos Pereira',num:'177',cep:'14.026-564',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'nova aliança':               {cnpj:'27.103.347/0007-01',end:'R Augusto Domingos Pereira',num:'177',cep:'14.026-564',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'nova alianca':               {cnpj:'27.103.347/0007-01',end:'R Augusto Domingos Pereira',num:'177',cep:'14.026-564',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'kia ribeirão preto':         {cnpj:'57.307.172/0001-20',end:'Av Braz Olaia Acosta',num:'2010',cep:'14.026-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'kia ribeirao preto':         {cnpj:'57.307.172/0001-20',end:'Av Braz Olaia Acosta',num:'2010',cep:'14.026-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'kia rp':                     {cnpj:'57.307.172/0001-20',end:'Av Braz Olaia Acosta',num:'2010',cep:'14.026-610',cidade:'Ribeirao Preto',uf:'SP',grupo:'BMMOT'},
+  'byd araraquara':             {cnpj:'27.103.347/0009-73',end:'R Miguel Ciomino',num:'54',cep:'14.802-339',cidade:'Araraquara',uf:'SP',grupo:'BMMOT'},
+  'byd franca':                 {cnpj:'27.103.347/0013-50',end:'R Mauro Antonio Comparini',num:'50',cep:'14.403-123',cidade:'Franca',uf:'SP',grupo:'BMMOT'},
+  'byd são carlos':             {cnpj:'27.103.347/0010-07',end:'Av Getulio Vargas',num:'1850',cep:'13570-672',cidade:'Sao Carlos',uf:'SP',grupo:'BMMOT'},
+  'byd sao carlos':             {cnpj:'27.103.347/0010-07',end:'Av Getulio Vargas',num:'1850',cep:'13570-672',cidade:'Sao Carlos',uf:'SP',grupo:'BMMOT'},
+  'byd barretos':               {cnpj:'27.103.347/0014-30',end:'Av 43',num:'1186',cep:'14780-536',cidade:'Barretos',uf:'SP',grupo:'BMMOT'},
+  // ── UNIC ──────────────────────────────────────────────────────────────────
+  'byd são paulo':              {cnpj:'56.955.667/0001-00',end:'Av dos Bandeirantes',num:'3301',cep:'04071-010',cidade:'Sao Paulo',uf:'SP',grupo:'UNIC'},
+  'byd sao paulo':              {cnpj:'56.955.667/0001-00',end:'Av dos Bandeirantes',num:'3301',cep:'04071-010',cidade:'Sao Paulo',uf:'SP',grupo:'UNIC'},
+  'unic':                       {cnpj:'56.955.667/0001-00',end:'Av dos Bandeirantes',num:'3301',cep:'04071-010',cidade:'Sao Paulo',uf:'SP',grupo:'UNIC'},
 };
+// ── CONTROLE DE ACESSO POR GRUPO E LOJA ─────────────────────────────────
+function userGrupos(){
+  const g=S.user?.grupos;
+  if(!g||!g.length||g.includes('TODOS'))return['DHG','BMMOT','UNIC'];
+  return g;
+}
+function userLojas(){
+  const l=S.user?.lojas_acesso;
+  if(!l||!l.length||l.includes('TODOS'))return['TODOS'];
+  return l;
+}
+function podeVerGrupo(grupo){
+  if(isGestor())return true;
+  return userGrupos().includes(grupo)||userGrupos().includes('TODOS');
+}
+function podeVerLoja(lojaId){
+  if(isGestor())return true;
+  const lojas=userLojas();
+  if(lojas.includes('TODOS'))return true;
+  return lojas.includes(lojaId);
+}
+function filtrarPorAcesso(lista){
+  if(isGestor())return lista;
+  return lista.filter(s=>{
+    const grp=s.grupo||(s.numero?.startsWith('BMM')?'BMMOT':s.numero?.startsWith('RC')?'UNIC':'DHG');
+    if(!podeVerGrupo(grp))return false;
+    if(userLojas().includes('TODOS'))return true;
+    return podeVerLoja(s.loja_id);
+  });
+}
+
 function getLojaDados(nomeOuId){
-  // Busca dados da loja pelo nome (busca parcial case-insensitive)
-  const key=Object.keys(LOJAS_INFO).find(k=>(nomeOuId||'').toLowerCase().includes(k));
+  if(!nomeOuId)return {cnpj:'',end:'',num:'',cep:'',cidade:'Bauru',uf:'SP',grupo:''};
+  const n=(nomeOuId||'').toLowerCase().trim();
+  // Busca exata primeiro
+  if(LOJAS_INFO[n])return LOJAS_INFO[n];
+  // Busca parcial: chave contida no nome OU nome contido na chave
+  const key=Object.keys(LOJAS_INFO).find(k=>n.includes(k)||k.includes(n.substring(0,8)));
   if(key)return LOJAS_INFO[key];
-  // Tenta pelo objeto loja do Supabase
-  const loja=S.lojas.find(l=>l.id===nomeOuId||l.nome===nomeOuId);
-  if(loja)return {cnpj:loja.cnpj||'',end:loja.endereco||'',num:loja.numero||'',cep:loja.cep||'',cidade:loja.cidade||'Bauru',uf:loja.uf||'SP',grupo:loja.grupo||''};
+  // Tenta pelo objeto loja do Supabase com cnpj/endereço já preenchido
+  const loja=S.lojas.find(l=>l.id===nomeOuId||l.nome===nomeOuId||(l.nome||'').toLowerCase()===n);
+  if(loja&&loja.cnpj)return {cnpj:loja.cnpj||'',end:loja.endereco||'',num:loja.numero||'',cep:loja.cep||'',cidade:loja.cidade||'Bauru',uf:loja.uf||'SP',grupo:loja.grupo||''};
+  if(loja)return {cnpj:'',end:'',num:'',cep:'',cidade:'Bauru',uf:'SP',grupo:loja.grupo||''};
   return {cnpj:'',end:'',num:'',cep:'',cidade:'Bauru',uf:'SP',grupo:''};
 }
 
@@ -433,7 +486,7 @@ async function loadPage(page){
 // ── NUMBERS ───────────────────────────────────────────────────────────────
 async function genNum(tipo,grupo){
   const tab={SOL:'solicitacoes',COT:'cotacoes',PED:'pedidos'}[tipo];
-  const pref=tipo==='SOL'?(grupo==='BMMOT'?'BMM':grupo==='R&C'?'RC':'DHC'):tipo;
+  const pref=tipo==='SOL'?(grupo==='BMMOT'?'BMM':grupo==='UNIC'?'RC':'DHG'):tipo;
   const {count}=await sb.from(tab).select('*',{count:'exact',head:true});
   return `${pref}-${String((count||0)+1).padStart(4,'0')}`;
 }
@@ -960,7 +1013,8 @@ function pgSol(){
 
   // Aplica filtros
   const q=(solFiltro.q||'').toLowerCase();
-  const lista=S.sol.filter(s=>{
+  const solBase=filtrarPorAcesso(S.sol);
+  const lista=solBase.filter(s=>{
     if(solFiltro.status&&s.status!==solFiltro.status)return false;
     if(solFiltro.loja&&s.loja_id!==solFiltro.loja)return false;
     if(solFiltro.grupo&&s.grupo!==solFiltro.grupo)return false;
@@ -983,9 +1037,9 @@ function pgSol(){
       value="${solFiltro.q}" oninput="solFiltro.q=this.value;render()">
     <select class="inp" style="width:95px;padding:8px 10px;font-size:13px" onchange="solFiltro.grupo=this.value;render()">
       <option value="">Grupos</option>
-      <option value="DHG"${solFiltro.grupo==='DHC'?' selected':''}>DHG</option>
+      <option value="DHG"${solFiltro.grupo==='DHG'?' selected':''}>DHG</option>
       <option value="BMMOT"${solFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
-      <option value="R&C"${solFiltro.grupo==='R&C'?' selected':''}>R&amp;C</option>
+      <option value="UNIC"${solFiltro.grupo==='UNIC'?' selected':''}>UNIC</option>
     </select>
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="solFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
@@ -1211,6 +1265,24 @@ function hDrop(e){
   e.preventDefault();
   const input=document.getElementById('sol-files');
   if(input&&e.dataTransfer.files.length){Object.defineProperty(input,'files',{value:e.dataTransfer.files});showFiles(input);}
+}
+
+function toggleGruposUser(el){
+  ['ugr-dhg','ugr-bmmot','ugr-unic'].forEach(id=>{
+    const cb=document.getElementById(id);
+    if(cb){cb.disabled=el.checked;if(el.checked)cb.checked=false;}
+  });
+  const ugr=document.getElementById('ugr');
+  if(ugr)ugr.value=el.checked?'TODOS':'';
+}
+
+function toggleTodosGrupos(el){
+  const gIds=['cu-g-dhg','cu-g-bmmot','cu-g-unic'];
+  gIds.forEach(id=>{
+    const cb=document.getElementById(id);
+    if(cb)cb.disabled=el.checked;
+    if(cb&&el.checked)cb.checked=false;
+  });
 }
 
 function atualizarCats(){
@@ -1466,7 +1538,8 @@ async function vSOL(id){
 
 function imprimirLista(){
   const q=(solFiltro.q||'').toLowerCase();
-  const lista=S.sol.filter(s=>{
+  const solBase=filtrarPorAcesso(S.sol);
+  const lista=solBase.filter(s=>{
     if(solFiltro.status&&s.status!==solFiltro.status)return false;
     if(solFiltro.urgencia&&s.urgencia!==solFiltro.urgencia)return false;
     if(q&&![s.numero,s.descricao,s.solicitante_nome,s.loja_nome].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
@@ -2617,9 +2690,9 @@ function pgForn(){
       value="${fornFiltro.q}" oninput="fornFiltro.q=this.value;render()">
     <select class="inp" style="width:120px;padding:8px 10px;font-size:13px" onchange="fornFiltro.grupo=this.value;render()">
       <option value="">Todos Grupos</option>
-      <option value="DHG"${fornFiltro.grupo==='DHC'?' selected':''}>DHG</option>
+      <option value="DHG"${fornFiltro.grupo==='DHG'?' selected':''}>DHG</option>
       <option value="BMMOT"${fornFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
-      <option value="R&C"${fornFiltro.grupo==='R&C'?' selected':''}>R&amp;C</option>
+      <option value="UNIC"${fornFiltro.grupo==='UNIC'?' selected':''}>UNIC</option>
       <option value="TODOS"${fornFiltro.grupo==='TODOS'?' selected':''}>Todos</option>
     </select>
     <select class="inp" style="width:130px;padding:8px 10px;font-size:13px" onchange="fornFiltro.status=this.value;render()">
@@ -2689,7 +2762,8 @@ let cotFiltro={q:'',status:'',grupo:''};
 function pgCot(){
   const ag=S.sol.filter(s=>s.status==='Aguardando Orçamento');
   const q=(cotFiltro.q||'').toLowerCase();
-  const listaC=S.cot.filter(c=>{
+  const cotBase=filtrarPorAcesso(S.sol).map(s=>s.id);
+  const listaC=S.cot.filter(c=>cotBase.includes(c.solicitacao_id)).filter(c=>{
     if(cotFiltro.status&&c.status!==cotFiltro.status)return false;
     if(cotFiltro.grupo){const s=S.sol.find(x=>x.id===c.solicitacao_id);if(!s||s.grupo!==cotFiltro.grupo)return false;}
     if(q&&![c.numero,c.descricao,c.vencedor].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
@@ -2703,9 +2777,9 @@ function pgCot(){
       value="${cotFiltro.q}" oninput="cotFiltro.q=this.value;render()">
     <select class="inp" style="width:120px;padding:8px 10px;font-size:13px" onchange="cotFiltro.grupo=this.value;render()">
       <option value="">Grupos</option>
-      <option value="DHG"${cotFiltro.grupo==='DHC'?' selected':''}>DHG</option>
+      <option value="DHG"${cotFiltro.grupo==='DHG'?' selected':''}>DHG</option>
       <option value="BMMOT"${cotFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
-      <option value="R&C"${cotFiltro.grupo==='R&C'?' selected':''}>R&amp;C</option>
+      <option value="UNIC"${cotFiltro.grupo==='UNIC'?' selected':''}>UNIC</option>
     </select>
     <select class="inp" style="width:160px;padding:8px 10px;font-size:13px" onchange="cotFiltro.status=this.value;render()">
       <option value="">Todos os Status</option>
@@ -3162,7 +3236,8 @@ Após confirmar, irá para aprovação do Gerente.`))return;
 let pedFiltro={q:'',status:'',grupo:'',loja:''};
 function pgPed(){
   const q=(pedFiltro.q||'').toLowerCase();
-  const listaP=S.ped.filter(p=>{
+  const pedSolIds=new Set(filtrarPorAcesso(S.sol).map(s=>s.id));
+  const listaP=S.ped.filter(p=>!p.solicitacao_id||pedSolIds.has(p.solicitacao_id)).filter(p=>{
     if(pedFiltro.status&&p.status!==pedFiltro.status)return false;
     if(pedFiltro.grupo&&p.grupo!==pedFiltro.grupo)return false;
     if(pedFiltro.loja&&p.loja_nome!==pedFiltro.loja)return false;
@@ -3180,7 +3255,7 @@ function pgPed(){
       <option value="">Grupos</option>
       <option value="DHG"${pedFiltro.grupo==='DHC'?' selected':''}>DHG</option>
       <option value="BMMOT"${pedFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
-      <option value="R&C"${pedFiltro.grupo==='R&C'?' selected':''}>R&amp;C</option>
+      <option value="UNIC"${pedFiltro.grupo==='UNIC'?' selected':''}>UNIC</option>
     </select>
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="pedFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
@@ -3314,7 +3389,7 @@ function pgRel(){
   <input type="month" class="inp" style="width:160px;padding:7px 12px" id="rf-ate" value="${relFiltros.ate}" onchange="relFiltros.ate=this.value;renderRel()">
   <select class="inp" style="width:160px;padding:7px 12px" id="rf-grupo" onchange="relFiltros.grupo=this.value;renderRel()">
     <option value="">Todos os Grupos</option>
-    <option value="DHG"${relFiltros.grupo==='DHC'?' selected':''}>DHG</option>
+    <option value="DHG"${relFiltros.grupo==='DHG'?' selected':''}>DHG</option>
     <option value="BMMOT"${relFiltros.grupo==='BMMOT'?' selected':''}>BMMOT</option>
   </select>
   <select class="inp" style="width:200px;padding:7px 12px" id="rf-loja" onchange="relFiltros.loja=this.value;renderRel()">
@@ -3344,7 +3419,7 @@ function aplicarFiltroBase(s){
   }
   if(relFiltros.grupo){
     // Determina o grupo pela solicitação: campo grupo OU prefixo do número
-    const grpSol=s.grupo||(s.numero?.startsWith('BMM')?'BMMOT':s.numero?.startsWith('RC')?'R&C':'DHC');
+    const grpSol=s.grupo||(s.numero?.startsWith('BMM')?'BMMOT':s.numero?.startsWith('RC')?'UNIC':'DHG');
     if(grpSol!==relFiltros.grupo)return false;
   }
   if(relFiltros.loja&&s.loja_id!==relFiltros.loja)return false;
@@ -3758,12 +3833,23 @@ function mdCriarUser(){
       <div class="f"><label>Área</label><select class="inp" id="uar">${AREAS.map(a=>`<option>${a}</option>`).join('')}</select></div>
     </div>
     <div class="fg2">
-      <div class="f"><label>Grupo</label><select class="inp" id="ugr">
-        <option value="TODOS">Todos os grupos</option>
-        <option value="DHG">Grupo DHG</option>
-        <option value="BMMOT">Grupo BMMOT</option>
-      </select></div>
-      <div class="f"><label>Loja</label><select class="inp" id="ulo"><option value="">— Nenhuma —</option>${lo}</select></div>
+      <div class="f">
+        <label>Grupos com Acesso</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;background:#F8F9FA;border-radius:8px;padding:10px;border:1px solid #E0E0E0">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ugr-todos" onchange="toggleGruposUser(this)" style="width:16px;height:16px"> Todos os Grupos</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ugr-dhg" value="DHG" style="width:16px;height:16px"> 🔵 DHG</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ugr-bmmot" value="BMMOT" style="width:16px;height:16px"> 🟢 BMMOT</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ugr-unic" value="UNIC" style="width:16px;height:16px"> 🟡 UNIC</label>
+        </div>
+        <input type="hidden" id="ugr" value="TODOS">
+      </div>
+      <div class="f">
+        <label>Lojas com Acesso</label>
+        <select class="inp" id="ulo" multiple size="5" style="height:120px">
+          <option value="TODOS" selected>✅ Todas as Lojas</option>
+          ${S.lojas.map(l=>`<option value="${l.id}">[${l.grupo||''}] ${l.nome}</option>`).join('')}
+        </select>
+        <span style="font-size:11px;color:#9E9E9E">Segure Ctrl para selecionar múltiplas</span></div>
     </div>
     <hr class="hdiv">
     <div class="fg2">
@@ -3798,11 +3884,18 @@ async function hCriarUser(){
   const btn=document.getElementById('btn-criar');
   if(btn){btn.textContent='Criando...';btn.disabled=true;}
   try{
-    const hash=await hashSenha(senha);
+    const todosGrp=document.getElementById('ugr-todos')?.checked;
+    const grpsSel=todosGrp?['TODOS']:['DHG','BMMOT','UNIC'].filter(g=>document.getElementById('ugr-'+g.toLowerCase())?.checked);
+    const grupoFinal=todosGrp?'TODOS':grpsSel[0]||grupo||'TODOS';
+    const lojaEl=document.getElementById('ulo');
+    const lojasSel=lojaEl?Array.from(lojaEl.selectedOptions).map(o=>o.value):['TODOS'];
+    const primeiraLoja=lojasSel.find(l=>l!=='TODOS')||null;
     const {error}=await sb.from('usuarios').insert({
       nome,sobrenome:sob,login,senha_hash:hash,
-      perfil,area,grupo,
-      loja_id:loja||null,ativo:true
+      perfil,area,grupo:grupoFinal,
+      loja_id:primeiraLoja||null,ativo:true,
+      grupos:grpsSel.length?grpsSel:['TODOS'],
+      lojas_acesso:lojasSel.includes('TODOS')?['TODOS']:lojasSel
     });
     if(error){
       if(error.message.includes('unique'))throw new Error(`Login "${login}" já existe. Tente um nome diferente.`);
