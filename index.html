@@ -461,23 +461,18 @@ async function loadSol(){
 }
 async function loadItens(){
   try{
-    // Busca com paginação para garantir todos os 493 itens
-    let all=[];
-    let from=0;const pageSize=200;
-    while(true){
-      const {data,error}=await sb.from('itens').select('*')
-        .order('categoria').order('descricao')
-        .range(from,from+pageSize-1);
-      if(error){console.error('loadItens erro:',error);break;}
-      if(!data||!data.length)break;
-      all=[...all,...data];
-      if(data.length<pageSize)break;
-      from+=pageSize;
+    console.log('⏳ loadItens iniciado...');
+    const res=await sb.from('itens').select('*').order('categoria').order('descricao');
+    console.log('loadItens resposta:',res);
+    if(res.error){
+      console.error('❌ loadItens erro:',res.error.message,res.error.code);
+      S.itens=[];
+    } else {
+      S.itens=res.data||[];
+      console.log('✅ loadItens OK:',S.itens.length,'itens');
     }
-    S.itens=all;
-    console.log('loadItens OK:',S.itens.length,'itens carregados');
   }catch(e){
-    console.error('loadItens exception:',e);
+    console.error('❌ loadItens exception:',e.message);
     S.itens=[];
   }
 }
@@ -651,10 +646,10 @@ function buildApp(){
     {id:'solicitacoes',icon:'🛒',label:'Solicitações',badge:tot},
     ...(isCompras()?[
       {id:'fornecedores',icon:'🏢',label:'Fornecedores'},
-    {id:'itens',icon:'🏷️',label:'Banco de Itens'},
       {id:'cotacoes',icon:'📋',label:'Cotações',badge:pO},
       {id:'pedidos',icon:'🚚',label:'Pedidos'},
     ]:[]),
+    ...(isGestor()||isCompras()?[{id:'itens',icon:'🏷️',label:'Banco de Itens'}]:[]),
     ...(isDiretoria()||isCompras()||isGestor()?[{id:'relatorios',icon:'📈',label:'Relatórios'}]:[]),
     ...(isGestor()?[{id:'usuarios',icon:'👥',label:'Usuários'}]:[]),
   ];
@@ -2755,7 +2750,7 @@ async function qSt(id,status){
 
 // ── FORNECEDORES ──────────────────────────────────────────────────────────
 // ── BANCO DE ITENS ────────────────────────────────────────────────────────
-let itensFiltro={q:'',categoria:'',tipo:'',status:''};
+let itensFiltro={q:'',categoria:'',tipo:'',status:'',sortCol:'categoria',sortDir:'asc'};
 
 function pgItens(){
   const q=(itensFiltro.q||'').toLowerCase();
@@ -2766,9 +2761,18 @@ function pgItens(){
     if(itensFiltro.status&&i.status!==itensFiltro.status)return false;
     if(q&&![i.codigo,i.descricao,i.categoria,i.subcategoria,i.unidade].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
     return true;
+  }).sort((a,b)=>{
+    const col=itensFiltro.sortCol;
+    const va=(a[col]||'').toString().toLowerCase();
+    const vb=(b[col]||'').toString().toLowerCase();
+    const num=!isNaN(parseFloat(va))&&!isNaN(parseFloat(vb));
+    const cmp=num?parseFloat(va)-parseFloat(vb):va.localeCompare(vb,'pt-BR');
+    return itensFiltro.sortDir==='asc'?cmp:-cmp;
   });
   const podeEditar=isGestor()||isCompras();
   const temFiltro=itensFiltro.q||itensFiltro.categoria||itensFiltro.tipo||itensFiltro.status;
+  // Debug: log atual
+  console.log('pgItens chamado, S.itens=',S.itens?.length||0);
   return `<div>
   <!-- FILTROS -->
   <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -2804,14 +2808,20 @@ function pgItens(){
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#0F2236;color:#fff">
-            <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600;white-space:nowrap">CÓDIGO</th>
-            <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600">DESCRIÇÃO DO ITEM</th>
-            <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600">CATEGORIA</th>
-            <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600">SUBCATEGORIA</th>
-            <th style="padding:12px 14px;text-align:center;font-size:11px;font-weight:600">UNID.</th>
-            <th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:600">ÚLT. VALOR</th>
-            <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600">ÚLT. FORNECEDOR</th>
-            <th style="padding:12px 14px;text-align:center;font-size:11px;font-weight:600">STATUS</th>
+            ${[
+              {l:'CÓDIGO',c:'codigo',a:'left'},
+              {l:'DESCRIÇÃO DO ITEM',c:'descricao',a:'left'},
+              {l:'CATEGORIA',c:'categoria',a:'left'},
+              {l:'SUBCATEGORIA',c:'subcategoria',a:'left'},
+              {l:'UNID.',c:'unidade',a:'center'},
+              {l:'ÚLT. VALOR',c:'ultimo_valor',a:'right'},
+              {l:'ÚLT. FORNECEDOR',c:'ultimo_fornecedor',a:'left'},
+              {l:'STATUS',c:'status',a:'center'},
+            ].map(h=>`<th onclick="sortItens('${h.c}')"
+              style="padding:12px 14px;text-align:${h.a};font-size:11px;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap"
+              onmouseenter="this.style.background='rgba(255,255,255,.1)'" onmouseleave="this.style.background=''">
+              ${h.l} ${sortIcon(h.c)}
+            </th>`).join('')}
             ${podeEditar?`<th style="padding:12px 14px;text-align:center;font-size:11px;font-weight:600">AÇÕES</th>`:''}
           </tr>
         </thead>
@@ -2855,6 +2865,21 @@ function pgItens(){
     </div>`:''}
   </div>
   </div>`;
+}
+
+function sortItens(col){
+  if(itensFiltro.sortCol===col){
+    itensFiltro.sortDir=itensFiltro.sortDir==='asc'?'desc':'asc';
+  } else {
+    itensFiltro.sortCol=col;
+    itensFiltro.sortDir='asc';
+  }
+  render();
+}
+
+function sortIcon(col){
+  if(itensFiltro.sortCol!==col)return '<span style="color:rgba(255,255,255,.3);font-size:10px">⇅</span>';
+  return itensFiltro.sortDir==='asc'?'<span style="font-size:10px">▲</span>':'<span style="font-size:10px">▼</span>';
 }
 
 function exportarItens(){
