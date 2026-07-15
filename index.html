@@ -487,6 +487,7 @@ async function loadPage(page){
     if(page==='cotacoes'){await loadCot();if(!S.sol.length)await loadSol();}
     if(['pedidos','dashboard'].includes(page))await loadPed();
     if(page==='usuarios')await loadUsers();
+    if(page==='itens')await loadItens();
   }catch(e){console.error(e);}
   S.loading=false;render();
 }
@@ -669,7 +670,7 @@ function buildApp(){
 }
 
 function buildPage(){
-  return({dashboard:pgDash,solicitacoes:pgSol,fornecedores:pgForn,cotacoes:pgCot,pedidos:pgPed,relatorios:pgRel,usuarios:pgUsers}[S.page]||pgDash)();
+  return({dashboard:pgDash,solicitacoes:pgSol,fornecedores:pgForn,cotacoes:pgCot,pedidos:pgPed,relatorios:pgRel,usuarios:pgUsers,itens:pgItens}[S.page]||pgDash)();
 }
 
 function buildTimeline(s){
