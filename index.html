@@ -2773,25 +2773,33 @@ async function hForn(id){
 }
 
 // ── COTAÇÕES ──────────────────────────────────────────────────────────────
-let cotFiltro={q:'',status:'',grupo:''};
+let cotFiltro={q:'',status:'',grupo:'',loja:''};
 function pgCot(){
   const ag=S.sol.filter(s=>s.status==='Aguardando Orçamento');
   const q=(cotFiltro.q||'').toLowerCase();
   const cotBase=filtrarPorAcesso(S.sol).map(s=>s.id);
   const listaC=S.cot.filter(c=>cotBase.includes(c.solicitacao_id)).filter(c=>{
     if(cotFiltro.status&&c.status!==cotFiltro.status)return false;
-    if(cotFiltro.grupo){const s=S.sol.find(x=>x.id===c.solicitacao_id);if(!s||s.grupo!==cotFiltro.grupo)return false;}
+    if(cotFiltro.grupo){
+      const s=S.sol.find(x=>x.id===c.solicitacao_id);
+      if(!s)return false;
+      const sg=s.grupo==='DHC'?'DHG':s.grupo;
+      if(sg!==cotFiltro.grupo)return false;
+    }
+    if(cotFiltro.loja){
+      const s=S.sol.find(x=>x.id===c.solicitacao_id);
+      if(!s||s.loja_id!==cotFiltro.loja)return false;
+    }
     if(q&&![c.numero,c.descricao,c.vencedor].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
     return true;
   });
-  const temFiltroC=cotFiltro.q||cotFiltro.status||cotFiltro.grupo;
+  const temFiltroC=cotFiltro.q||cotFiltro.status||cotFiltro.grupo||cotFiltro.loja;
   return `<div>
   <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <input class="inp" placeholder="🔍 Número, solicitação, fornecedor..."
       style="flex:1;min-width:180px;padding:8px 12px;font-size:13px"
       value="${cotFiltro.q}" oninput="cotFiltro.q=this.value;render()">
     <select class="inp" style="width:120px;padding:8px 10px;font-size:13px" onchange="cotFiltro.grupo=this.value;render()">
-      <option value="">Grupos</option>
       <option value="DHG"${cotFiltro.grupo==='DHG'?' selected':''}>DHG</option>
       <option value="BMMOT"${cotFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
       <option value="UNIC"${cotFiltro.grupo==='UNIC'?' selected':''}>UNIC</option>
@@ -3267,7 +3275,6 @@ function pgPed(){
       style="flex:1;min-width:200px;padding:8px 12px;font-size:13px"
       value="${pedFiltro.q}" oninput="pedFiltro.q=this.value;render()">
     <select class="inp" style="width:110px;padding:8px 10px;font-size:13px" onchange="pedFiltro.grupo=this.value;pedFiltro.loja='';render()">
-      <option value="">Grupos</option>
       <option value="DHG"${pedFiltro.grupo==='DHC'?' selected':''}>DHG</option>
       <option value="BMMOT"${pedFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
       <option value="UNIC"${pedFiltro.grupo==='UNIC'?' selected':''}>UNIC</option>
