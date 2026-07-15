@@ -308,7 +308,7 @@ async function hashSenha(senha){
 
 // ── STATE ─────────────────────────────────────────────────────────────────
 let S={user:null,page:'dashboard',modal:null,
-  lojas:[],sol:[],forn:[],cot:[],ped:[],users:[],loading:false};
+  lojas:[],sol:[],forn:[],cot:[],ped:[],users:[],itens:[],loading:false};
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────
 const TIPOS_COMPRA=[
@@ -458,6 +458,11 @@ async function loadSol(){
   if(error)console.error('loadSol error:',error);
   S.sol=data||[];
 }
+async function loadItens(){
+  const {data}=await sb.from('itens').select('*').order('categoria').order('descricao');
+  S.itens=data||[];
+}
+
 async function loadForn(){const {data}=await sb.from('fornecedores').select('*').order('nome');S.forn=data||[];}
 async function loadCot(){const {data}=await sb.from('cotacoes').select('*').order('data_criacao',{ascending:false});S.cot=data||[];}
 async function loadPed(){const {data}=await sb.from('pedidos').select('*').order('created_at',{ascending:false});S.ped=data||[];}
@@ -626,6 +631,7 @@ function buildApp(){
     {id:'solicitacoes',icon:'🛒',label:'Solicitações',badge:tot},
     ...(isCompras()?[
       {id:'fornecedores',icon:'🏢',label:'Fornecedores'},
+    {id:'itens',icon:'🏷️',label:'Banco de Itens'},
       {id:'cotacoes',icon:'📋',label:'Cotações',badge:pO},
       {id:'pedidos',icon:'🚚',label:'Pedidos'},
     ]:[]),
@@ -1252,6 +1258,46 @@ function removerItem(rowId){
   if(document.querySelectorAll('#itens-tbody tr').length<=1)return alert('Mantenha ao menos 1 item.');
   const r=document.getElementById(rowId);if(r)r.remove();calcTotal();
 }
+
+function buscarItemBanco(input,n){
+  const q=(input.value||'').toLowerCase().trim();
+  const sug=document.getElementById('si-sug-'+n);
+  if(!sug)return;
+  if(!q||q.length<2||!S.itens.length){sug.style.display='none';return;}
+  const matches=S.itens.filter(i=>i.status==='Ativo'&&
+    (i.descricao||'').toLowerCase().includes(q)).slice(0,8);
+  if(!matches.length){sug.style.display='none';return;}
+  sug.innerHTML=matches.map(i=>`
+    <div onclick="selecionarItem(${n},'${i.id}')"
+      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #F0F2F5;display:flex;justify-content:space-between;align-items:center"
+      onmouseenter="this.style.background='#F0F7FF'" onmouseleave="this.style.background='#fff'">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#0F2236">${i.descricao}</div>
+        <div style="font-size:10px;color:#9E9E9E;margin-top:2px">${i.codigo||''} ${i.categoria?'· '+i.categoria:''} · ${i.unidade||'UN'}</div>
+      </div>
+      ${i.ultimo_valor?`<span style="font-size:12px;font-weight:700;color:#2E7D32;white-space:nowrap;margin-left:12px">R$ ${parseFloat(i.ultimo_valor).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>`:''}
+    </div>`).join('');
+  sug.style.display='block';
+}
+
+function selecionarItem(n,itemId){
+  const it=S.itens.find(x=>x.id===itemId);
+  if(!it)return;
+  const desc=document.getElementById('si-d-'+n);
+  const val=document.getElementById('si-v-'+n);
+  if(desc)desc.value=it.descricao;
+  if(val&&it.ultimo_valor)val.value=it.ultimo_valor;
+  const sug=document.getElementById('si-sug-'+n);
+  if(sug)sug.style.display='none';
+  calcTotal();
+}
+
+// Fecha sugestões ao clicar fora
+document.addEventListener('click',function(e){
+  document.querySelectorAll('[id^="si-sug-"]').forEach(el=>{
+    if(!el.contains(e.target))el.style.display='none';
+  });
+});
 
 function calcTotal(){
   let total=0,count=0;
@@ -2688,6 +2734,219 @@ async function qSt(id,status){
 }
 
 // ── FORNECEDORES ──────────────────────────────────────────────────────────
+// ── BANCO DE ITENS ────────────────────────────────────────────────────────
+let itensFiltro={q:'',categoria:'',tipo:'',status:''};
+
+function pgItens(){
+  const q=(itensFiltro.q||'').toLowerCase();
+  const cats=[...new Set(S.itens.map(i=>i.categoria).filter(Boolean))].sort();
+  const lista=S.itens.filter(i=>{
+    if(itensFiltro.categoria&&i.categoria!==itensFiltro.categoria)return false;
+    if(itensFiltro.tipo&&i.tipo!==itensFiltro.tipo)return false;
+    if(itensFiltro.status&&i.status!==itensFiltro.status)return false;
+    if(q&&![i.codigo,i.descricao,i.categoria,i.subcategoria,i.unidade].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
+    return true;
+  });
+  const podeEditar=isGestor()||isCompras();
+  const temFiltro=itensFiltro.q||itensFiltro.categoria||itensFiltro.tipo||itensFiltro.status;
+  return `<div>
+  <!-- FILTROS -->
+  <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input class="inp" placeholder="🔍 Buscar por código, descrição, categoria..."
+      style="flex:1;min-width:220px;padding:8px 12px;font-size:13px"
+      value="${itensFiltro.q}" oninput="itensFiltro.q=this.value;render()">
+    <select class="inp" style="width:180px;padding:8px 10px;font-size:13px" onchange="itensFiltro.categoria=this.value;render()">
+      <option value="">Todas as Categorias</option>
+      ${cats.map(c=>`<option value="${c}"${itensFiltro.categoria===c?' selected':''}>${c}</option>`).join('')}
+    </select>
+    <select class="inp" style="width:130px;padding:8px 10px;font-size:13px" onchange="itensFiltro.status=this.value;render()">
+      <option value="">Todos Status</option>
+      <option value="Ativo"${itensFiltro.status==='Ativo'?' selected':''}>✅ Ativo</option>
+      <option value="Inativo"${itensFiltro.status==='Inativo'?' selected':''}>❌ Inativo</option>
+    </select>
+    ${temFiltro?`<button class="btn bsc" onclick="itensFiltro={q:'',categoria:'',tipo:'',status:''};render()" style="padding:8px 14px;font-size:12px">↺ Limpar</button>`:''}
+    <span style="font-size:12px;color:#9E9E9E">${lista.length} de ${S.itens.length} itens</span>
+    ${podeEditar?`<button class="btn bp" onclick="mdItem()" style="padding:8px 16px;margin-left:auto">+ Novo Item</button>`:'<div style="margin-left:auto"></div>'}
+  </div>
+
+  <!-- TABELA -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tw">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:#0F2236;color:#fff">
+            <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600;white-space:nowrap">CÓDIGO</th>
+            <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600">DESCRIÇÃO DO ITEM</th>
+            <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600">CATEGORIA</th>
+            <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600">SUBCATEGORIA</th>
+            <th style="padding:12px 14px;text-align:center;font-size:11px;font-weight:600">UNID.</th>
+            <th style="padding:12px 14px;text-align:right;font-size:11px;font-weight:600">ÚLT. VALOR</th>
+            <th style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600">ÚLT. FORNECEDOR</th>
+            <th style="padding:12px 14px;text-align:center;font-size:11px;font-weight:600">STATUS</th>
+            ${podeEditar?`<th style="padding:12px 14px;text-align:center;font-size:11px;font-weight:600">AÇÕES</th>`:''}
+          </tr>
+        </thead>
+        <tbody>
+          ${!lista.length?`<tr><td colspan="9" style="text-align:center;padding:48px;color:#ccc">
+            <div style="font-size:36px;margin-bottom:10px">🏷️</div>
+            <div style="font-size:14px">${temFiltro?'Nenhum item encontrado com esses filtros':'Nenhum item cadastrado'}</div>
+            ${!temFiltro&&podeEditar?`<button class="btn bp" onclick="mdItem()" style="margin-top:14px">+ Cadastrar Primeiro Item</button>`:''}
+          </td></tr>`:''}
+          ${lista.map((i,idx)=>`<tr style="border-bottom:1px solid #F0F2F5;background:${idx%2===0?'#fff':'#FAFAFA'}" onmouseenter="this.style.background='#F0F7FF'" onmouseleave="this.style.background='${idx%2===0?'#fff':'#FAFAFA'}'">
+            <td style="padding:10px 14px;font-family:monospace;font-size:12px;color:#1565C0;font-weight:600;white-space:nowrap">${i.codigo||'—'}</td>
+            <td style="padding:10px 14px;font-weight:500;font-size:13px;max-width:220px">${i.descricao}</td>
+            <td style="padding:10px 14px;font-size:12px;color:#555">${i.categoria||'—'}</td>
+            <td style="padding:10px 14px;font-size:12px;color:#9E9E9E">${i.subcategoria||'—'}</td>
+            <td style="padding:10px 14px;text-align:center;font-size:12px;font-weight:600">
+              <span style="background:#E3F2FD;color:#1565C0;padding:2px 8px;border-radius:12px;font-size:11px">${i.unidade||'UN'}</span>
+            </td>
+            <td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:700;color:${i.ultimo_valor?'#2E7D32':'#ccc'}">
+              ${i.ultimo_valor?'R$ '+parseFloat(i.ultimo_valor).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}
+            </td>
+            <td style="padding:10px 14px;font-size:12px;color:#555;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i.ultimo_fornecedor||'—'}</td>
+            <td style="padding:10px 14px;text-align:center">
+              ${i.status==='Ativo'
+                ?'<span class="chip" style="background:#E8F5E9;color:#2E7D32;font-size:11px">✅ Ativo</span>'
+                :'<span class="chip" style="background:#FFEBEE;color:#C62828;font-size:11px">❌ Inativo</span>'}
+            </td>
+            ${podeEditar?`<td style="padding:10px 14px;text-align:center;white-space:nowrap">
+              <button class="sm bl" onclick="mdItem('${i.id}')" title="Editar">✏️</button>
+              <button class="sm" style="background:${i.status==='Ativo'?'#FFEBEE':'#E8F5E9'};color:${i.status==='Ativo'?'#C62828':'#2E7D32'}"
+                onclick="toggleItem('${i.id}','${i.status}')" title="${i.status==='Ativo'?'Desativar':'Ativar'}">
+                ${i.status==='Ativo'?'🚫':'✅'}
+              </button>
+            </td>`:''}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${lista.length>0?`<div style="padding:12px 16px;background:#F8F9FA;border-top:1px solid #E0E0E0;font-size:12px;color:#9E9E9E;display:flex;justify-content:space-between">
+      <span>Exibindo ${lista.length} de ${S.itens.length} itens</span>
+      <span>${cats.length} categorias cadastradas</span>
+    </div>`:''}
+  </div>
+  </div>`;
+}
+
+async function mdItem(id){
+  if(!isGestor()&&!isCompras())return alert('⛔ Apenas Gestor e Compras podem gerenciar o banco de itens.');
+  const it=id?S.itens.find(x=>x.id===id):null;
+  const cats=[...new Set(S.itens.map(i=>i.categoria).filter(Boolean))].sort();
+  const TIPOS_ITEM=['Material','Serviço','Equipamento','Manutenção','Tecnologia','Marketing'];
+  const CATS_ITEM=['Material Elétrico','Material Hidráulico','Construção','Limpeza','Pintura',
+    'Escritório','Informática','Ferramentas','EPIs','Uniformes','Serviço','Equipamentos','Outros'];
+  const UNI=['UN','M','M²','M³','KG','LT','CX','PC','RL','SC','SV','HR','DI','MT','GL','BD','FR','JG'];
+  openModal(`<div class="modal" style="max-width:600px">
+  <div class="mh" style="background:#0F2236;color:#fff;border-radius:14px 14px 0 0">
+    <div>
+      <div style="font-size:15px;font-weight:700">🏷️ ${it?'Editar Item':'Novo Item'}</div>
+      <div style="font-size:11px;opacity:.7;margin-top:2px">${it?it.codigo+' — '+it.descricao:'Cadastrar novo item no banco'}</div>
+    </div>
+    <button class="xb" style="color:rgba(255,255,255,.7)" onclick="closeModal()">✕</button>
+  </div>
+  <div class="mb">
+    <div class="fg2">
+      <div class="f" style="margin:0">
+        <label>Código do Item</label>
+        <input class="inp" id="it-cod" placeholder="Ex: MAT000001" value="${it?.codigo||''}" style="font-family:monospace">
+      </div>
+      <div class="f" style="margin:0">
+        <label>Unidade de Medida *</label>
+        <select class="inp" id="it-und">
+          ${UNI.map(u=>`<option${(it?.unidade||'UN')===u?' selected':''}>${u}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="f">
+      <label>Descrição do Item *</label>
+      <input class="inp" id="it-desc" placeholder="Descrição completa do item" value="${it?.descricao||''}" style="font-size:14px;font-weight:500">
+    </div>
+    <div class="fg2">
+      <div class="f" style="margin:0">
+        <label>Tipo</label>
+        <select class="inp" id="it-tipo">
+          ${TIPOS_ITEM.map(t=>`<option${(it?.tipo||'Material')===t?' selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="f" style="margin:0">
+        <label>Categoria</label>
+        <select class="inp" id="it-cat">
+          ${CATS_ITEM.map(c=>`<option${(it?.categoria||'')===c?' selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="fg2">
+      <div class="f" style="margin:0">
+        <label>Subcategoria</label>
+        <input class="inp" id="it-sub" placeholder="Ex: Cabos, Disjuntores..." value="${it?.subcategoria||''}">
+      </div>
+      <div class="f" style="margin:0">
+        <label>Status</label>
+        <select class="inp" id="it-status">
+          <option value="Ativo"${(it?.status||'Ativo')==='Ativo'?' selected':''}>✅ Ativo</option>
+          <option value="Inativo"${it?.status==='Inativo'?' selected':''}>❌ Inativo</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg2">
+      <div class="f" style="margin:0">
+        <label>Último Valor Pago (R$)</label>
+        <input class="inp" type="number" id="it-val" step="0.01" placeholder="0,00" value="${it?.ultimo_valor||''}">
+      </div>
+      <div class="f" style="margin:0">
+        <label>Lead Time Médio (dias)</label>
+        <input class="inp" type="number" id="it-lead" placeholder="Ex: 7" value="${it?.lead_time_medio||''}">
+      </div>
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    ${it?`<button class="btn bd" onclick="if(confirm('Excluir este item?'))excluirItem('${it.id}')">🗑️ Excluir</button>`:''}
+    <button class="btn bp" onclick="hItem(${it?`'${it.id}'`:'null'})">💾 Salvar Item</button>
+  </div>
+  </div>`);
+}
+
+async function hItem(id){
+  const desc=document.getElementById('it-desc')?.value?.trim();
+  if(!desc)return alert('Informe a descrição do item.');
+  const upd={
+    codigo:document.getElementById('it-cod')?.value?.trim()||null,
+    descricao:desc,
+    tipo:document.getElementById('it-tipo')?.value||'Material',
+    categoria:document.getElementById('it-cat')?.value||'',
+    subcategoria:document.getElementById('it-sub')?.value||'',
+    unidade:document.getElementById('it-und')?.value||'UN',
+    status:document.getElementById('it-status')?.value||'Ativo',
+    ultimo_valor:parseFloat(document.getElementById('it-val')?.value)||null,
+    lead_time_medio:parseInt(document.getElementById('it-lead')?.value)||null,
+    updated_at:new Date().toISOString()
+  };
+  try{
+    if(id){
+      const {error}=await sb.from('itens').update(upd).eq('id',id);
+      if(error)throw error;
+    }else{
+      const {error}=await sb.from('itens').insert(upd);
+      if(error)throw error;
+    }
+    closeModal();await loadItens();render();
+    alert('✅ Item salvo com sucesso!');
+  }catch(e){alert('Erro: '+e.message);}
+}
+
+async function toggleItem(id,status){
+  const novoStatus=status==='Ativo'?'Inativo':'Ativo';
+  if(!confirm(`${novoStatus==='Inativo'?'Desativar':'Ativar'} este item?`))return;
+  await sb.from('itens').update({status:novoStatus}).eq('id',id);
+  await loadItens();render();
+}
+
+async function excluirItem(id){
+  await sb.from('itens').delete().eq('id',id);
+  closeModal();await loadItens();render();
+}
+
 let fornFiltro={q:'',grupo:'',status:''};
 function pgForn(){
   const q=(fornFiltro.q||'').toLowerCase();
@@ -2799,17 +3058,26 @@ function pgCot(){
     <input class="inp" placeholder="🔍 Número, solicitação, fornecedor..."
       style="flex:1;min-width:180px;padding:8px 12px;font-size:13px"
       value="${cotFiltro.q}" oninput="cotFiltro.q=this.value;render()">
-    <select class="inp" style="width:120px;padding:8px 10px;font-size:13px" onchange="cotFiltro.grupo=this.value;render()">
-      <option value="DHG"${cotFiltro.grupo==='DHG'?' selected':''}>DHG</option>
-      <option value="BMMOT"${cotFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
-      <option value="UNIC"${cotFiltro.grupo==='UNIC'?' selected':''}>UNIC</option>
+    <select class="inp" style="width:110px;padding:8px 10px;font-size:13px" onchange="cotFiltro.grupo=this.value;cotFiltro.loja='';render()">
+      <option value="">Grupos</option>
+      <option value="DHG"${cotFiltro.grupo==='DHG'?' selected':''}>🔵 DHG</option>
+      <option value="BMMOT"${cotFiltro.grupo==='BMMOT'?' selected':''}>🟢 BMMOT</option>
+      <option value="UNIC"${cotFiltro.grupo==='UNIC'?' selected':''}>🟡 UNIC</option>
     </select>
-    <select class="inp" style="width:160px;padding:8px 10px;font-size:13px" onchange="cotFiltro.status=this.value;render()">
+    <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="cotFiltro.loja=this.value;render()">
+      <option value="">Todas as Lojas</option>
+      ${(()=>{
+        let ljs=S.lojas;
+        if(cotFiltro.grupo)ljs=ljs.filter(l=>(l.grupo==='DHC'?'DHG':l.grupo)===cotFiltro.grupo);
+        return ljs.map(l=>`<option value="${l.id}"${cotFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
+      })()}
+    </select>
+    <select class="inp" style="width:155px;padding:8px 10px;font-size:13px" onchange="cotFiltro.status=this.value;render()">
       <option value="">Todos os Status</option>
       <option value="Aberta"${cotFiltro.status==='Aberta'?' selected':''}>Aberta</option>
       <option value="Encerrada"${cotFiltro.status==='Encerrada'?' selected':''}>Encerrada</option>
     </select>
-    ${temFiltroC?`<button class="btn bsc" onclick="cotFiltro={q:'',status:'',grupo:''};render()" style="padding:8px 14px;font-size:12px">↺ Limpar</button>`:''}
+    ${temFiltroC?`<button class="btn bsc" onclick="cotFiltro={q:'',status:'',grupo:'',loja:''};render()" style="padding:8px 14px;font-size:12px">↺ Limpar</button>`:''}
     <span style="font-size:12px;color:#9E9E9E">${listaC.length} de ${S.cot.length}</span>
     <button class="btn bp" onclick="mdCot()" style="padding:8px 16px;margin-left:auto">+ Registrar Orçamentos</button>
   </div>
@@ -4095,6 +4363,7 @@ function isLate(dateStr){
 async function init(){
   loadSession();
   try{await loadLojas();}catch(e){}
+  try{await loadItens();}catch(e){}
   if(S.user)await loadPage('dashboard');
   else render();
 }
