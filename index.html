@@ -2771,8 +2771,6 @@ function pgItens(){
   });
   const podeEditar=isGestor()||isCompras();
   const temFiltro=itensFiltro.q||itensFiltro.categoria||itensFiltro.tipo||itensFiltro.status;
-  // Debug: log atual
-  console.log('pgItens chamado, S.itens=',S.itens?.length||0);
   return `<div>
   <!-- FILTROS -->
   <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -2808,20 +2806,14 @@ function pgItens(){
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#0F2236;color:#fff">
-            ${[
-              {l:'CÓDIGO',c:'codigo',a:'left'},
-              {l:'DESCRIÇÃO DO ITEM',c:'descricao',a:'left'},
-              {l:'CATEGORIA',c:'categoria',a:'left'},
-              {l:'SUBCATEGORIA',c:'subcategoria',a:'left'},
-              {l:'UNID.',c:'unidade',a:'center'},
-              {l:'ÚLT. VALOR',c:'ultimo_valor',a:'right'},
-              {l:'ÚLT. FORNECEDOR',c:'ultimo_fornecedor',a:'left'},
-              {l:'STATUS',c:'status',a:'center'},
-            ].map(h=>`<th onclick="sortItens('${h.c}')"
-              style="padding:12px 14px;text-align:${h.a};font-size:11px;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap"
-              onmouseenter="this.style.background='rgba(255,255,255,.1)'" onmouseleave="this.style.background=''">
-              ${h.l} ${sortIcon(h.c)}
-            </th>`).join('')}
+            <th onclick="sortItens('codigo')" style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">CÓDIGO ${sortIcon('codigo')}</th>
+            <th onclick="sortItens('descricao')" style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600;cursor:pointer">DESCRIÇÃO DO ITEM ${sortIcon('descricao')}</th>
+            <th onclick="sortItens('categoria')" style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600;cursor:pointer">CATEGORIA ${sortIcon('categoria')}</th>
+            <th onclick="sortItens('subcategoria')" style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600;cursor:pointer">SUBCATEGORIA ${sortIcon('subcategoria')}</th>
+            <th onclick="sortItens('unidade')" style="padding:12px 14px;text-align:center;font-size:11px;font-weight:600;cursor:pointer">UNID. ${sortIcon('unidade')}</th>
+            <th onclick="sortItens('ultimo_valor')" style="padding:12px 14px;text-align:right;font-size:11px;font-weight:600;cursor:pointer">ÚLT. VALOR ${sortIcon('ultimo_valor')}</th>
+            <th onclick="sortItens('ultimo_fornecedor')" style="padding:12px 14px;text-align:left;font-size:11px;font-weight:600;cursor:pointer">ÚLT. FORNECEDOR ${sortIcon('ultimo_fornecedor')}</th>
+            <th onclick="sortItens('status')" style="padding:12px 14px;text-align:center;font-size:11px;font-weight:600;cursor:pointer">STATUS ${sortIcon('status')}</th>
             ${podeEditar?`<th style="padding:12px 14px;text-align:center;font-size:11px;font-weight:600">AÇÕES</th>`:''}
           </tr>
         </thead>
