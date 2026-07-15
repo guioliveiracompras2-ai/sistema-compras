@@ -6,6 +6,7 @@
 <title>Sistema de Compras · DHG & BMMOT</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Inter,system-ui,sans-serif;background:#F0F2F5;color:#1A202C}
@@ -460,11 +461,21 @@ async function loadSol(){
 }
 async function loadItens(){
   try{
-    // Supabase default limit is 1000 rows - fetch all with range
-    const {data,error}=await sb.from('itens').select('*').order('categoria').order('descricao').limit(1000);
-    if(error){console.error('loadItens erro:',error);S.itens=[];return;}
-    S.itens=data||[];
-    console.log('loadItens OK:',S.itens.length,'itens');
+    // Busca com paginação para garantir todos os 493 itens
+    let all=[];
+    let from=0;const pageSize=200;
+    while(true){
+      const {data,error}=await sb.from('itens').select('*')
+        .order('categoria').order('descricao')
+        .range(from,from+pageSize-1);
+      if(error){console.error('loadItens erro:',error);break;}
+      if(!data||!data.length)break;
+      all=[...all,...data];
+      if(data.length<pageSize)break;
+      from+=pageSize;
+    }
+    S.itens=all;
+    console.log('loadItens OK:',S.itens.length,'itens carregados');
   }catch(e){
     console.error('loadItens exception:',e);
     S.itens=[];
@@ -2775,7 +2786,16 @@ function pgItens(){
     </select>
     ${temFiltro?`<button class="btn bsc" onclick="itensFiltro={q:'',categoria:'',tipo:'',status:''};render()" style="padding:8px 14px;font-size:12px">↺ Limpar</button>`:''}
     <span style="font-size:12px;color:#9E9E9E">${lista.length} de ${S.itens.length} itens</span>
-    ${podeEditar?`<button class="btn bp" onclick="mdItem()" style="padding:8px 16px;margin-left:auto">+ Novo Item</button>`:'<div style="margin-left:auto"></div>'}
+    <div style="display:flex;gap:8px;margin-left:auto">
+      <button class="btn bsc" onclick="exportarItens()" style="padding:8px 14px;font-size:12px" title="Exportar para Excel">📥 Exportar</button>
+      ${podeEditar?`
+        <label class="btn bsc" style="padding:8px 14px;font-size:12px;cursor:pointer;margin:0" title="Importar Excel">
+          📤 Importar
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importarItens(this)">
+        </label>
+        <button class="btn bp" onclick="mdItem()" style="padding:8px 16px">+ Novo Item</button>
+      `:''}
+    </div>
   </div>
 
   <!-- TABELA -->
@@ -2835,6 +2855,75 @@ function pgItens(){
     </div>`:''}
   </div>
   </div>`;
+}
+
+function exportarItens(){
+  if(!window.XLSX){return alert('SheetJS não carregado. Recarregue a página.');}
+  const lista=S.itens.length?S.itens:[{descricao:'Nenhum item'}];
+  const rows=lista.map(i=>({
+    'Código':i.codigo||'',
+    'Tipo':i.tipo||'Material',
+    'Categoria':i.categoria||'',
+    'Subcategoria':i.subcategoria||'',
+    'Descrição':i.descricao||'',
+    'Unidade':i.unidade||'UN',
+    'Último Valor':i.ultimo_valor||'',
+    'Último Fornecedor':i.ultimo_fornecedor||'',
+    'Status':i.status||'Ativo',
+    'Lead Time (dias)':i.lead_time_medio||''
+  }));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Banco de Itens');
+  XLSX.writeFile(wb,`banco_itens_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+async function importarItens(input){
+  const file=input.files?.[0];
+  if(!file)return;
+  if(!window.XLSX){return alert('SheetJS não carregado. Recarregue a página.');}
+  const reader=new FileReader();
+  reader.onload=async(e)=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws);
+      if(!rows.length)return alert('Planilha vazia!');
+
+      // Mapeia colunas flexível
+      const itens=rows.map(r=>{
+        const desc=r['Descrição']||r['Descricao']||r['descricao']||r['DESCRIÇÃO']||r['description']||'';
+        if(!desc)return null;
+        return {
+          codigo:String(r['Código']||r['Codigo']||r['codigo']||r['CÓDIGO']||r['Codigo do Item']||r['Código do Item']||'').trim()||null,
+          tipo:String(r['Tipo']||r['tipo']||'Material').trim(),
+          categoria:String(r['Categoria']||r['categoria']||'').trim(),
+          subcategoria:String(r['Subcategoria']||r['subcategoria']||'').trim(),
+          descricao:String(desc).trim(),
+          unidade:String(r['Unidade']||r['unidade']||r['Unidade de Medida']||'UN').trim(),
+          ultimo_valor:parseFloat(r['Último Valor']||r['Ultimo Valor']||r['ultimo_valor']||0)||null,
+          status:String(r['Status']||r['status']||'Ativo').trim(),
+          lead_time_medio:parseInt(r['Lead Time (dias)']||r['Lead Time']||0)||null,
+        };
+      }).filter(Boolean);
+
+      if(!itens.length)return alert('Nenhum item válido encontrado na planilha.');
+      if(!confirm(`Importar ${itens.length} itens? Itens com mesma descrição e categoria não serão duplicados.`))return;
+
+      // Insert em lotes de 50
+      let ok=0,err=0;
+      for(let i=0;i<itens.length;i+=50){
+        const lote=itens.slice(i,i+50);
+        const {error}=await sb.from('itens').upsert(lote,{onConflict:'descricao,categoria',ignoreDuplicates:true});
+        if(error){console.error('Lote erro:',error);err+=lote.length;}
+        else ok+=lote.length;
+      }
+      await loadItens();render();
+      alert('✅ Importação concluída!\n'+ok+' itens importados'+( err?'\n⚠️ '+err+' com erro':''));
+    }catch(ex){alert('Erro ao ler arquivo: '+ex.message);}
+  };
+  reader.readAsBinaryString(file);
+  input.value='';
 }
 
 async function mdItem(id){
