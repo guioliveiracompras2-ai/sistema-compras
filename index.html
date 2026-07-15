@@ -3282,12 +3282,10 @@ function pgPed(){
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="pedFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
       ${(()=>{
-      // Filtra lojas de pedidos pelo grupo selecionado
-      let lojasP=lojasPed;
-      if(pedFiltro.grupo)lojasP=S.ped.filter(p=>p.grupo===pedFiltro.grupo).map(p=>p.loja_nome).filter(Boolean);
-      lojasP=[...new Set(lojasP)].sort();
-      return lojasP.map(l=>`<option value="${l}"${pedFiltro.loja===l?' selected':''}>${l}</option>`).join('');
-    })()}
+        let ljs=S.lojas;
+        if(pedFiltro.grupo)ljs=ljs.filter(l=>(l.grupo==='DHC'?'DHG':l.grupo)===pedFiltro.grupo);
+        return ljs.map(l=>`<option value="${l.nome}"${pedFiltro.loja===l.nome?' selected':''}>${l.nome}</option>`).join('');
+      })()}
     </select>
     <select class="inp" style="width:155px;padding:8px 10px;font-size:13px" onchange="pedFiltro.status=this.value;render()">
       <option value="">Todos os Status</option>
