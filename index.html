@@ -459,8 +459,16 @@ async function loadSol(){
   S.sol=data||[];
 }
 async function loadItens(){
-  const {data}=await sb.from('itens').select('*').order('categoria').order('descricao');
-  S.itens=data||[];
+  try{
+    // Supabase default limit is 1000 rows - fetch all with range
+    const {data,error}=await sb.from('itens').select('*').order('categoria').order('descricao').limit(1000);
+    if(error){console.error('loadItens erro:',error);S.itens=[];return;}
+    S.itens=data||[];
+    console.log('loadItens OK:',S.itens.length,'itens');
+  }catch(e){
+    console.error('loadItens exception:',e);
+    S.itens=[];
+  }
 }
 
 async function loadForn(){const {data}=await sb.from('fornecedores').select('*').order('nome');S.forn=data||[];}
@@ -2761,7 +2769,7 @@ function pgItens(){
       ${cats.map(c=>`<option value="${c}"${itensFiltro.categoria===c?' selected':''}>${c}</option>`).join('')}
     </select>
     <select class="inp" style="width:130px;padding:8px 10px;font-size:13px" onchange="itensFiltro.status=this.value;render()">
-      <option value="">Todos Status</option>
+      <option value="${itensFiltro.status===''?' selected':''}">Todos Status</option>
       <option value="Ativo"${itensFiltro.status==='Ativo'?' selected':''}>✅ Ativo</option>
       <option value="Inativo"${itensFiltro.status==='Inativo'?' selected':''}>❌ Inativo</option>
     </select>
