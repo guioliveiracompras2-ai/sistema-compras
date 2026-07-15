@@ -1040,9 +1040,11 @@ function pgSol(){
     <input class="inp" placeholder="🔍 Número, descrição, loja, área..."
       style="flex:1;min-width:200px;padding:8px 12px;font-size:13px"
       value="${solFiltro.q}" oninput="solFiltro.q=this.value;render()">
-    <select class="inp" style="width:95px;padding:8px 10px;font-size:13px" onchange="solFiltro.grupo=this.value;solFiltro.loja='';render()">
-      <option value="">Grupos</option>
-      ${grupoOptsHtml}
+    <select class="inp" style="width:110px;padding:8px 10px;font-size:13px" onchange="solFiltro.grupo=this.value;solFiltro.loja='';render()">
+      <option value="">Todos Grupos</option>
+      <option value="DHG"${solFiltro.grupo==='DHG'?' selected':''}>🔵 DHG</option>
+      <option value="BMMOT"${solFiltro.grupo==='BMMOT'?' selected':''}>🟢 BMMOT</option>
+      <option value="UNIC"${solFiltro.grupo==='UNIC'?' selected':''}>🟡 UNIC</option>
     </select>
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="solFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
