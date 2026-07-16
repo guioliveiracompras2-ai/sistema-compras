@@ -1409,8 +1409,80 @@ function toggleGruposUser(el){
     const cb=document.getElementById(id);
     if(cb){cb.disabled=el.checked;if(el.checked)cb.checked=false;}
   });
-  const ugr=document.getElementById('ugr');
-  if(ugr)ugr.value=el.checked?'TODOS':'';
+  // Update group card styles
+  ['dhg','bmmot','unic'].forEach(g=>{
+    const card=document.getElementById('gb-'+g);
+    if(card)card.style.borderColor='#E0E0E0';
+  });
+  const todosCard=document.getElementById('gb-todos');
+  if(todosCard)todosCard.style.borderColor=el.checked?'#1565C0':'#E0E0E0';
+}
+
+function selecionarGrupoUser(grupo){
+  // Uncheck todos
+  const todosCb=document.getElementById('ugr-todos');
+  if(todosCb){todosCb.checked=false;todosCb.disabled=false;}
+  // Toggle this group
+  const cb=document.getElementById('ugr-'+grupo.toLowerCase());
+  if(cb)cb.checked=!cb.checked;
+  // Update card styles
+  ['dhg','bmmot','unic','todos'].forEach(g=>{
+    const card=document.getElementById('gb-'+g);
+    if(!card)return;
+    const gKey=g==='todos'?'todos':g.toUpperCase();
+    const isActive=g==='todos'?false:document.getElementById('ugr-'+g)?.checked;
+    card.style.borderColor=isActive?'#1565C0':'#E0E0E0';
+    card.style.background=isActive?'#E3F2FD':'#F8F9FA';
+  });
+  filtrarLojasPorGrupo();
+}
+
+function filtrarLojasPorGrupo(){
+  const todosCb=document.getElementById('ugr-todos');
+  const todosGrupos=todosCb?.checked;
+  const grpsSel=['DHG','BMMOT','UNIC'].filter(g=>document.getElementById('ugr-'+g.toLowerCase())?.checked);
+  const container=document.getElementById('lojas-checkboxes');
+  const hint=document.getElementById('loja-hint');
+  if(!container)return;
+
+  // Determina quais lojas mostrar
+  let lojasFiltradas=S.lojas;
+  if(!todosGrupos&&grpsSel.length>0){
+    lojasFiltradas=S.lojas.filter(l=>grpsSel.includes(l.grupo==='DHC'?'DHG':l.grupo));
+  }
+
+  if(hint)hint.textContent=lojasFiltradas.length+' lojas disponíveis';
+
+  // Rebuild checkboxes
+  container.innerHTML=`
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fff;border-radius:6px;cursor:pointer;font-size:12px;border:1px solid #E0E0E0;grid-column:1/-1" id="loja-cb-todos">
+      <input type="checkbox" id="ulo-todos" onchange="toggleTodasLojas(this)" style="width:14px;height:14px">
+      <span style="font-weight:600;color:#1565C0">Todas as Lojas do grupo</span>
+    </label>
+    ${lojasFiltradas.map(l=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fff;border-radius:6px;cursor:pointer;font-size:12px;border:1px solid #E0E0E0" id="loja-cb-${l.id}">
+      <input type="checkbox" class="ulo-loja" value="${l.id}" onchange="atualizarHiddenLojas()" style="width:14px;height:14px">
+      <span>${l.nome}</span>
+    </label>`).join('')}`;
+  atualizarHiddenLojas();
+}
+
+function toggleTodasLojas(el){
+  document.querySelectorAll('.ulo-loja').forEach(cb=>cb.checked=false);
+  atualizarHiddenLojas();
+}
+
+function atualizarHiddenLojas(){
+  const todosCb=document.getElementById('ulo-todos');
+  const selecionadas=Array.from(document.querySelectorAll('.ulo-loja:checked')).map(cb=>cb.value);
+  const hidden=document.getElementById('ulo');
+  if(todosCb&&selecionadas.length===0){
+    todosCb.checked=true;
+    if(hidden)hidden.value='TODOS';
+  } else {
+    if(todosCb)todosCb.checked=false;
+    if(hidden)hidden.value=JSON.stringify(selecionadas);
+  }
 }
 
 function toggleTodosGrupos(el){
@@ -4287,68 +4359,91 @@ function pgUsers(){
 }
 
 function mdCriarUser(){
-  const lojasVisiveis=isGestor()?S.lojas:S.lojas.filter(l=>podeVerGrupo(l.grupo));
-  const lo=lojasVisiveis.map(l=>`<option value="${l.id}">${l.nome} (${l.grupo||''})</option>`).join('');
-  openModal(`<div class="modal" style="max-width:520px">
-  <div class="mh"><span>➕ Criar Novo Usuário</span><button class="xb" onclick="closeModal()">✕</button></div>
+  openModal(`<div class="modal" style="max-width:540px">
+  <div class="mh" style="background:#0F2236;color:#fff;border-radius:14px 14px 0 0">
+    <div>
+      <div style="font-size:15px;font-weight:700">➕ Criar Novo Usuário</div>
+      <div style="font-size:11px;opacity:.7;margin-top:2px">Login gerado automaticamente como nome.sobrenome</div>
+    </div>
+    <button class="xb" style="color:rgba(255,255,255,.7)" onclick="closeModal()">✕</button>
+  </div>
   <div class="mb">
     <div id="ue" class="eb"></div>
-    <div class="ib ibl">O login é gerado como <strong>nome.sobrenome</strong>. Você define a senha inicial.</div>
     <div class="fg2">
-      <div class="f"><label>Nome *</label><input class="inp" id="un" placeholder="João" oninput="prevL()"></div>
-      <div class="f"><label>Sobrenome *</label><input class="inp" id="uss" placeholder="Silva" oninput="prevL()"></div>
+      <div class="f" style="margin:0"><label>Nome *</label><input class="inp" id="un" oninput="prevLogin()" placeholder="Nome"></div>
+      <div class="f" style="margin:0"><label>Sobrenome *</label><input class="inp" id="uss" oninput="prevLogin()" placeholder="Sobrenome"></div>
     </div>
-    <div id="ulp" style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 14px;font-size:13px;color:#1e40af;margin-bottom:12px;font-family:monospace">
-      Login: será gerado automaticamente
-    </div>
-    <div class="fg2">
-      <div class="f"><label>Perfil *</label><select class="inp" id="upr">
-        <option value="requisitante">Requisitante — só faz solicitações</option>
-        <option value="diretoria">Diretoria — aprova tudo</option>
-        <option value="gerente">Gerente — aprovação final</option>
-        <option value="compras">Compras — gerencia orçamentos</option>
-        <option value="gestor">Gestor — acesso total</option>
-      </select></div>
-      <div class="f"><label>Área</label><select class="inp" id="uar">${AREAS.map(a=>`<option>${a}</option>`).join('')}</select></div>
+    <div id="prev-login" style="background:#F0F7FF;border-radius:6px;padding:8px 12px;font-size:12px;color:#1565C0;margin-bottom:10px;display:none">
+      🔑 Login: <b id="pl"></b>
     </div>
     <div class="fg2">
-      <div class="f">
-        <label>Grupos com Acesso</label>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;background:#F8F9FA;border-radius:8px;padding:10px;border:1px solid #E0E0E0">
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ugr-todos" onchange="toggleGruposUser(this)" style="width:16px;height:16px"> Todos os Grupos</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ugr-dhg" value="DHG" style="width:16px;height:16px"> 🔵 DHG</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ugr-bmmot" value="BMMOT" style="width:16px;height:16px"> 🟢 BMMOT</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ugr-unic" value="UNIC" style="width:16px;height:16px"> 🟡 UNIC</label>
-        </div>
-        <input type="hidden" id="ugr" value="TODOS">
-      </div>
-      <div class="f">
-        <label>Lojas com Acesso</label>
-        <select class="inp" id="ulo" multiple size="5" style="height:120px">
-          <option value="TODOS" selected>✅ Todas as Lojas</option>
-          ${S.lojas.map(l=>`<option value="${l.id}">[${l.grupo||''}] ${l.nome}</option>`).join('')}
+      <div class="f" style="margin:0"><label>Perfil *</label>
+        <select class="inp" id="upr">
+          <option value="requisitante">Requisitante — só faz solicitações</option>
+          <option value="compras">Compras — faz cotações e OC</option>
+          <option value="gerente">Gerente — aprova compras</option>
+          <option value="diretoria">Diretoria — aprova solicitações</option>
+          <option value="gestor">Gestor — acesso total</option>
         </select>
-        <span style="font-size:11px;color:#9E9E9E">Segure Ctrl para selecionar múltiplas</span></div>
+      </div>
+      <div class="f" style="margin:0"><label>Área</label>
+        <select class="inp" id="uar">${AREAS.map(a=>`<option>${a}</option>`).join('')}</select>
+      </div>
     </div>
-    <hr class="hdiv">
+
+    <div class="f">
+      <label style="margin-bottom:8px;display:block;font-weight:600">Grupo com Acesso *</label>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        ${[{id:'todos',icon:'🌐',label:'Todos',sub:'',color:'#555'},
+           {id:'dhg',icon:'🔵',label:'DHG',sub:'11 lojas',color:'#1565C0'},
+           {id:'bmmot',icon:'🟢',label:'BMMOT',sub:'7 lojas',color:'#2E7D32'},
+           {id:'unic',icon:'🟡',label:'UNIC',sub:'1 loja',color:'#E65100'}
+        ].map(g=>`
+        <div onclick="selecionarGrupoUser('${g.id}')" id="gcard-${g.id}"
+          style="display:flex;flex-direction:column;align-items:center;gap:4px;background:#F8F9FA;border:2px solid #E0E0E0;border-radius:10px;padding:12px 6px;cursor:pointer;transition:.15s;text-align:center">
+          <span style="font-size:20px">${g.icon}</span>
+          <span style="font-size:12px;font-weight:700;color:${g.color}">${g.label}</span>
+          ${g.sub?`<span style="font-size:10px;color:#9E9E9E">${g.sub}</span>`:''}
+          <input type="checkbox" id="ugr-${g.id}" value="${g.id.toUpperCase()}" style="display:none">
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="f">
+      <label style="margin-bottom:6px;display:flex;justify-content:space-between">
+        <span style="font-weight:600">Lojas com Acesso</span>
+        <span style="font-size:11px;color:#9E9E9E" id="loja-hint">Selecione um grupo acima</span>
+      </label>
+      <div id="lojas-checkboxes" style="background:#F8F9FA;border:1px solid #E0E0E0;border-radius:8px;padding:10px;max-height:160px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <label style="grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:7px 10px;background:#E3F2FD;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:#1565C0">
+          <input type="checkbox" id="ulo-todos" checked onchange="toggleTodasLojas(this)" style="width:14px;height:14px">
+          ✅ Todas as Lojas
+        </label>
+      </div>
+      <input type="hidden" id="ulo" value="TODOS">
+    </div>
+
     <div class="fg2">
-      <div class="f"><label>Senha inicial *</label><input class="inp" id="use" type="password" placeholder="Mínimo 6 caracteres"></div>
-      <div class="f"><label>Confirmar senha *</label><input class="inp" id="use2" type="password" placeholder="Repita a senha"></div>
+      <div class="f" style="margin:0"><label>Senha *</label><input class="inp" type="password" id="use" placeholder="Mín. 6 caracteres"></div>
+      <div class="f" style="margin:0"><label>Confirmar Senha *</label><input class="inp" type="password" id="use2" placeholder="Repita a senha"></div>
     </div>
   </div>
   <div class="mf">
     <button class="btn bsc" onclick="closeModal()">Cancelar</button>
-    <button class="btn bp" id="btn-criar" onclick="hCriarUser()">Criar Usuário</button>
+    <button class="btn bp" id="btn-criar" onclick="hCriarUser()">✅ Criar Usuário</button>
   </div>
   </div>`);
 }
 
-function prevL(){
-  const n=V('un'),s=V('uss'),el=document.getElementById('ulp');
-  if(!el)return;
+function prevLogin(){
+  const n=V('un'),s=V('uss');
+  const el=document.getElementById('pl');
+  const box=document.getElementById('prev-login');
   const l=slug(`${n} ${s}`);
-  el.textContent=l.length>2?`Login: ${l}`:'Login: será gerado automaticamente';
+  if(el)el.textContent=l;
+  if(box)box.style.display=n&&s?'block':'none';
 }
+
 
 async function hCriarUser(){
   const nome=V('un'),sob=V('uss'),perfil=V('upr'),area=V('uar'),grupo=V('ugr'),loja=V('ulo'),senha=V('use'),senha2=V('use2');
@@ -4367,8 +4462,11 @@ async function hCriarUser(){
     const todosGrp=document.getElementById('ugr-todos')?.checked;
     const grpsSel=todosGrp?['TODOS']:['DHG','BMMOT','UNIC'].filter(g=>document.getElementById('ugr-'+g.toLowerCase())?.checked);
     const grupoFinal=todosGrp?'TODOS':grpsSel[0]||grupo||'TODOS';
-    const lojaEl=document.getElementById('ulo');
-    const lojasSel=lojaEl?Array.from(lojaEl.selectedOptions).map(o=>o.value):['TODOS'];
+    // Lê lojas do novo sistema de checkboxes
+    const lojaHidden=document.getElementById('ulo')?.value||'TODOS';
+    let lojasSel;
+    if(lojaHidden==='TODOS'){lojasSel=['TODOS'];}
+    else{try{lojasSel=JSON.parse(lojaHidden);}catch{lojasSel=['TODOS'];}}
     const primeiraLoja=lojasSel.find(l=>l!=='TODOS')||null;
     const {error}=await sb.from('usuarios').insert({
       nome,sobrenome:sob,login,senha_hash:hash,
