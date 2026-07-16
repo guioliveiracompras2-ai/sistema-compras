@@ -1082,9 +1082,7 @@ function pgSol(){
       style="flex:1;min-width:200px;padding:8px 12px;font-size:13px"
       value="${solFiltro.q}" oninput="solFiltro.q=this.value;render()">
     <select class="inp" style="width:110px;padding:8px 10px;font-size:13px" onchange="solFiltro.grupo=this.value;solFiltro.loja='';render()">
-      <option value="DHG"${solFiltro.grupo==='DHG'?' selected':''}>🔵 DHG</option>
-      <option value="BMMOT"${solFiltro.grupo==='BMMOT'?' selected':''}>🟢 BMMOT</option>
-      <option value="UNIC"${solFiltro.grupo==='UNIC'?' selected':''}>🟡 UNIC</option>
+      ${GRUPOS_USER.map(g=>{const lb={DHG:'🔵 DHG',BMMOT:'🟢 BMMOT',UNIC:'🟡 UNIC'};return lb[g]?`<option value="${g}"${solFiltro.grupo===g?' selected':''}>${lb[g]}</option>`:''}).join('')}
     </select>
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="solFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
