@@ -249,6 +249,17 @@ function userLojas(){
   if(!l||!l.length||l.includes('TODOS'))return['TODOS'];
   return l;
 }
+
+// Retorna lojas visíveis para o usuário atual (respeita grupo E lojas_acesso)
+function lojasDoUsuario(){
+  const lojas=userLojas();
+  const todasLojas=lojas.includes('TODOS');
+  return S.lojas.filter(l=>{
+    if(!podeVerGrupo(l.grupo))return false;
+    if(todasLojas)return true;
+    return lojas.includes(l.id);
+  });
+}
 function podeVerGrupo(grupo){
   if(isGestor())return true;
   const g=grupo==='DHC'?'DHG':grupo;
@@ -273,10 +284,10 @@ function filtrarPorAcesso(lista){
       (s.numero||s.solicitacao_numero||'').startsWith('BMM')?'BMMOT':
       (s.numero||s.solicitacao_numero||'').startsWith('RC')?'UNIC':'DHG'
     );
-    // DHC e DHG são o mesmo grupo
     const grp=grpRaw==='DHC'?'DHG':grpRaw;
     if(!todosGrps&&!grps.includes(grp))return false;
     if(todasLojas)return true;
+    // Verifica se a loja da solicitação está nas lojas permitidas
     return lojas.includes(s.loja_id)||lojas.includes(s.loja_nome);
   });
 }
@@ -1070,14 +1081,10 @@ function pgSol(){
       <option value="">Todas as Lojas</option>
       ${(()=>{
       // Filtra lojas pelo grupo selecionado no filtro OU pelo acesso do usuário
-      let lojasFiltro=S.lojas;
-      if(!isGestor())lojasFiltro=lojasFiltro.filter(l=>podeVerGrupo(l.grupo));
+      let lojasFiltro=lojasDoUsuario();
       if(solFiltro.grupo){
         const gf=solFiltro.grupo;
-        lojasFiltro=lojasFiltro.filter(l=>{
-          const lg=l.grupo==='DHC'?'DHG':l.grupo;
-          return lg===gf;
-        });
+        lojasFiltro=lojasFiltro.filter(l=>(l.grupo==='DHC'?'DHG':l.grupo)===gf);
       }
       return lojasFiltro.map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
     })()}
@@ -3226,7 +3233,7 @@ function pgCot(){
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="cotFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
       ${(()=>{
-        let ljs=S.lojas;
+        let ljs=lojasDoUsuario();
         if(cotFiltro.grupo)ljs=ljs.filter(l=>(l.grupo==='DHC'?'DHG':l.grupo)===cotFiltro.grupo);
         return ljs.map(l=>`<option value="${l.id}"${cotFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
       })()}
@@ -3709,7 +3716,7 @@ function pgPed(){
     <select class="inp" style="width:175px;padding:8px 10px;font-size:13px" onchange="pedFiltro.loja=this.value;render()">
       <option value="">Todas as Lojas</option>
       ${(()=>{
-        let ljs=S.lojas;
+        let ljs=lojasDoUsuario();
         if(pedFiltro.grupo)ljs=ljs.filter(l=>(l.grupo==='DHC'?'DHG':l.grupo)===pedFiltro.grupo);
         return ljs.map(l=>`<option value="${l.nome}"${pedFiltro.loja===l.nome?' selected':''}>${l.nome}</option>`).join('');
       })()}
@@ -3848,8 +3855,7 @@ function pgRel(){
   <select class="inp" style="width:200px;padding:7px 12px" id="rf-loja" onchange="relFiltros.loja=this.value;renderRel()">
     <option value="">Todas as Lojas</option>
     ${(()=>{
-      let ljs=S.lojas;
-      if(!isGestor())ljs=ljs.filter(l=>podeVerGrupo(l.grupo));
+      let ljs=lojasDoUsuario();
       if(relFiltros.grupo){
         const gf=relFiltros.grupo;
         ljs=ljs.filter(l=>(l.grupo==='DHC'?'DHG':l.grupo)===gf);
