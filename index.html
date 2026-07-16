@@ -4338,6 +4338,7 @@ async function hCriarUser(){
   const btn=document.getElementById('btn-criar');
   if(btn){btn.textContent='Criando...';btn.disabled=true;}
   try{
+    const hash=await hashSenha(senha);
     const todosGrp=document.getElementById('ugr-todos')?.checked;
     const grpsSel=todosGrp?['TODOS']:['DHG','BMMOT','UNIC'].filter(g=>document.getElementById('ugr-'+g.toLowerCase())?.checked);
     const grupoFinal=todosGrp?'TODOS':grpsSel[0]||grupo||'TODOS';
