@@ -1180,7 +1180,8 @@ function mdNovaSOL(){
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead><tr style="background:#F8F9FA">
           <th style="padding:8px;text-align:left;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:36px">N</th>
-          <th style="padding:8px;text-align:left;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0">Descricao do Item *</th>
+          <th style="padding:8px;text-align:left;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0">Descrição do Item *</th>
+          <th style="padding:8px;text-align:center;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:60px">Und.</th>
           <th style="padding:8px;text-align:center;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:70px">Qtd.</th>
           <th style="padding:8px;text-align:right;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:110px">Valor Unit.</th>
           <th style="padding:8px;text-align:right;font-size:11px;color:#9E9E9E;border-bottom:1px solid #E0E0E0;width:110px">Total</th>
@@ -1189,11 +1190,16 @@ function mdNovaSOL(){
         <tbody id="itens-tbody">
           <tr id="item-row-1">
             <td style="padding:6px 8px;color:#9E9E9E;font-size:12px">1</td>
-            <td style="padding:3px 4px"><input class="inp item-desc" style="padding:7px 10px" placeholder="Descricao do item..."></td>
+            <td style="padding:3px 4px;position:relative">
+              <input class="inp item-desc" id="item-desc-1" style="padding:7px 10px;width:100%" placeholder="Digite para buscar no banco de itens..." autocomplete="off"
+                oninput="buscarItemBanco(this,1)">
+              <div id="item-sug-1" style="display:none;position:absolute;z-index:999;background:#fff;border:1px solid #BBDEFB;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.15);max-height:220px;overflow-y:auto;width:100%;top:38px;left:0;min-width:300px"></div>
+            </td>
+            <td style="padding:3px 4px"><input class="inp item-und" id="item-und-1" style="padding:7px 4px;text-align:center;width:55px" placeholder="UN" value="UN"></td>
             <td style="padding:3px 4px"><input class="inp item-qtd" type="number" min="1" value="1" style="padding:7px 6px;text-align:center" oninput="calcTotal()"></td>
             <td style="padding:3px 4px"><input class="inp item-val" type="number" min="0" step="0.01" placeholder="0,00" style="padding:7px 6px;text-align:right" oninput="calcTotal()"></td>
             <td style="padding:6px 8px;text-align:right;font-weight:600;color:#1565C0" id="item-total-1">R$ 0,00</td>
-            <td style="padding:3px 4px;text-align:center"><button onclick="removerItem('item-row-1')" style="background:#FFEBEE;border:none;color:#C62828;border-radius:6px;padding:5px 7px;cursor:pointer">X</button></td>
+            <td style="padding:3px 4px;text-align:center"><button onclick="removerItem('item-row-1')" style="background:#FFEBEE;border:none;color:#C62828;border-radius:6px;padding:5px 7px;cursor:pointer">✕</button></td>
           </tr>
         </tbody>
       </table>
@@ -1261,12 +1267,18 @@ function adicionarItem(){
   const tr=document.createElement('tr');
   tr.id='item-row-'+n;
   tr.innerHTML=`<td style="padding:6px 8px;color:#9E9E9E;font-size:12px">${n}</td>
-    <td style="padding:3px 4px"><input class="inp item-desc" style="padding:7px 10px" placeholder="Descricao..."></td>
+    <td style="padding:3px 4px;position:relative">
+      <input class="inp item-desc" id="item-desc-${n}" style="padding:7px 10px;width:100%" placeholder="Digite para buscar no banco de itens..." autocomplete="off"
+        oninput="buscarItemBanco(this,${n})">
+      <div id="item-sug-${n}" style="display:none;position:absolute;z-index:999;background:#fff;border:1px solid #BBDEFB;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.15);max-height:220px;overflow-y:auto;width:100%;top:38px;left:0;min-width:300px"></div>
+    </td>
+    <td style="padding:3px 4px"><input class="inp item-und" id="item-und-${n}" style="padding:7px 4px;text-align:center;width:55px" placeholder="UN" value="UN"></td>
     <td style="padding:3px 4px"><input class="inp item-qtd" type="number" min="1" value="1" style="padding:7px 6px;text-align:center" oninput="calcTotal()"></td>
     <td style="padding:3px 4px"><input class="inp item-val" type="number" min="0" step="0.01" placeholder="0,00" style="padding:7px 6px;text-align:right" oninput="calcTotal()"></td>
     <td style="padding:6px 8px;text-align:right;font-weight:600;color:#1565C0" id="item-total-${n}">R$ 0,00</td>
-    <td style="padding:3px 4px;text-align:center"><button onclick="removerItem('item-row-${n}')" style="background:#FFEBEE;border:none;color:#C62828;border-radius:6px;padding:5px 7px;cursor:pointer">X</button></td>`;
+    <td style="padding:3px 4px;text-align:center"><button onclick="removerItem('item-row-${n}')" style="background:#FFEBEE;border:none;color:#C62828;border-radius:6px;padding:5px 7px;cursor:pointer">✕</button></td>`;
   tbody.appendChild(tr);
+  document.getElementById('item-desc-'+n)?.focus();
 }
 
 function removerItem(rowId){
@@ -1276,41 +1288,63 @@ function removerItem(rowId){
 
 function buscarItemBanco(input,n){
   const q=(input.value||'').toLowerCase().trim();
-  const sug=document.getElementById('si-sug-'+n);
+  const sug=document.getElementById('item-sug-'+n);
   if(!sug)return;
-  if(!q||q.length<2||!S.itens.length){sug.style.display='none';return;}
-  const matches=S.itens.filter(i=>i.status==='Ativo'&&
-    (i.descricao||'').toLowerCase().includes(q)).slice(0,8);
-  if(!matches.length){sug.style.display='none';return;}
+  if(!q||q.length<2){sug.style.display='none';return;}
+  if(!S.itens||!S.itens.length){
+    sug.innerHTML='<div style="padding:12px 14px;font-size:12px;color:#9E9E9E">⏳ Carregando banco de itens...</div>';
+    sug.style.display='block';
+    loadItens().then(()=>{if(input.value)buscarItemBanco(input,n);});
+    return;
+  }
+  const matches=S.itens.filter(i=>i.status!=='Inativo'&&
+    (i.descricao||'').toLowerCase().includes(q)).slice(0,10);
+  if(!matches.length){
+    sug.innerHTML=`<div style="padding:12px 14px;font-size:12px;color:#E65100">
+      ⚠️ "<b>${input.value}</b>" não encontrado no banco de itens.<br>
+      <span style="font-size:11px;color:#9E9E9E">Você pode digitar livremente e salvar assim mesmo.</span>
+    </div>`;
+    sug.style.display='block';
+    return;
+  }
   sug.innerHTML=matches.map(i=>`
-    <div onclick="selecionarItem(${n},'${i.id}')"
+    <div onclick="selecionarItemRow(${n},'${i.id}')"
       style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #F0F2F5;display:flex;justify-content:space-between;align-items:center"
       onmouseenter="this.style.background='#F0F7FF'" onmouseleave="this.style.background='#fff'">
-      <div>
+      <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:600;color:#0F2236">${i.descricao}</div>
-        <div style="font-size:10px;color:#9E9E9E;margin-top:2px">${i.codigo||''} ${i.categoria?'· '+i.categoria:''} · ${i.unidade||'UN'}</div>
+        <div style="font-size:10px;color:#9E9E9E;margin-top:2px">
+          ${i.codigo?i.codigo+' · ':''}${i.categoria||''}${i.subcategoria?' › '+i.subcategoria:''} · <b>${i.unidade||'UN'}</b>
+        </div>
       </div>
-      ${i.ultimo_valor?`<span style="font-size:12px;font-weight:700;color:#2E7D32;white-space:nowrap;margin-left:12px">R$ ${parseFloat(i.ultimo_valor).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>`:''}
+      ${i.ultimo_valor?`<span style="font-size:12px;font-weight:700;color:#2E7D32;white-space:nowrap;margin-left:10px">R$ ${parseFloat(i.ultimo_valor).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>`:'<span style="font-size:11px;color:#9E9E9E;margin-left:10px">Sem valor</span>'}
     </div>`).join('');
   sug.style.display='block';
 }
 
-function selecionarItem(n,itemId){
+function selecionarItemRow(n,itemId){
   const it=S.itens.find(x=>x.id===itemId);
   if(!it)return;
-  const desc=document.getElementById('si-d-'+n);
-  const val=document.getElementById('si-v-'+n);
-  if(desc)desc.value=it.descricao;
+  const row=document.getElementById('item-row-'+n);
+  if(!row)return;
+  const desc=document.getElementById('item-desc-'+n);
+  const und=document.getElementById('item-und-'+n);
+  const val=row.querySelector('.item-val');
+  if(desc){desc.value=it.descricao;desc.style.borderColor='#2E7D32';}
+  if(und)und.value=it.unidade||'UN';
   if(val&&it.ultimo_valor)val.value=it.ultimo_valor;
-  const sug=document.getElementById('si-sug-'+n);
+  const sug=document.getElementById('item-sug-'+n);
   if(sug)sug.style.display='none';
   calcTotal();
 }
 
+// Compatibilidade com código antigo
+function selecionarItem(n,itemId){selecionarItemRow(n,itemId);}
+
 // Fecha sugestões ao clicar fora
 document.addEventListener('click',function(e){
-  document.querySelectorAll('[id^="si-sug-"]').forEach(el=>{
-    if(!el.contains(e.target))el.style.display='none';
+  document.querySelectorAll('[id^="item-sug-"]').forEach(el=>{
+    if(!el.contains(e.target)&&!e.target.classList.contains('item-desc'))el.style.display='none';
   });
 });
 
