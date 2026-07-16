@@ -253,12 +253,14 @@ function userLojas(){
 // Retorna lojas visíveis para o usuário atual (respeita grupo E lojas_acesso)
 function lojasDoUsuario(){
   const lojas=userLojas();
-  const todasLojas=lojas.includes('TODOS');
-  return S.lojas.filter(l=>{
+  const todasLojas=lojas.includes('TODOS')||isGestor();
+  const result=S.lojas.filter(l=>{
     if(!podeVerGrupo(l.grupo))return false;
     if(todasLojas)return true;
     return lojas.includes(l.id);
   });
+  console.log('lojasDoUsuario:',result.map(l=>l.nome),'(lojas_acesso:',lojas,')');
+  return result;
 }
 function podeVerGrupo(grupo){
   if(isGestor())return true;
@@ -394,6 +396,10 @@ async function doLogin(login,senha){
     const {data:loja}=await sb.from('lojas').select('nome').eq('id',u.loja_id).single();
     u.loja={nome:loja?.nome||''};
   }
+  // Garante grupos e lojas_acesso carregados
+  if(!u.grupos)u.grupos=['TODOS'];
+  if(!u.lojas_acesso)u.lojas_acesso=['TODOS'];
+  console.log('Login OK:',u.login,'grupos:',u.grupos,'lojas_acesso:',u.lojas_acesso);
   S.user=u;
   salvarSessao(u);
 }
@@ -420,28 +426,31 @@ function doLogout(){
 
 function loadSession(){
   try{
-    // Tenta localStorage primeiro, depois sessionStorage como fallback
     const raw=localStorage.getItem(SESSION_KEY)||sessionStorage.getItem(SESSION_KEY);
     if(!raw)return;
     const dados=JSON.parse(raw);
-
-    // Suporte ao formato antigo (sem expiry)
     const u=dados.user||dados;
     const expira=dados.expira||Date.now()+(30*24*60*60*1000);
-
-    // Verifica expiração
     if(Date.now()>expira){
       localStorage.removeItem(SESSION_KEY);
       sessionStorage.removeItem(SESSION_KEY);
       S.user=null;
       return;
     }
-
-    // Valida campos mínimos (compatível com sessões antigas sem id)
     if(u&&u.login&&u.perfil){
       S.user=u;
-      // Renova sessão por mais 30 dias a cada login
       salvarSessao(u);
+      // Recarrega dados frescos do banco (grupos e lojas_acesso podem ter mudado)
+      sb.from('usuarios').select('*').eq('login',u.login).single().then(({data})=>{
+        if(data){
+          data.loja=u.loja; // mantém loja do cache
+          if(!data.grupos)data.grupos=['TODOS'];
+          if(!data.lojas_acesso)data.lojas_acesso=['TODOS'];
+          S.user=data;
+          salvarSessao(data);
+          render();
+        }
+      }).catch(()=>{});
     } else {
       localStorage.removeItem(SESSION_KEY);
       sessionStorage.removeItem(SESSION_KEY);
