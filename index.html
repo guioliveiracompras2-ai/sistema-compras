@@ -1147,7 +1147,17 @@ ${!lista.length?`<div class="card" style="text-align:center;padding:48px;color:#
 
 // ── NOVA SOLICITAÇÃO ──────────────────────────────────────────────────────
 function mdNovaSOL(){
-  const lo=S.lojas.map(l=>`<option value="${l.id}"${S.user?.loja_id===l.id?' selected':''}>${l.nome} (${l.grupo})</option>`).join('');
+  // Filtra lojas pelo acesso do usuário (grupo + lojas específicas)
+  const lojas_acesso=S.user?.lojas_acesso||['TODOS'];
+  const todasLojas=lojas_acesso.includes('TODOS');
+  const lojasVisiveis=S.lojas.filter(l=>{
+    // Filtra por grupo
+    if(!podeVerGrupo(l.grupo))return false;
+    // Se tem lojas específicas, filtra por elas
+    if(!todasLojas)return lojas_acesso.includes(l.id);
+    return true;
+  });
+  const lo=lojasVisiveis.map(l=>`<option value="${l.id}"${S.user?.loja_id===l.id?' selected':''}>${l.nome} (${l.grupo})</option>`).join('');
   const TIPOS=TIPOS_COMPRA;
   openModal(`<div class="modal" style="max-width:940px;width:96vw">
   <div class="mh"><span>Nova Requisicao de Compra</span><button class="xb" onclick="closeModal()">x</button></div>
