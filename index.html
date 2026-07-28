@@ -552,7 +552,7 @@ async function criarSol(f){
     valor_estimado:parseFloat(f.val)||null,
     urgencia:f.urg||'Baixa',
     justificativa:f.just,
-    grupo:loja?.grupo,
+    grupo:loja?.grupo||'DHG',
     status:(loja?.grupo==='BMMOT')?'Aguardando Gerente':'Aguardando Diretoria'
   };
   // Tenta adicionar colunas extras (podem não existir em versões antigas do banco)
@@ -1755,7 +1755,11 @@ async function vSOL(id){
 
   let dirHtml='';
   if(pD){
-    dirHtml=`<hr class="hdiv"><div class="ib ibo">Aprove para Compras realizar os orcamentos.</div>
+    const isBmmotDir=s.grupo==='BMMOT';
+    dirHtml=`<hr class="hdiv">
+    <div style="background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:10px;padding:14px;margin-bottom:12px">
+    <div style="font-size:12px;font-weight:700;color:#E65100;margin-bottom:6px">${isBmmotDir?'&#128084; 3&#170; APROVA&#199;&#195;O &mdash; DIRETORIA (SIMONE ou ANDREA)':'&#128084; APROVA&#199;&#195;O DIRETORIA'}</div>
+    <div style="font-size:12px;color:#555;margin-bottom:10px">${isBmmotDir?'Evandro j&#225; aprovou. Sua aprova&#231;&#227;o envia para Compras cotar.':'Aprove para Compras realizar os or&#231;amentos.'}</div>
     <div class="f"><label>Observacao</label><textarea class="inp" id="ov" placeholder="Instrucao..."></textarea></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
       <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Orçamento')">✅ Aprovar</button>
