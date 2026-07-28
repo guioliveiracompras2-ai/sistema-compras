@@ -4430,7 +4430,10 @@ function mdCriarUser(){
         </select>
       </div>
       <div class="f" style="margin:0"><label>Área</label>
-        <select class="inp" id="uar">${AREAS.map(a=>`<option>${a}</option>`).join('')}</select>
+        <select class="inp" id="uar">
+          <option value="Todos">🌐 Todos os Departamentos</option>
+          ${AREAS.map(a=>`<option>${a}</option>`).join('')}
+        </select>
       </div>
     </div>
 
