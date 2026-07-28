@@ -356,6 +356,10 @@ const SC={
   'Reprovada':                    'background:#FFEBEE;color:#B71C1C',
   'Aguardando Orçamento':         'background:#FFF3E0;color:#E65100',
   'Aguardando Aprovação Diretoria':'background:#FFF8E1;color:#F57F17',
+  'Aguardando Gerente': 'background:#E8EAF6;color:#3949AB',
+  'Aguardando Evandro': 'background:#E8EAF6;color:#3949AB',
+  'Aguardando Gerente Cotação': 'background:#EDE7F6;color:#6A1B9A',
+  'Aguardando Evandro Cotação': 'background:#EDE7F6;color:#6A1B9A',
   'Aguardando Aprovação Gerente': 'background:#E8EAF6;color:#3949AB',
   'Aprovada':                     'background:#E8F5E9;color:#1B5E20',
   'Comprada':                     'background:#E0F2F1;color:#004D40',
@@ -549,7 +553,7 @@ async function criarSol(f){
     urgencia:f.urg||'Baixa',
     justificativa:f.just,
     grupo:loja?.grupo,
-    status:'Aguardando Diretoria'
+    status:(loja?.grupo==='BMMOT')?'Aguardando Gerente':'Aguardando Diretoria'
   };
   // Tenta adicionar colunas extras (podem não existir em versões antigas do banco)
   const {data:solData,error}=await sb.from('solicitacoes').insert(solBase).select().single();
@@ -586,7 +590,9 @@ async function salvarCot(solId,itens){
     grupo:sol?.grupo,status:'Aberta',criado_por:criador
   });
   if(error)throw new Error(error.message);
-  await sb.from('solicitacoes').update({status:'Aguardando Aprovação Diretoria'}).eq('id',solId);
+  const solForCot=S.sol.find(s=>s.id===solId);
+  const statusPosCot=solForCot?.grupo==='BMMOT'?'Aguardando Gerente Cotação':'Aguardando Aprovação Diretoria';
+  await sb.from('solicitacoes').update({status:statusPosCot}).eq('id',solId);
   await sb.from('solicitacoes').update({cotacao_por:criador,cotacao_data:agora}).eq('id',solId).then(()=>{}).catch(()=>{});
 }
 
@@ -1013,8 +1019,8 @@ function pgDash(){
       if(po)pends.push({icon:'📋',txt:po+' cotação(ões) aguardando escolha do fornecedor',pg:'solicitacoes',alert:false});
     }
     if(isGerente()){
-      const pg=S.sol.filter(s=>s.status==='Aguardando Aprovação Gerente').length;
-      if(pg)pends.push({icon:'✅',txt:pg+' compra(s) aguardando sua aprovação final',pg:'solicitacoes',alert:false});
+      const pg=S.sol.filter(s=>s.status==='Aguardando Aprovação Gerente'||s.status==='Aguardando Gerente').length;
+      if(pg)pends.push({icon:'👔',txt:pg+' solicitação(ões) aguardando sua aprovação',pg:'solicitacoes',alert:false});
     }
     if(isCompras()){
       const pc=S.sol.filter(s=>s.status==='Aguardando Orçamento').length;
@@ -1067,7 +1073,7 @@ function pgSol(){
     return true;
   });
 
-  const STATUS=['Aguardando Diretoria','Aguardando Orçamento','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue','Reprovada'];
+  const STATUS=['Aguardando Gerente','Aguardando Evandro','Aguardando Diretoria','Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue','Reprovada'];
   const GRUPOS_USER=['DHG','BMMOT','UNIC'].filter(g=>podeVerGrupo(g));
   const grupoOptsHtml=GRUPOS_USER.map(g=>`<option value="${g}"${solFiltro.grupo===g?' selected':''} >${g}</option>`).join('');
   const lojaOpts=S.lojas.map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
@@ -1150,6 +1156,7 @@ ${!lista.length?`<div class="card" style="text-align:center;padding:48px;color:#
       ${isDiretoria()&&s.status==='Aguardando Diretoria'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar</button>`:''}
       ${isDiretoria()&&s.status==='Aguardando Aprovação Diretoria'?`<button class="sm ok" onclick="vSOL('${s.id}')">📋 Ver Orçamentos</button>`:''}
       ${isGerente()&&s.status==='Aguardando Aprovação Gerente'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar Final</button>`:''}
+      ${(isGerente()||isGestor())&&s.status==='Aguardando Gerente'?`<button class="sm" style="background:#3949AB;color:#fff" onclick="vSOL('${s.id}')">👔 Aprovar</button>`:''}
       ${isCompras()&&s.status==='Aprovada'?`<button class="sm or" onclick="vSOL('${s.id}')">🛒 Gerar Ordem de Compra</button>`:''}
       ${isCompras()&&s.status==='Comprada'?`<button class="sm ok" onclick="mdEntSol('${s.id}')">📦 Confirmar Entrega</button>`:''}
       ${s.status==='Aguardando Ajuste'?`<button class="sm" style="background:#FF6F00;color:#fff" onclick="vSOL('${s.id}')">⚠️ Ajuste Solicitado</button>`:''}
@@ -1585,6 +1592,51 @@ async function vSOL(id){
   const s=S.sol.find(x=>x.id===id);if(!s)return;
   const pD=isDiretoria()&&s.status==='Aguardando Diretoria';
   const pAD=isDiretoria()&&s.status==='Aguardando Aprovação Diretoria';
+  // ── BMMOT: Evandro (Diretoria step 2) ─────────────────────────────
+  let evandroHtml='';
+  const pEvandro=(isDiretoria()||isGestor())&&s.status==='Aguardando Evandro';
+  if(pEvandro){
+    evandroHtml=`<hr class="hdiv">
+    <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; 2&#170; APROVA&#199;&#195;O &#8212; EVANDRO (BMMOT)</div>
+      <div style="font-size:12px;color:#555;margin-bottom:12px">Gerente aprovou. Aguardando sua aprova&#231;&#227;o.</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Diretoria')">&#10003; Aprovar</button>
+        <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
+      </div>
+    </div>`;
+  }
+
+  // ── BMMOT: Gerente aprova Cotação ───────────────────────────────────
+  let gerenteCotHtml='';
+  const pGerenteCot=(isGerente()||isGestor())&&s.status==='Aguardando Gerente Cotação';
+  if(pGerenteCot){
+    gerenteCotHtml=`<hr class="hdiv">
+    <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; APROVA&#199;&#195;O COTA&#199;&#195;O &#8212; GERENTE (1&#170; etapa)</div>
+      <div style="font-size:12px;color:#555;margin-bottom:12px">Compras registrou os or&#231;amentos. Analise e aprove.</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Evandro Cotação')">&#10003; Aprovar Cota&#231;&#227;o</button>
+        <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
+      </div>
+    </div>`;
+  }
+
+  // ── BMMOT: Evandro aprova Cotação ───────────────────────────────────
+  let evandroCoтHtml='';
+  const pEvandroCot=(isDiretoria()||isGestor())&&s.status==='Aguardando Evandro Cotação';
+  if(pEvandroCot){
+    evandroCoтHtml=`<hr class="hdiv">
+    <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; APROVA&#199;&#195;O COTA&#199;&#195;O &#8212; EVANDRO (2&#170; etapa)</div>
+      <div style="font-size:12px;color:#555;margin-bottom:12px">Gerente aprovou a cota&#231;&#227;o. Aguardando sua aprova&#231;&#227;o.</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Aprovação Diretoria')">&#10003; Aprovar Cota&#231;&#227;o</button>
+        <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
+      </div>
+    </div>`;
+  }
+
   const pG=isGerente()&&s.status==='Aguardando Aprovação Gerente';
   const pComprasExec=isCompras()&&s.status==='Aprovada';
   // Carrega cotações para todos os casos relevantes
@@ -1686,6 +1738,21 @@ async function vSOL(id){
     <button class="btn bs" style="width:100%;padding:12px;font-size:14px" onclick="hExecutarCompra('${s.id}','${cotVenc?.id||''}','${s.fornecedor||'—'}',${valRef})">🛒 Gerar Ordem de Compra</button>`;
   }
 
+  // Gerente 1ª aprovação (BMMOT)
+  let gerenteInicialHtml='';
+  const pGerenteInicial=(isGerente()||isGestor())&&s.status==='Aguardando Gerente';
+  if(pGerenteInicial){
+    gerenteInicialHtml=`<hr class="hdiv">
+    <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; 1ª APROVAÇÃO — GERENTE (BMMOT)</div>
+      <div style="font-size:12px;color:#555;margin-bottom:12px">Solicitação aguardando sua aprovação antes de ir para a Diretoria.</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Evandro')">&#10003; Aprovar</button>
+        <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
+      </div>
+    </div>`;
+  }
+
   let dirHtml='';
   if(pD){
     dirHtml=`<hr class="hdiv"><div class="ib ibo">Aprove para Compras realizar os orcamentos.</div>
@@ -1784,7 +1851,7 @@ async function vSOL(id){
     <div style="font-size:13px;line-height:1.6;color:#424242">${s.justificativa||'-'}</div>
     ${s.anexos?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">ANEXOS</div><div style="font-size:12px;color:#1565C0">📎 ${s.anexos}</div>`:''}
     ${s.observacoes?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">OBSERVACOES</div><div style="font-size:13px">${s.observacoes}</div>`:''}
-    ${dirHtml}${ajusteHtml}${cotHtml}${gerenteHtml}${comprasHtml}${entregaHtml}
+    ${gerenteInicialHtml}${evandroHtml}${dirHtml}${ajusteHtml}${gerenteCotHtml}${evandroCoтHtml}${cotHtml}${gerenteHtml}${comprasHtml}${entregaHtml}
   </div></div>`);
 }
 
@@ -2906,7 +2973,9 @@ async function hEscolherForn(cotId,solId,forn,val){
     // Apenas marca o vencedor — não fecha a cotação ainda
     if(cotId)await sb.from('cotacoes').update({vencedor:forn}).eq('id',cotId);
     // Base - sempre funciona
-    const upd={status:'Aguardando Aprovação Gerente',fornecedor:forn,valor_final:val};
+    const sol=S.sol.find(s=>s.id===solId);
+    const novoStatusEsc=sol?.grupo==='BMMOT'?'Aprovada':'Aguardando Aprovação Gerente';
+    const upd={status:novoStatusEsc,fornecedor:forn,valor_final:val};
     if(obs)upd.observacoes=obs;
     await sb.from('solicitacoes').update(upd).eq('id',solId);
     // Auditoria - não bloqueia se colunas não existem
@@ -4737,8 +4806,8 @@ function getBadge(page){
   const mySol=filtrarPorAcesso(S.sol);
   const myPed=S.ped.filter(p=>!p.solicitacao_id||solIdsAcesso().has(p.solicitacao_id));
   if(page==='solicitacoes'){
-    if(isDiretoria())n=mySol.filter(s=>s.status==='Aguardando Diretoria'||s.status==='Aguardando Aprovação Diretoria').length;
-    if(isGerente()&&!isDiretoria())n=mySol.filter(s=>s.status==='Aguardando Aprovação Gerente').length;
+    if(isDiretoria())n=mySol.filter(s=>['Aguardando Diretoria','Aguardando Evandro','Aguardando Aprovação Diretoria','Aguardando Evandro Cotação'].includes(s.status)).length;
+    if(isGerente()&&!isDiretoria())n=mySol.filter(s=>['Aguardando Aprovação Gerente','Aguardando Gerente','Aguardando Gerente Cotação'].includes(s.status)).length;
     if(isCompras()&&!isDiretoria())n=mySol.filter(s=>s.status==='Aprovada'||s.status==='Comprada').length;
   }
   if(page==='cotacoes'&&isCompras())n=mySol.filter(s=>s.status==='Aguardando Orçamento').length;
