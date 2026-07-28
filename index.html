@@ -350,6 +350,7 @@ const PERFIS={
   gerente:   {label:'Gerente',       color:'#2E7D32', bg:'#E8F5E9'},
   compras:   {label:'Compras',       color:'#E65100', bg:'#FFF3E0'},
   requisitante:{label:'Requisitante',color:'#424242', bg:'#F5F5F5'},
+  comite:     {label:'Comitê',        color:'#6A1B9A', bg:'#F3E5F5'},
 };
 const SC={
   'Aguardando Diretoria':         'background:#E3F2FD;color:#0D47A1',
@@ -357,6 +358,8 @@ const SC={
   'Aguardando Orçamento':         'background:#FFF3E0;color:#E65100',
   'Aguardando Aprovação Diretoria':'background:#FFF8E1;color:#F57F17',
   'Aguardando Gerente': 'background:#E8EAF6;color:#3949AB',
+  'Aguardando Comite': 'background:#F3E5F5;color:#6A1B9A',
+  'Aguardando Aprovação Comite': 'background:#F3E5F5;color:#6A1B9A',
   'Aguardando Evandro': 'background:#E8EAF6;color:#3949AB',
   'Aguardando Gerente Cotação': 'background:#EDE7F6;color:#6A1B9A',
   'Aguardando Evandro Cotação': 'background:#EDE7F6;color:#6A1B9A',
@@ -382,6 +385,14 @@ const isGestor=()=>S.user?.perfil==='gestor';
 const isDiretoria=()=>['gestor','diretoria'].includes(S.user?.perfil);
 const isGerente=()=>['gestor','gerente'].includes(S.user?.perfil);
 const isCompras=()=>['gestor','compras'].includes(S.user?.perfil);
+const isComite=()=>['gestor','comite'].includes(S.user?.perfil);
+const podeGerenteAprovarSol=s=>{
+  if(!isGerente())return false;
+  if(isGestor())return true;
+  const ua=S.user?.area;
+  if(!ua||ua==='Todos')return true;
+  return ua===s.area;
+};
 const pLabel=p=>PERFIS[p]?.label||p;
 const pColor=p=>PERFIS[p]?.color||'#9E9E9E';
 const pBg=p=>PERFIS[p]?.bg||'#F5F5F5';
@@ -553,7 +564,9 @@ async function criarSol(f){
     urgencia:f.urg||'Baixa',
     justificativa:f.just,
     grupo:loja?.grupo||'DHG',
-    status:(loja?.grupo==='BMMOT')?'Aguardando Gerente':'Aguardando Diretoria'
+    status:(loja?.grupo==='BMMOT')
+      ?(f.area==='Administrativo'?'Aguardando Evandro':'Aguardando Gerente')
+      :'Aguardando Diretoria'
   };
   // Tenta adicionar colunas extras (podem não existir em versões antigas do banco)
   const {data:solData,error}=await sb.from('solicitacoes').insert(solBase).select().single();
@@ -591,7 +604,10 @@ async function salvarCot(solId,itens){
   });
   if(error)throw new Error(error.message);
   const solForCot=S.sol.find(s=>s.id===solId);
-  const statusPosCot=solForCot?.grupo==='BMMOT'?'Aguardando Gerente Cotação':'Aguardando Aprovação Diretoria';
+  const isAdmCot=solForCot?.area==='Administrativo';
+  const statusPosCot=solForCot?.grupo==='BMMOT'
+    ?(isAdmCot?'Aguardando Evandro Cotação':'Aguardando Gerente Cotação')
+    :'Aguardando Aprovação Diretoria';
   await sb.from('solicitacoes').update({status:statusPosCot}).eq('id',solId);
   await sb.from('solicitacoes').update({cotacao_por:criador,cotacao_data:agora}).eq('id',solId).then(()=>{}).catch(()=>{});
 }
@@ -676,7 +692,7 @@ function buildApp(){
       {id:'pedidos',icon:'🚚',label:'Pedidos'},
     ]:[]),
     ...(isGestor()||isCompras()?[{id:'itens',icon:'🏷️',label:'Banco de Itens'}]:[]),
-    ...(isDiretoria()||isCompras()||isGestor()?[{id:'relatorios',icon:'📈',label:'Relatórios'}]:[]),
+    ...(isDiretoria()||isCompras()||isGestor()||isComite()?[{id:'relatorios',icon:'📈',label:'Relatórios'}]:[]),
     ...(isGestor()?[{id:'usuarios',icon:'👥',label:'Usuários'}]:[]),
   ];
 
@@ -1073,7 +1089,7 @@ function pgSol(){
     return true;
   });
 
-  const STATUS=['Aguardando Gerente','Aguardando Evandro','Aguardando Diretoria','Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue','Reprovada'];
+  const STATUS=['Aguardando Gerente','Aguardando Evandro','Aguardando Diretoria','Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Comite','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue','Reprovada'];
   const GRUPOS_USER=['DHG','BMMOT','UNIC'].filter(g=>podeVerGrupo(g));
   const grupoOptsHtml=GRUPOS_USER.map(g=>`<option value="${g}"${solFiltro.grupo===g?' selected':''} >${g}</option>`).join('');
   const lojaOpts=S.lojas.map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
@@ -1598,10 +1614,10 @@ async function vSOL(id){
   if(pEvandro){
     evandroHtml=`<hr class="hdiv">
     <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; 2&#170; APROVA&#199;&#195;O &#8212; EVANDRO (BMMOT)</div>
-      <div style="font-size:12px;color:#555;margin-bottom:12px">Gerente aprovou. Aguardando sua aprova&#231;&#227;o.</div>
+      <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; 2&#170; APROVA&#199;&#195;O &#8212; DIRETORIA (EVANDRO)</div>
+      <div style="font-size:12px;color:#555;margin-bottom:12px">Gerente aprovou. Sua aprova&#231;&#227;o envia para o Comit&#234;.</div>
       <div style="display:flex;gap:8px">
-        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Diretoria')">&#10003; Aprovar</button>
+        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Orçamento')">&#10003; Aprovar</button>
         <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
       </div>
     </div>`;
@@ -1609,7 +1625,7 @@ async function vSOL(id){
 
   // ── BMMOT: Gerente aprova Cotação ───────────────────────────────────
   let gerenteCotHtml='';
-  const pGerenteCot=(isGerente()||isGestor())&&s.status==='Aguardando Gerente Cotação';
+  const pGerenteCot=podeGerenteAprovarSol(s)&&s.status==='Aguardando Gerente Cotação';
   if(pGerenteCot){
     gerenteCotHtml=`<hr class="hdiv">
     <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
@@ -1655,7 +1671,7 @@ async function vSOL(id){
     <div style="font-size:12px;color:#666;margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap">
       ${i.prazo?`<span>&#x23F1; ${i.prazo} dias</span>`:''}${i.pgto?`<span>&#x1F4B3; ${i.pgto}</span>`:''}${i.obs?`<span>&#x1F4DD; ${i.obs}</span>`:''}${i.arquivo?`<span>&#x1F4CE; ${i.arquivo}</span>`:''}
     </div>
-    ${pAD?`<button onclick="hEscolherForn('${cot?.id}','${s.id}','${i.forn.replace(/'/g,"\'")}',${i.val})" style="width:100%;padding:9px;background:${i.forn===best?.forn?'#2E7D32':'#1565C0'};color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">${i.forn===best?.forn?'&#x2713; Escolher este (Menor preco)':'Escolher este fornecedor'}</button>`:''}
+    ${(pAD||pACom)?`<button onclick="hEscolherForn('${cot?.id}','${s.id}','${i.forn.replace(/'/g,"\'")}',${i.val})" style="width:100%;padding:9px;background:${i.forn===best?.forn?'#2E7D32':'#1565C0'};color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">${i.forn===best?.forn?'&#x2713; Escolher este (Menor preco)':'Escolher este fornecedor'}</button>`:''}
   </div>`;
 
   let cotHtml='';
@@ -1740,7 +1756,7 @@ async function vSOL(id){
 
   // Gerente 1ª aprovação (BMMOT)
   let gerenteInicialHtml='';
-  const pGerenteInicial=(isGerente()||isGestor())&&s.status==='Aguardando Gerente';
+  const pGerenteInicial=podeGerenteAprovarSol(s)&&s.status==='Aguardando Gerente';
   if(pGerenteInicial){
     gerenteInicialHtml=`<hr class="hdiv">
     <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
@@ -1753,7 +1769,20 @@ async function vSOL(id){
     </div>`;
   }
 
-  let dirHtml='';
+    let comiteHtml='';
+  const pComite=false&&s.status==='Aguardando Comite'; // Removido do fluxo de solicitação
+  if(pComite){
+    comiteHtml=`<hr class="hdiv">
+    <div style="background:#F3E5F5;border:1.5px solid #CE93D8;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:12px;color:#6A1B9A;font-weight:700;margin-bottom:8px">&#128100; 3&#170; APROVA&#199;&#195;O &#8212; COMIT&#202; (SIMONE ou ANDREA)</div>
+      <div style="font-size:12px;color:#555;margin-bottom:12px">Evandro aprovou. Aguardando aprovação do Comitê para prosseguir.</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Orçamento')">&#10003; Aprovar</button>
+        <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
+      </div>
+    </div>`;
+  }
+let dirHtml='';
   if(pD){
     const isBmmotDir=s.grupo==='BMMOT';
     dirHtml=`<hr class="hdiv">
@@ -1855,7 +1884,7 @@ async function vSOL(id){
     <div style="font-size:13px;line-height:1.6;color:#424242">${s.justificativa||'-'}</div>
     ${s.anexos?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">ANEXOS</div><div style="font-size:12px;color:#1565C0">📎 ${s.anexos}</div>`:''}
     ${s.observacoes?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">OBSERVACOES</div><div style="font-size:13px">${s.observacoes}</div>`:''}
-    ${gerenteInicialHtml}${evandroHtml}${dirHtml}${ajusteHtml}${gerenteCotHtml}${evandroCoтHtml}${cotHtml}${gerenteHtml}${comprasHtml}${entregaHtml}
+    ${gerenteInicialHtml}${evandroHtml}${comiteHtml}${dirHtml}${ajusteHtml}${gerenteCotHtml}${evandroCoтHtml}${cotHtml}${gerenteHtml}${comprasHtml}${entregaHtml}
   </div></div>`);
 }
 
@@ -2978,7 +3007,7 @@ async function hEscolherForn(cotId,solId,forn,val){
     if(cotId)await sb.from('cotacoes').update({vencedor:forn}).eq('id',cotId);
     // Base - sempre funciona
     const sol=S.sol.find(s=>s.id===solId);
-    const novoStatusEsc=sol?.grupo==='BMMOT'?'Aprovada':'Aguardando Aprovação Gerente';
+    const novoStatusEsc=(sol?.grupo==='BMMOT'||sol?.status==='Aguardando Aprovação Comite')?'Aprovada':'Aguardando Aprovação Gerente';
     const upd={status:novoStatusEsc,fornecedor:forn,valor_final:val};
     if(obs)upd.observacoes=obs;
     await sb.from('solicitacoes').update(upd).eq('id',solId);
@@ -4029,8 +4058,8 @@ let relCharts={};
 let relFiltros={de:'',ate:'',loja:'',grupo:'',area:''};
 
 function pgRel(){
-  if(!isDiretoria()&&!isCompras()&&!isGestor()){
-    return '<div class="card" style="text-align:center;padding:48px;color:#9E9E9E">Acesso restrito à Diretoria e Compras.</div>';
+  if(!isDiretoria()&&!isCompras()&&!isGestor()&&!isComite()){
+    return '<div class="card" style="text-align:center;padding:48px;color:#9E9E9E">Acesso restrito à Diretoria, Comitê e Compras.</div>';
   }
   const lojaOpts=S.lojas.map(l=>`<option value="${l.id}">${l.nome}</option>`).join('');
   const hoje=new Date().toISOString().slice(0,7);
@@ -4532,8 +4561,9 @@ function mdCriarUser(){
         <select class="inp" id="upr">
           <option value="requisitante">Requisitante — só faz solicitações</option>
           <option value="compras">Compras — faz cotações e OC</option>
-          <option value="gerente">Gerente — aprova compras</option>
+          <option value="gerente">Gerente — aprova por área</option>
           <option value="diretoria">Diretoria — aprova solicitações</option>
+          <option value="comite">Comitê — aprovação final BMMOT</option>
           <option value="gestor">Gestor — acesso total</option>
         </select>
       </div>
@@ -4733,6 +4763,7 @@ function mdEditUser(id){
         <option value="compras"${u.perfil==='compras'?' selected':''}>Compras</option>
         <option value="gerente"${u.perfil==='gerente'?' selected':''}>Gerente</option>
         <option value="diretoria"${u.perfil==='diretoria'?' selected':''}>Diretoria</option>
+        <option value="comite"${u.perfil==='comite'?' selected':''}>Comitê</option>
         <option value="gestor"${u.perfil==='gestor'?' selected':''}>Gestor</option>
       </select></div>
       <div class="f" style="margin:0"><label>Área</label><select class="inp" id="ea">
@@ -4811,6 +4842,7 @@ function getBadge(page){
   const myPed=S.ped.filter(p=>!p.solicitacao_id||solIdsAcesso().has(p.solicitacao_id));
   if(page==='solicitacoes'){
     if(isDiretoria())n=mySol.filter(s=>['Aguardando Diretoria','Aguardando Evandro','Aguardando Aprovação Diretoria','Aguardando Evandro Cotação'].includes(s.status)).length;
+    if(isComite()&&!isGestor())n=(n||0)+mySol.filter(s=>['Aguardando Comite','Aguardando Aprovação Comite'].includes(s.status)).length;
     if(isGerente()&&!isDiretoria())n=mySol.filter(s=>['Aguardando Aprovação Gerente','Aguardando Gerente','Aguardando Gerente Cotação'].includes(s.status)).length;
     if(isCompras()&&!isDiretoria())n=mySol.filter(s=>s.status==='Aprovada'||s.status==='Comprada').length;
   }
