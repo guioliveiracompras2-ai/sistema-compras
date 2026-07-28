@@ -4370,16 +4370,51 @@ function exportarRel(){
 }
 
 // ── USUÁRIOS ──────────────────────────────────────────────────────────────
+let usersFiltro={q:'',perfil:'',grupo:'',status:''};
 function pgUsers(){
+  const q=(usersFiltro.q||'').toLowerCase();
+  const lista=S.users.filter(u=>{
+    if(!u.id)return false;
+    if(!isGestor()&&!userGrupos().includes('TODOS')&&!userGrupos().some(g=>(u.grupos||[u.grupo]||[]).includes(g)))return false;
+    if(usersFiltro.perfil&&u.perfil!==usersFiltro.perfil)return false;
+    if(usersFiltro.grupo&&!(u.grupos||[u.grupo]||[]).includes(usersFiltro.grupo))return false;
+    if(usersFiltro.status==='ativo'&&!u.ativo)return false;
+    if(usersFiltro.status==='inativo'&&u.ativo)return false;
+    if(q&&![u.nome,u.sobrenome,u.login,u.area].filter(Boolean).join(' ').toLowerCase().includes(q))return false;
+    return true;
+  });
+  const temFiltro=usersFiltro.q||usersFiltro.perfil||usersFiltro.grupo||usersFiltro.status;
   return `
-<div class="tb">
-  <button class="btn bp" onclick="mdCriarUser()">+ Criar Usuário</button>
-  <span style="font-size:12px;color:#9E9E9E;background:#F8F9FA;padding:6px 12px;border-radius:20px">
-    ${S.users.filter(u=>u.ativo).length} ativos · ${S.users.filter(u=>!u.ativo).length} inativos
-  </span>
+<div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+  <input class="inp" placeholder="&#128269; Buscar por nome, login..."
+    style="flex:1;min-width:180px;padding:8px 12px;font-size:13px"
+    value="${usersFiltro.q}" oninput="usersFiltro.q=this.value;render()">
+  <select class="inp" style="width:170px;padding:8px 10px;font-size:13px" onchange="usersFiltro.perfil=this.value;render()">
+    <option value="">Todos os Perfis</option>
+    <option value="requisitante"${usersFiltro.perfil==='requisitante'?' selected':''}>Requisitante</option>
+    <option value="compras"${usersFiltro.perfil==='compras'?' selected':''}>Compras</option>
+    <option value="gerente"${usersFiltro.perfil==='gerente'?' selected':''}>Gerente</option>
+    <option value="diretoria"${usersFiltro.perfil==='diretoria'?' selected':''}>Diretoria</option>
+    <option value="gestor"${usersFiltro.perfil==='gestor'?' selected':''}>Gestor</option>
+  </select>
+  <select class="inp" style="width:120px;padding:8px 10px;font-size:13px" onchange="usersFiltro.grupo=this.value;render()">
+    <option value="">Grupos</option>
+    <option value="DHG"${usersFiltro.grupo==='DHG'?' selected':''}>DHG</option>
+    <option value="BMMOT"${usersFiltro.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+    <option value="UNIC"${usersFiltro.grupo==='UNIC'?' selected':''}>UNIC</option>
+  </select>
+  <select class="inp" style="width:120px;padding:8px 10px;font-size:13px" onchange="usersFiltro.status=this.value;render()">
+    <option value="">Todos</option>
+    <option value="ativo"${usersFiltro.status==='ativo'?' selected':''}>Ativos</option>
+    <option value="inativo"${usersFiltro.status==='inativo'?' selected':''}>Inativos</option>
+  </select>
+  ${temFiltro?`<button class="btn bsc" onclick="usersFiltro={q:'',perfil:'',grupo:'',status:''};render()" style="padding:8px 14px;font-size:12px">&#8634; Limpar</button>`:''}
+  <span style="font-size:12px;color:#9E9E9E">${lista.length} de ${S.users.filter(u=>u.id).length}</span>
+  <button class="btn bp" onclick="mdCriarUser()" style="margin-left:auto">+ Criar Usuário</button>
 </div>
 <div style="display:grid;gap:10px">
-  ${S.users.filter(u=>u.id&&(isGestor()||userGrupos().includes('TODOS')||userGrupos().some(g=>(u.grupos||[u.grupo]||[]).includes(g)))).map(u=>`
+  ${!lista.length?`<div class="card" style="text-align:center;padding:48px;color:#ccc">Nenhum resultado</div>`:''}
+  ${lista.map(u=>`
   <div class="uc" style="opacity:${u.ativo?1:.55}">
     <div class="av" style="background:${pColor(u.perfil)};width:42px;height:42px;font-size:14px;flex-shrink:0">${ini(u.nome,u.sobrenome)}</div>
     <div style="flex:1;min-width:0">
@@ -4601,43 +4636,81 @@ async function hToggle(id,ativo){
 
 function mdEditUser(id){
   const u=S.users.find(x=>x.id===id);if(!u)return;
-  const lo=S.lojas.map(l=>`<option value="${l.id}"${u.loja_id===l.id?' selected':''}>${l.nome}</option>`).join('');
-  openModal(`<div class="modal" style="max-width:480px">
-  <div class="mh"><span>✏️ Editar — ${u.nome} ${u.sobrenome}</span><button class="xb" onclick="closeModal()">✕</button></div>
+  // Lojas filtradas pelo grupo atual do usuário
+  const grpAtual=(u.grupos&&u.grupos[0])||u.grupo||'TODOS';
+  const lojasFiltradas=grpAtual==='TODOS'?S.lojas:S.lojas.filter(l=>(l.grupo==='DHC'?'DHG':l.grupo)===grpAtual);
+  const lo=lojasFiltradas.map(l=>`<option value="${l.id}"${u.loja_id===l.id?' selected':''}>${l.nome}</option>`).join('');
+
+  openModal(`<div class="modal" style="max-width:500px">
+  <div class="mh" style="background:#0F2236;color:#fff;border-radius:14px 14px 0 0">
+    <div>
+      <div style="font-size:15px;font-weight:700">✏️ Editar Usuário</div>
+      <div style="font-size:11px;opacity:.7;margin-top:2px">${u.nome} ${u.sobrenome}</div>
+    </div>
+    <button class="xb" style="color:rgba(255,255,255,.7)" onclick="closeModal()">✕</button>
+  </div>
   <div class="mb">
     <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 14px;margin-bottom:16px">
       <div style="font-size:11px;color:#1e40af;margin-bottom:2px">Login (não pode ser alterado)</div>
       <div style="font-family:monospace;font-size:15px;font-weight:600;color:#1565C0">${u.login}</div>
     </div>
     <div class="fg2">
-      <div class="f"><label>Perfil</label><select class="inp" id="ep">
+      <div class="f" style="margin:0"><label>Perfil</label><select class="inp" id="ep">
         <option value="requisitante"${u.perfil==='requisitante'?' selected':''}>Requisitante</option>
-        <option value="diretoria"${u.perfil==='diretoria'?' selected':''}>Diretoria</option>
-        <option value="gerente"${u.perfil==='gerente'?' selected':''}>Gerente</option>
         <option value="compras"${u.perfil==='compras'?' selected':''}>Compras</option>
+        <option value="gerente"${u.perfil==='gerente'?' selected':''}>Gerente</option>
+        <option value="diretoria"${u.perfil==='diretoria'?' selected':''}>Diretoria</option>
         <option value="gestor"${u.perfil==='gestor'?' selected':''}>Gestor</option>
       </select></div>
-      <div class="f"><label>Área</label><select class="inp" id="ea">${AREAS.map(a=>`<option${u.area===a?' selected':''}>${a}</option>`).join('')}</select></div>
-    </div>
-    <div class="fg2">
-      <div class="f"><label>Grupo</label><select class="inp" id="eg">
-        <option value="TODOS"${u.grupo==='TODOS'?' selected':''}>Todos</option>
-        <option value="DHG"${u.grupo==='DHG'?' selected':''}>DHG</option>
-        <option value="BMMOT"${u.grupo==='BMMOT'?' selected':''}>BMMOT</option>
+      <div class="f" style="margin:0"><label>Área</label><select class="inp" id="ea">
+        <option value="Todos"${(u.area==='Todos'||!u.area)?' selected':''}>🌐 Todos os Departamentos</option>
+        ${AREAS.map(a=>`<option value="${a}"${u.area===a?' selected':''}>${a}</option>`).join('')}
       </select></div>
-      <div class="f"><label>Loja</label><select class="inp" id="el"><option value="">— Nenhuma —</option>${lo}</select></div>
+    </div>
+    <div class="f">
+      <label>Grupo com Acesso</label>
+      <select class="inp" id="eg" onchange="atualizarLojasEdit('${u.id}')">
+        <option value="TODOS"${grpAtual==='TODOS'?' selected':''}>🌐 Todos os grupos</option>
+        <option value="DHG"${grpAtual==='DHG'?' selected':''}>🔵 DHG — 11 lojas</option>
+        <option value="BMMOT"${grpAtual==='BMMOT'?' selected':''}>🟢 BMMOT — 7 lojas</option>
+        <option value="UNIC"${grpAtual==='UNIC'?' selected':''}>🟡 UNIC — 1 loja</option>
+      </select>
+    </div>
+    <div class="f">
+      <label>Loja Específica (opcional)</label>
+      <select class="inp" id="el">
+        <option value="">— Todas as lojas do grupo —</option>
+        ${lo}
+      </select>
+      <span style="font-size:11px;color:#9E9E9E;margin-top:3px;display:block">Ao mudar o grupo acima, a lista de lojas atualiza automaticamente</span>
     </div>
   </div>
-  <div class="mf"><button class="btn bsc" onclick="closeModal()">Cancelar</button><button class="btn bp" onclick="hEditUser('${u.id}')">Salvar</button></div>
+  <div class="mf">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    <button class="btn bp" onclick="hEditUser('${u.id}')">💾 Salvar Alterações</button>
+  </div>
   </div>`);
+}
+
+function atualizarLojasEdit(){
+  const grp=document.getElementById('eg')?.value||'TODOS';
+  const sel=document.getElementById('el');
+  if(!sel)return;
+  const lojas=grp==='TODOS'?S.lojas:S.lojas.filter(l=>(l.grupo==='DHC'?'DHG':l.grupo)===grp);
+  sel.innerHTML=`<option value="">— Todas as lojas do grupo —</option>${lojas.map(l=>`<option value="${l.id}">${l.nome}</option>`).join('')}`;
 }
 
 async function hEditUser(id){
   const perfil=V('ep'),grupo=V('eg'),loja_id=V('el')||null,area=V('ea');
+  const grupos=grupo==='TODOS'?['TODOS']:[grupo];
+  const lojas_acesso=loja_id?[loja_id]:['TODOS'];
   try{
-    const {error}=await sb.from('usuarios').update({perfil,grupo,loja_id,area}).eq('id',id);
+    const {error}=await sb.from('usuarios').update({
+      perfil,grupo,loja_id,area,grupos,lojas_acesso
+    }).eq('id',id);
     if(error)throw new Error(error.message);
     closeModal();await loadUsers();render();
+    alert('✅ Usuário atualizado com sucesso!');
   }catch(e){alert(e.message);}
 }
 
