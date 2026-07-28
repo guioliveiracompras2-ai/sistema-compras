@@ -1189,8 +1189,15 @@ function mdNovaSOL(){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
         <div class="f" style="margin:0"><label>4. Categoria *</label><select class="inp" id="sc"><option value="">— Selecionar —</option>${(CATS_MAP['Servico']||[]).map(c=>`<option>${c}</option>`).join('')}</select></div>
-        <div class="f" style="margin:0"><label>5. Prioridade</label><select class="inp" id="su"><option value="">— Selecionar —</option><option value="Baixa">Baixa</option><option value="Media">Media</option><option value="Alta">Alta</option></select></div>
-        <div class="f" style="margin:0"><label>6. Data Estimada</label><input class="inp" type="date" id="sdt"></div>
+        <div class="f" style="margin:0"><label>5. Prioridade</label><select class="inp" id="su" onchange="atualizarDataMinima()">
+              <option value="">— Selecionar —</option>
+              <option value="Baixa">🟢 Baixa — 7 dias úteis</option>
+              <option value="Media">🟡 Média — 4 dias úteis</option>
+              <option value="Alta">🔴 Alta — 2 dias úteis</option>
+            </select></div>
+        <div class="f" style="margin:0"><label>6. Data Estimada</label>
+          <input class="inp" type="date" id="sdt">
+          <span id="data-hint" style="font-size:11px;color:#9E9E9E;margin-top:3px;display:block">Selecione a prioridade primeiro</span></div>
       </div>
       <div class="f" style="margin:0">
         <label>7. Justificativa *</label>
@@ -1490,6 +1497,44 @@ function toggleTodosGrupos(el){
     if(cb)cb.disabled=el.checked;
     if(cb&&el.checked)cb.checked=false;
   });
+}
+
+function adicionarDiasUteis(data, dias){
+  // Feriados nacionais fixos (MM-DD)
+  const feriados=['01-01','04-21','05-01','09-07','10-12','11-02','11-15','11-20','12-25'];
+  let d=new Date(data);
+  let adicionados=0;
+  while(adicionados<dias){
+    d.setDate(d.getDate()+1);
+    const diaSemana=d.getDay(); // 0=dom, 6=sab
+    const mmdd=(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0');
+    if(diaSemana!==0&&diaSemana!==6&&!feriados.includes(mmdd)){
+      adicionados++;
+    }
+  }
+  return d;
+}
+
+function calcDataMinima(prioridade){
+  const hoje=new Date();
+  hoje.setHours(0,0,0,0);
+  const dias={Baixa:7,Media:4,Alta:2}[prioridade]||7;
+  return adicionarDiasUteis(hoje,dias);
+}
+
+function atualizarDataMinima(){
+  const prio=document.getElementById('su')?.value||'Baixa';
+  const dateInput=document.getElementById('sdt');
+  if(!dateInput)return;
+  const minDate=calcDataMinima(prio);
+  const minStr=minDate.toISOString().slice(0,10);
+  dateInput.min=minStr;
+  if(dateInput.value&&dateInput.value<minStr){
+    dateInput.value=minStr;
+  }
+  const hint=document.getElementById('data-hint');
+  const dias={Baixa:7,Media:4,Alta:2}[prio]||7;
+  if(hint)hint.textContent=`Mínimo ${dias} dias úteis — a partir de ${minDate.toLocaleDateString('pt-BR')}`;
 }
 
 function atualizarCats(){
