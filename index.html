@@ -3398,12 +3398,9 @@ function pgAprovacoes(){
   _aprovPendentes=mySol.filter(s=>{
     if(!s||!s.status)return false;
     if(isGestor())return['Aguardando Gerente','Aguardando Evandro','Aguardando Diretoria',
-      'Aguardando Comite','Aguardando Gerente Cotacao','Aguardando Evandro Cotacao',
-      'Aguardando Aprovacao Diretoria','Aguardando Aprovacao Gerente',
-      'Aguardando Aprovacao Comite'].includes(s.status)||
-      ['Aguardando Gerente Cotação','Aguardando Evandro Cotação',
-       'Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente',
-       'Aguardando Aprovação Comite'].includes(s.status);
+      'Aguardando Comite','Aguardando Gerente Cotação','Aguardando Evandro Cotação',
+      'Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente',
+      'Aguardando Aprovação Comite'].includes(s.status);
     if(isGerente()&&!isDiretoria()&&!isComite()){
       if(!podeGerenteAprovarSol(s))return false;
       return['Aguardando Gerente','Aguardando Gerente Cotação'].includes(s.status);
@@ -3414,99 +3411,141 @@ function pgAprovacoes(){
     return false;
   });
 
-  const prioColor={Alta:'#C62828',Media:'#E65100',Média:'#E65100',Baixa:'#2E7D32',Normal:'#1565C0'};
-
-  function getItensHtml(s){
-    try{
-      const itens=typeof s.itens==='string'?JSON.parse(s.itens):(s.itens||[]);
-      if(!itens.length)return '';
-      let html='<div style="margin-top:10px;background:#F8F9FA;border-radius:8px;padding:8px 12px;border-left:3px solid #1565C0">';
-      html+='<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:6px;text-transform:uppercase">Itens da Solicitação</div>';
-      html+='<table style="width:100%;border-collapse:collapse">';
-      html+='<tr style="font-size:10px;color:#9E9E9E"><th style="text-align:left;padding:2px 4px">Item</th><th style="text-align:center;padding:2px 4px">Qtd</th><th style="text-align:right;padding:2px 4px">Unit.</th><th style="text-align:right;padding:2px 4px">Total</th></tr>';
-      itens.slice(0,4).forEach(i=>{
-        const total=parseFloat(i.qtd||1)*parseFloat(i.val||0);
-        html+='<tr style="font-size:12px;border-top:1px solid #E0E0E0">'
-          +'<td style="padding:4px;color:#333">'+(i.desc||i.descricao||'—')+'</td>'
-          +'<td style="padding:4px;text-align:center;color:#555">'+(i.qtd||1)+'</td>'
-          +'<td style="padding:4px;text-align:right;color:#555">'+(i.val?'R$ '+parseFloat(i.val).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
-          +'<td style="padding:4px;text-align:right;font-weight:600;color:#1565C0">'+(total?'R$ '+total.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
-          +'</tr>';
-      });
-      if(itens.length>4)html+='<tr><td colspan="4" style="padding:4px;font-size:11px;color:#9E9E9E">...e mais '+(itens.length-4)+' item(s)</td></tr>';
-      html+='</table></div>';
-      return html;
-    }catch(e){return '';}
-  }
-
   if(!_aprovPendentes.length){
-    return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
-      +'<div><div style="font-size:18px;font-weight:700;color:#0F2236">Minhas Aprovações</div>'
-      +'<div style="font-size:12px;color:#9E9E9E">Nenhuma pendência</div></div>'
-      +'<button class="btn bp" onclick="goTo(\'solicitacoes\')" style="padding:8px 16px;font-size:12px">Ver Todas</button>'
-      +'</div>'
-      +'<div class="card" style="text-align:center;padding:48px;color:#9E9E9E">'
-      +'<div style="font-size:48px;margin-bottom:12px">✅</div>'
-      +'<div style="font-size:16px;font-weight:600">Tudo em dia!</div>'
-      +'<div style="font-size:13px;margin-top:8px">Nenhuma aprovação pendente para você.</div>'
+    return '<div style="text-align:center;padding:60px 20px">'
+      +'<div style="font-size:64px;margin-bottom:16px">✅</div>'
+      +'<div style="font-size:20px;font-weight:700;color:#0F2236;margin-bottom:8px">Tudo em dia!</div>'
+      +'<div style="font-size:14px;color:#9E9E9E">Nenhuma aprovação pendente para você no momento.</div>'
       +'</div>';
   }
 
-  let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
-    +'<div><div style="font-size:18px;font-weight:700;color:#0F2236">Minhas Aprovações</div>'
-    +'<div style="font-size:12px;color:#9E9E9E">'+_aprovPendentes.length+' pendente(s)</div></div>'
-    +'<button class="btn bp" onclick="goTo(\'solicitacoes\')" style="padding:8px 16px;font-size:12px">Ver Todas</button>'
+  let html='<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">'
+    +'<div>'
+    +'<div style="font-size:20px;font-weight:700;color:#0F2236">Minhas Aprovações</div>'
+    +'<div style="font-size:13px;color:#9E9E9E;margin-top:2px">'+_aprovPendentes.length+' solicitação(ões) aguardando sua ação</div>'
+    +'</div>'
     +'</div>';
 
   _aprovPendentes.forEach((s,i)=>{
     const isCot=['Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Comite','Aguardando Aprovação Diretoria'].includes(s.status);
     const stLabel=statusLabel(s.status);
-    const prio=s.urgencia||'Normal';
-    const pc=prioColor[prio]||'#555';
+    const prioColor={Alta:'#C62828',Media:'#E65100',Média:'#E65100',Baixa:'#2E7D32',Normal:'#1565C0'};
+    const pc=prioColor[s.urgencia||'Normal']||'#1565C0';
 
-    html+='<div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;overflow:hidden;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)">'
-      // Header
-      +'<div style="background:#0F2236;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">'
-      +'<div style="display:flex;align-items:center;gap:8px">'
-      +'<span style="background:rgba(255,255,255,.2);color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">'+s.numero+'</span>'
-      +'<span style="background:'+(isCot?'#FFF3E0':'#E3F2FD')+';color:'+(isCot?'#E65100':'#1565C0')+';padding:3px 10px;border-radius:20px;font-size:11px">'
-      +(isCot?'📋 Cotação':'📝 Solicitação')+'</span>'
+    // Parse items
+    let itensHtml='';
+    try{
+      const itens=typeof s.itens==='string'?JSON.parse(s.itens):(s.itens||[]);
+      if(itens.length){
+        itensHtml='<div style="margin-top:12px;border:1px solid #E0E0E0;border-radius:8px;overflow:hidden">'
+          +'<div style="background:#F8F9FA;padding:8px 12px;font-size:11px;font-weight:700;color:#555;text-transform:uppercase;border-bottom:1px solid #E0E0E0">Itens da Solicitação</div>'
+          +'<table style="width:100%;border-collapse:collapse">'
+          +'<thead><tr style="background:#F8F9FA">'
+          +'<th style="padding:6px 12px;text-align:left;font-size:11px;color:#9E9E9E;font-weight:600">DESCRIÇÃO</th>'
+          +'<th style="padding:6px 12px;text-align:center;font-size:11px;color:#9E9E9E;font-weight:600;width:60px">QTD</th>'
+          +'<th style="padding:6px 12px;text-align:right;font-size:11px;color:#9E9E9E;font-weight:600;width:100px">V. UNIT.</th>'
+          +'<th style="padding:6px 12px;text-align:right;font-size:11px;color:#9E9E9E;font-weight:600;width:100px">TOTAL</th>'
+          +'</tr></thead><tbody>';
+        let totalGeral=0;
+        itens.forEach(it=>{
+          const total=parseFloat(it.qtd||1)*parseFloat(it.val||0);
+          totalGeral+=total;
+          itensHtml+='<tr style="border-top:1px solid #F0F2F5">'
+            +'<td style="padding:8px 12px;font-size:13px;color:#333">'+(it.desc||it.descricao||'—')+'</td>'
+            +'<td style="padding:8px 12px;text-align:center;font-size:13px;color:#555">'+(it.qtd||1)+' '+(it.und||'')+'</td>'
+            +'<td style="padding:8px 12px;text-align:right;font-size:13px;color:#555">'+(it.val?'R$ '+parseFloat(it.val).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
+            +'<td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:700;color:#1565C0">'+(total?'R$ '+total.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
+            +'</tr>';
+        });
+        if(totalGeral>0){
+          itensHtml+='<tr style="background:#EFF6FF;border-top:2px solid #1565C0">'
+            +'<td colspan="3" style="padding:8px 12px;font-size:13px;font-weight:700;color:#1565C0">TOTAL ESTIMADO</td>'
+            +'<td style="padding:8px 12px;text-align:right;font-size:15px;font-weight:700;color:#1565C0">R$ '+totalGeral.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>'
+            +'</tr>';
+        }
+        itensHtml+='</tbody></table></div>';
+      }
+    }catch(e){}
+
+    // Flow steps
+    const ORDER_S=['Aguardando Gerente','Aguardando Evandro','Aguardando Comite','Aguardando Diretoria',
+      'Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação',
+      'Aguardando Aprovação Comite','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente',
+      'Aprovada','Comprada','Entregue'];
+    const steps=s.grupo==='BMMOT'?[
+      {lbl:'Gerente Área',st:'Aguardando Gerente'},
+      {lbl:'Aprovação Diretoria',st:'Aguardando Evandro'},
+      {lbl:'Aprovação Comitê',st:'Aguardando Comite'},
+      {lbl:'Compras Cotação',st:'Aguardando Orçamento'},
+      ...(isCot?[
+        {lbl:'Gerente Cot.',st:'Aguardando Gerente Cotação'},
+        {lbl:'Diretoria Cot.',st:'Aguardando Evandro Cotação'},
+        {lbl:'Comitê Escolhe',st:'Aguardando Aprovação Comite'},
+      ]:[]),
+      {lbl:'Aprovada',st:'Aprovada'}
+    ]:[
+      {lbl:'Aprovação Diretoria',st:'Aguardando Diretoria'},
+      {lbl:'Compras Cotação',st:'Aguardando Orçamento'},
+      {lbl:'Dir. Aprovação',st:'Aguardando Aprovação Diretoria'},
+      {lbl:'Gerente Aprova',st:'Aguardando Aprovação Gerente'},
+      {lbl:'Aprovada',st:'Aprovada'}
+    ];
+    const curIdx=ORDER_S.indexOf(s.status);
+    const flowHtml=steps.map((step,si)=>{
+      const etpIdx=ORDER_S.indexOf(step.st);
+      const done=curIdx>etpIdx;
+      const current=s.status===step.st;
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F0F2F5">'
+        +'<div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;'
+        +'background:'+(done?'#2E7D32':current?'#1565C0':'#E0E0E0')+';'
+        +'color:'+(done||current?'#fff':'#9E9E9E')+';">'
+        +(done?'✓':(si+1))+'</div>'
+        +'<span style="font-size:12px;font-weight:'+(current?700:400)+';color:'+(current?'#1565C0':done?'#2E7D32':'#9E9E9E')+'">'
+        +step.lbl+(current?' ◀':'')+'</span>'
+        +'</div>';
+    }).join('');
+
+    html+='<div style="background:#fff;border:1px solid #E0E0E0;border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.08)">'
+      // ── Header ──
+      +'<div style="background:#0F2236;padding:14px 18px;display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+      +'<span style="background:rgba(255,255,255,.2);color:#fff;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700">'+s.numero+'</span>'
+      +'<span style="background:'+(isCot?'#FFF3E0':'#E3F2FD')+';color:'+(isCot?'#E65100':'#1565C0')+';padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600">'+(isCot?'📋 Cotação':'📝 Solicitação')+'</span>'
+      +'<span style="background:rgba(255,255,255,.15);color:#fff;padding:4px 10px;border-radius:20px;font-size:11px">⏳ '+stLabel+'</span>'
       +'</div>'
-      +'<span style="background:'+pc+';color:#fff;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600">'+prio+'</span>'
+      +'<span style="background:'+pc+';color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">'+( s.urgencia||'Normal')+'</span>'
       +'</div>'
-      // Body
-      +'<div style="padding:14px 16px">'
-      +'<div style="display:flex;gap:12px;align-items:flex-start">'
-      +'<div style="flex:1">'
-      +'<div style="font-size:15px;font-weight:700;color:#0F2236;margin-bottom:6px">'+(s.descricao||s.itens_resumo||'Sem descrição').substring(0,80)+'</div>'
-      +'<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:6px">'
+      // ── Body ──
+      +'<div style="display:grid;grid-template-columns:1fr 180px;gap:0">'
+      // Left: info + items
+      +'<div style="padding:16px 18px;border-right:1px solid #F0F2F5">'
+      +'<div style="font-size:17px;font-weight:700;color:#0F2236;margin-bottom:8px">'+(s.descricao||s.itens_resumo||'Sem descrição')+'</div>'
+      +'<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:8px">'
       +'<span>🏢 '+(s.loja_nome||'—')+'</span>'
       +'<span>👤 '+(s.solicitante_nome||'—')+'</span>'
       +(s.area?'<span>🏷️ '+s.area+'</span>':'')
+      +'<span>📂 '+(s.categoria||s.tipo||'—')+'</span>'
       +'<span>📅 '+new Date(s.data_criacao).toLocaleDateString('pt-BR')+'</span>'
       +'</div>'
-      +(s.valor_estimado?'<div style="font-size:16px;font-weight:700;color:#1565C0">R$ '+parseFloat(s.valor_estimado).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>':'')
-      +'<div style="margin-top:6px"><span style="background:#FFF3E0;color:#E65100;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">⏳ '+stLabel+'</span></div>'
-      +getItensHtml(s)
+      +(s.justificativa?'<div style="font-size:12px;color:#777;font-style:italic;margin-bottom:8px;padding:8px;background:#FFFDE7;border-radius:6px;border-left:3px solid #FDD835">📋 '+s.justificativa+'</div>':'')
+      +itensHtml
       +'</div>'
-      // Fluxo lateral
-      +'<div style="min-width:160px;background:#F8F9FA;border-radius:8px;padding:10px 12px;flex-shrink:0">'
-      +'<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:8px;text-transform:uppercase">Fluxo</div>'
-      +buildFlowSidebar(s,isCot)
+      // Right: flow
+      +'<div style="padding:14px;background:#FAFAFA">'
+      +'<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Fluxo de Aprovação</div>'
+      +flowHtml
       +'</div>'
       +'</div>'
-      // Botões com onclick direto - sem event delegation, sem caracteres especiais
-      +'<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #F0F2F5;flex-wrap:wrap">'
-      +'<button class="btn bl" onclick="vSOL(\"'+s.id+'\")" style="padding:8px 14px;font-size:12px">🔍 Ver Detalhes</button>'
+      // ── Action buttons ──
+      +'<div style="padding:14px 18px;background:#F8F9FA;border-top:2px solid #E0E0E0;display:flex;gap:10px;align-items:center">'
       +(s.status==='Aguardando Aprovação Comite'
-        ?'<button class="btn" style="background:#6A1B9A;color:#fff;padding:8px 16px;font-size:12px" onclick="escolherFornDireto('+i+')">🟣 Escolher Fornecedor</button>'
-        :'<button class="btn bs aprov-btn-aprovar" onclick="aprovarDireto('+i+')" style="padding:8px 20px;font-size:12px;font-weight:700">✅ Aprovar</button>'
-        +'<button class="btn bd" onclick="reprovarDireto('+i+')" style="padding:8px 14px;font-size:12px">❌ Reprovar</button>')
-      +'</div>'
+        ?'<button class="btn" style="background:#6A1B9A;color:#fff;padding:10px 24px;font-size:14px;font-weight:700;border-radius:8px;flex:1;max-width:250px" onclick="escolherFornDireto('+i+')">🟣 Escolher Fornecedor</button>'
+        :'<button class="btn bs aprov-btn-aprovar" onclick="aprovarDireto('+i+')" style="padding:10px 32px;font-size:14px;font-weight:700;border-radius:8px;flex:1;max-width:200px">✅ Aprovar</button>'
+        +'<button class="btn bd" onclick="reprovarDireto('+i+')" style="padding:10px 24px;font-size:14px;font-weight:700;border-radius:8px">❌ Reprovar</button>')
+      +'<button class="btn bl" onclick="vSOL(\"'+s.id+'\")" style="padding:10px 18px;font-size:13px;margin-left:auto;border-radius:8px">🔍 Ver Detalhes</button>'
       +'</div>'
       +'</div>';
   });
-
   return html;
 };
 
