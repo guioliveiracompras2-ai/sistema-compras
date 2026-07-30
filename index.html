@@ -3011,33 +3011,25 @@ async function salvarEdicaoAjuste(solId,numItens){
 }
 
 async function hSt(id,status){
-  const obs=V('ov')||'';
-  const nome=`${S.user?.nome||''} ${S.user?.sobrenome||''}`.trim();
-  const agora=new Date().toISOString();
   try{
+    const obs=V('ov')||'';
     const upd={status};
     if(obs)upd.observacoes=obs;
-    if(status==='Aprovada')upd.data_aprovacao=agora;
-    // Registra quem aprovou em campos de auditoria (ignora erro se coluna não existe)
-    try{
-      if(['Aguardando Orçamento','Aguardando Comite','Aguardando Evandro','Reprovada'].includes(status)){
-        await sb.from('solicitacoes').update({aprovado_dir_nome:nome,aprovado_dir_data:agora}).eq('id',id);
-      }
-    }catch(e2){}
-    try{
-      if(['Aprovada','Aguardando Aprovação Comite'].includes(status)){
-        await sb.from('solicitacoes').update({aprovado_ger_nome:nome,aprovado_ger_data:agora}).eq('id',id);
-      }
-    }catch(e3){}
-    // Atualiza status — operação principal
-    const {error}=await sb.from('solicitacoes').update(upd).eq('id',id);
-    if(error)throw new Error('Erro ao atualizar: '+error.message);
+    if(status==='Aprovada')upd.data_aprovacao=new Date().toISOString();
+    console.log('hSt chamado:', id, status, upd);
+    const {data,error}=await sb.from('solicitacoes').update(upd).eq('id',id).select();
+    console.log('hSt resultado:', data, error);
+    if(error){
+      alert('❌ Erro: '+error.message+' (code: '+error.code+')');
+      return;
+    }
     closeModal();
     await loadSol();
     render();
+    console.log('hSt concluído OK');
   }catch(e){
-    console.error('hSt error:',e);
-    alert('❌ Erro ao aprovar: '+e.message);
+    console.error('hSt exception:',e);
+    alert('❌ Erro inesperado: '+e.message);
   }
 }
 
