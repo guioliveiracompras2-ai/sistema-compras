@@ -3011,36 +3011,23 @@ async function salvarEdicaoAjuste(solId,numItens){
 }
 
 async function hSt(id,status){
+  // Feedback visual imediato
+  document.querySelectorAll('.aprov-btn-aprovar').forEach(b=>{b.disabled=true;b.textContent='Aprovando...';});
   try{
-    const obs=V('ov')||'';
     const upd={status};
-    if(obs)upd.observacoes=obs;
     if(status==='Aprovada')upd.data_aprovacao=new Date().toISOString();
-    // Testa permissão antes de atualizar
-    const testRead=await sb.from('solicitacoes').select('id,status').eq('id',id).single();
-    if(testRead.error){
-      alert('❌ Sem acesso à solicitação: '+testRead.error.message);
-      return;
-    }
-    const {data,error}=await sb.from('solicitacoes').update(upd).eq('id',id).select();
-    if(error){
-      // Erro específico de RLS
-      if(error.code==='42501'||error.message.includes('permission')||error.message.includes('policy')){
-        alert('❌ Permissão negada. Rode no Supabase: CREATE POLICY sol_all ON public.solicitacoes FOR ALL USING (true) WITH CHECK (true);');
-      } else {
-        alert('❌ Erro ao aprovar: '+error.message+' Código: '+error.code);
-      }
-      return;
-    }
-    if(!data||!data.length){
-      alert('⚠️ Sem registros atualizados — RLS pode estar bloqueando. Rode no Supabase: CREATE POLICY sol_all ON public.solicitacoes FOR ALL USING (true) WITH CHECK (true);');
+    const res=await sb.from('solicitacoes').update(upd).eq('id',id);
+    if(res.error){
+      alert('Erro: '+res.error.message+' | Código: '+res.error.code);
+      document.querySelectorAll('.aprov-btn-aprovar').forEach(b=>{b.disabled=false;b.textContent='✅ Aprovar';});
       return;
     }
     closeModal();
     await loadSol();
     render();
   }catch(e){
-    alert('❌ Erro inesperado: '+e.message);
+    alert('Erro: '+e.message);
+    document.querySelectorAll('.aprov-btn-aprovar').forEach(b=>{b.disabled=false;b.textContent='✅ Aprovar';});
   }
 }
 
@@ -3513,7 +3500,7 @@ function pgAprovacoes(){
       +'<button class="btn bl" onclick="vSOL(\"'+s.id+'\")" style="padding:8px 14px;font-size:12px">🔍 Ver Detalhes</button>'
       +(s.status==='Aguardando Aprovação Comite'
         ?'<button class="btn" style="background:#6A1B9A;color:#fff;padding:8px 16px;font-size:12px" onclick="escolherFornDireto('+i+')">🟣 Escolher Fornecedor</button>'
-        :'<button class="btn bs" onclick="aprovarDireto('+i+')" style="padding:8px 20px;font-size:12px;font-weight:700">✅ Aprovar</button>'
+        :'<button class="btn bs aprov-btn-aprovar" onclick="aprovarDireto('+i+')" style="padding:8px 20px;font-size:12px;font-weight:700">✅ Aprovar</button>'
         +'<button class="btn bd" onclick="reprovarDireto('+i+')" style="padding:8px 14px;font-size:12px">❌ Reprovar</button>')
       +'</div>'
       +'</div>'
