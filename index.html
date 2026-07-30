@@ -1642,287 +1642,229 @@ async function hCriarSOL(){
 // ── MODAL DETALHES ────────────────────────────────────────────────────────
 async function vSOL(id){
   const s=S.sol.find(x=>x.id===id);if(!s)return;
+
+  // ── Approval permissions ─────────────────────────────────────────────────
   const pD=(isDiretoria()||isGestor())&&s.status==='Aguardando Diretoria';
   const pAD=(isDiretoria()||isGestor())&&s.status==='Aguardando Aprovação Diretoria';
-  // ── BMMOT: Evandro (Diretoria step 2) ─────────────────────────────
-  let evandroHtml='';
   const pEvandro=(isDiretoria()||isGestor())&&s.status==='Aguardando Evandro';
-  if(pEvandro){
-    evandroHtml=`<hr class="hdiv">
-    <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; APROVA&#199;&#195;O DIRETORIA (BMMOT)</div>
-      <div style="font-size:12px;color:#555;margin-bottom:12px">Gerente aprovou. Sua aprova&#231;&#227;o envia para o Comit&#234;.</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Orçamento')">&#10003; Aprovar</button>
-        <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
-      </div>
-    </div>`;
-  }
-
-  // ── BMMOT: Gerente aprova Cotação ───────────────────────────────────
-  let gerenteCotHtml='';
-  const pGerenteCot=podeGerenteAprovarSol(s)&&s.status==='Aguardando Gerente Cotação';
-  if(pGerenteCot){
-    gerenteCotHtml=`<hr class="hdiv">
-    <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; APROVA&#199;&#195;O COTA&#199;&#195;O &#8212; GERENTE (1&#170; etapa)</div>
-      <div style="font-size:12px;color:#555;margin-bottom:12px">Compras registrou os or&#231;amentos. Analise e aprove.</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Evandro Cotação')">&#10003; Aprovar Cota&#231;&#227;o</button>
-        <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
-      </div>
-    </div>`;
-  }
-
-  // ── BMMOT: Evandro aprova Cotação ───────────────────────────────────
-  let evandroCoтHtml='';
-  const pEvandroCot=(isDiretoria()||isGestor())&&s.status==='Aguardando Evandro Cotação';
-  if(pEvandroCot){
-    evandroCoтHtml=`<hr class="hdiv">
-    <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; APROVA&#199;&#195;O DIRETORIA &#8212; COTA&#199;&#195;O</div>
-      <div style="font-size:12px;color:#555;margin-bottom:12px">Gerente aprovou a cota&#231;&#227;o. Aguardando sua aprova&#231;&#227;o.</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Aprovação Comite')">&#10003; Aprovar Cotação</button>
-        <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
-      </div>
-    </div>`;
-  }
-
-  const pG=isGerente()&&s.status==='Aguardando Aprovação Gerente';
-  const pComprasExec=isCompras()&&s.status==='Aprovada';
-  // Carrega cotações para todos os casos relevantes
-  if(pAD||pG||pComprasExec){
-    const {data}=await sb.from('cotacoes').select('*').eq('solicitacao_id',id);
-    if(data&&data.length)S.cot=[...S.cot.filter(c=>c.solicitacao_id!==id),...data];
-  }
-  const cot=S.cot.find(c=>c.solicitacao_id===id);
-  const itens=cot?(typeof cot.itens==='string'?JSON.parse(cot.itens||'[]'):(cot.itens||[])):[];
-  const best=itens.length?itens.reduce((a,b)=>a.val<b.val?a:b,itens[0]):null;
-  const fmtBtn=(i)=>`<div style="background:${i.forn===best?.forn?'#F1F8E9':'#F8F9FA'};border:2px solid ${i.forn===best?.forn?'#A5D6A7':'#E0E0E0'};border-radius:10px;padding:16px;margin-bottom:10px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px">
-      <div><div style="font-weight:700;font-size:14px">${i.forn}</div>${i.cnpj?`<div style="font-size:11px;color:#9E9E9E">CNPJ: ${i.cnpj}</div>`:''}</div>
-      <div style="font-size:20px;font-weight:700;color:${i.forn===best?.forn?'#2E7D32':'#1565C0'}">${fmt(i.val)}</div>
-    </div>
-    <div style="font-size:12px;color:#666;margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap">
-      ${i.prazo?`<span>&#x23F1; ${i.prazo} dias</span>`:''}${i.pgto?`<span>&#x1F4B3; ${i.pgto}</span>`:''}${i.obs?`<span>&#x1F4DD; ${i.obs}</span>`:''}${i.arquivo?`<span>&#x1F4CE; ${i.arquivo}</span>`:''}
-    </div>
-    ${(pAD||pACom)?`<button onclick="hEscolherForn('${cot?.id}','${s.id}','${i.forn.replace(/'/g,"\'")}',${i.val})" style="width:100%;padding:9px;background:${i.forn===best?.forn?'#2E7D32':'#1565C0'};color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer">${i.forn===best?.forn?'&#x2713; Escolher este (Menor preco)':'Escolher este fornecedor'}</button>`:''}
-  </div>`;
-
-  let cotHtml='';
-  if(pAD){
-    if(cot&&itens.length){
-      cotHtml=`<hr class="hdiv"><div style="font-size:14px;font-weight:700;color:#0F2236;margin-bottom:10px">Orcamentos recebidos</div>
-      <div style="font-size:11px;color:#9E9E9E;margin-bottom:10px">Lancado por: <strong style="color:#555">${cot.criado_por||'Compras'}</strong> . ${fmtD(cot.data_criacao)}</div>
-      ${itens.map(fmtBtn).join('')}
-      <div style="background:#E8F5E9;border-radius:8px;padding:10px 14px;font-size:12px;color:#1B5E20;margin-bottom:12px">Recomendacao: <strong>${best?.forn||'-'}</strong> com <strong>${fmt(best?.val)}</strong></div>
-      <div class="f"><label>Observacao</label><textarea class="inp" id="ov" placeholder="Comentario..."></textarea></div>
-      <button class="btn bd" style="width:100%" onclick="hSt('${s.id}','Reprovada')">x Reprovar todos os orcamentos</button>`;
-    }else{
-      cotHtml=`<hr class="hdiv"><div style="background:#F8F9FA;border-radius:8px;padding:14px;color:#9E9E9E;font-size:13px">Nenhum orcamento encontrado ainda.</div>`;
-    }
-  }
-
-  let gerenteHtml='';
-  if(pG){
-    gerenteHtml=`<hr class="hdiv">
-    ${s.fornecedor?`<div style="background:#E3F2FD;border-radius:8px;padding:14px;margin-bottom:12px">
-      <div style="font-size:11px;color:#9E9E9E">Fornecedor escolhido pela Diretoria</div>
-      <div style="font-size:16px;font-weight:700">${s.fornecedor}</div>
-      <div style="font-size:18px;font-weight:600;color:#1565C0">${fmt(s.valor_final)}</div></div>`:''}
-    <div class="ib ibl">Sua aprovacao libera a compra para o time de Compras executar.</div>
-    <div class="f"><label>Observacao</label><textarea class="inp" id="ov" placeholder="Comentario final..."></textarea></div>
-    <div class="fg2"><button class="btn bs" onclick="hSt('${s.id}','Aprovada')">✓ Aprovar — Liberar para Compras</button><button class="btn bd" onclick="hSt('${s.id}','Reprovada')">✗ Reprovar</button></div>`;
-  }
-
-  // Requisitante pode ajustar quando Diretoria pediu ajuste
-  const pAjuste=s.status==='Aguardando Ajuste';
-  let ajusteHtml='';
-  if(pAjuste){
-    const itens=s.itens_requisicao||[];
-    const itensAj=s.itens_ajustados||itens;
-    ajusteHtml=`<hr class="hdiv">
-    <div style="background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:10px;padding:16px;margin-bottom:14px">
-      <div style="font-size:12px;color:#E65100;font-weight:700;margin-bottom:8px">⚠️ AJUSTE SOLICITADO PELA DIRETORIA</div>
-      ${s.obs_ajuste?`<div style="font-size:13px;color:#555;background:#fff;border-radius:6px;padding:10px;margin-bottom:12px">"${s.obs_ajuste}"</div>`:''}
-      <div style="font-size:11px;color:#666;margin-bottom:10px">Quantidades ajustadas pela Diretoria:</div>
-      <table style="width:100%;font-size:12px;border-collapse:collapse">
-        <thead><tr style="background:#FFE0B2">
-          <th style="padding:6px 8px;text-align:left">Item</th>
-          <th style="padding:6px 8px;text-align:center">Qtd. Original</th>
-          <th style="padding:6px 8px;text-align:center">Qtd. Ajustada</th>
-          <th style="padding:6px 8px;text-align:center">Novo Total</th>
-        </tr></thead>
-        <tbody>${itensAj.map((i,idx)=>{
-          const orig=itens[idx]||i;
-          const changed=i.qtd!==orig.qtd;
-          return `<tr style="border-bottom:1px solid #FFE0B2;background:${changed?'#FFF8E1':''}">
-            <td style="padding:6px 8px">${i.desc||i.descricao||'—'}</td>
-            <td style="padding:6px 8px;text-align:center;text-decoration:${changed?'line-through':'none'};color:${changed?'#999':'#333'}">${orig.qtd||1}</td>
-            <td style="padding:6px 8px;text-align:center;font-weight:${changed?'700':'400'};color:${changed?'#E65100':'#333'}">${i.qtd||1}</td>
-            <td style="padding:6px 8px;text-align:center;color:#1565C0;font-weight:600">R$ ${((i.qtd||1)*(i.val||0)).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table>
-    </div>
-    <div class="ib" style="background:#FFF3E0;border-color:#FFB74D;color:#E65100">Você pode aceitar as novas quantidades e reenviar, ou editar antes de resubmeter.</div>
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <button class="btn" style="flex:1;background:#FF6F00;color:#fff" onclick="mdEditarAjuste('${s.id}')">✏️ Editar Quantidades</button>
-      <button class="btn bs" style="flex:1" onclick="reenviarAjuste('${s.id}')">🔄 Aceitar e Reenviar</button>
-    </div>`;
-  }
-
-  // Compras executa a compra após aprovação do gerente
-  const pCompras=(isCompras()||isGestor())&&s.status==='Aprovada';
-  let comprasHtml='';
-  if(pCompras){
-    const cotVenc=S.cot.find(c=>c.solicitacao_id===s.id);
-    const valRef=s.valor_final||s.valor_estimado||0;
-    comprasHtml=`<hr class="hdiv">
-    <div style="background:#E8F5E9;border-radius:8px;padding:16px;margin-bottom:14px">
-      <div style="font-size:12px;color:#2E7D32;font-weight:600;margin-bottom:6px">✅ APROVADA — Aguardando execução da compra</div>
-      <div style="font-size:15px;font-weight:700">${s.fornecedor||'—'}</div>
-      <div style="font-size:20px;font-weight:700;color:#1565C0;margin-top:4px">${fmt(valRef)}</div>
-      <div style="font-size:11px;color:#9E9E9E;margin-top:6px">Dir: ${s.aprovado_dir_nome||'—'} · Ger: ${s.aprovado_ger_nome||'—'}</div>
-    </div>
-    <div class="ib ibo">Preencha a Ordem de Compra e confirme a execução para gerar o pedido.</div>
-    <button class="btn bs" style="width:100%;padding:12px;font-size:14px" onclick="hExecutarCompra('${s.id}','${cotVenc?.id||''}','${s.fornecedor||'—'}',${valRef})">🛒 Gerar Ordem de Compra</button>`;
-  }
-
-  // Gerente 1ª aprovação (BMMOT)
-  let gerenteInicialHtml='';
-  const pGerenteInicial=podeGerenteAprovarSol(s)&&s.status==='Aguardando Gerente';
-  if(pGerenteInicial){
-    gerenteInicialHtml=`<hr class="hdiv">
-    <div style="background:#E8EAF6;border:1.5px solid #9FA8DA;border-radius:10px;padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; 1ª APROVAÇÃO — GERENTE (BMMOT)</div>
-      <div style="font-size:12px;color:#555;margin-bottom:12px">Solicitação aguardando sua aprovação antes de ir para a Diretoria.</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Evandro')">&#10003; Aprovar</button>
-        <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
-      </div>
-    </div>`;
-  }
-
-    let comiteHtml='';
   const pComite=(isComite()||isGestor())&&s.status==='Aguardando Comite';
-  if(pComite){
-    comiteHtml=`<hr class="hdiv">
-    <div style="background:#F3E5F5;border:1.5px solid #CE93D8;border-radius:10px;padding:14px;margin-bottom:12px">
-      <div style="font-size:12px;color:#6A1B9A;font-weight:700;margin-bottom:8px">&#128100; 3&#170; APROVA&#199;&#195;O &#8212; COMIT&#202; (SIMONE ou ANDREA)</div>
-      <div style="font-size:12px;color:#555;margin-bottom:12px">Evandro aprovou. Aguardando aprovação do Comitê para prosseguir.</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Comite')">&#10003; Aprovar</button>
-        <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
+  const pGerenteInicial=podeGerenteAprovarSol(s)&&s.status==='Aguardando Gerente';
+  const pGerenteCot=podeGerenteAprovarSol(s)&&s.status==='Aguardando Gerente Cotação';
+  const pEvandroCot=(isDiretoria()||isGestor())&&s.status==='Aguardando Evandro Cotação';
+  const pG=isGerente()&&s.status==='Aguardando Aprovação Gerente';
+  const pACom=(isComite()||isGestor())&&s.status==='Aguardando Aprovação Comite';
+  const pCot=(isCompras()||isGestor())&&s.status==='Aguardando Orçamento';
+  const cotVenc=S.cot.find(c=>c.solicitacao_id===s.id);
+
+  // Next status for footer Aprovar button
+  const proxMap={
+    'Aguardando Gerente':'Aguardando Evandro',
+    'Aguardando Evandro':'Aguardando Comite',
+    'Aguardando Comite':'Aguardando Orçamento',
+    'Aguardando Diretoria':'Aguardando Orçamento',
+    'Aguardando Gerente Cotação':'Aguardando Evandro Cotação',
+    'Aguardando Evandro Cotação':'Aguardando Aprovação Comite',
+    'Aguardando Aprovação Diretoria':s.grupo==='BMMOT'?'Aprovada':'Aguardando Aprovação Gerente',
+    'Aguardando Aprovação Gerente':'Aprovada',
+  };
+  const proxSt=proxMap[s.status]||'';
+  const canApprove=pGerenteInicial||pEvandro||pComite||pD||pGerenteCot||pEvandroCot||pG;
+
+  // ── Parse itens ───────────────────────────────────────────────────────────
+  let itens=[];
+  try{itens=typeof s.itens==='string'?JSON.parse(s.itens):(s.itens||[]);}catch(e){}
+  const totalItens=itens.reduce((a,i)=>a+parseFloat(i.qtd||1)*parseFloat(i.val||0),0);
+
+  // ── Fluxo de aprovação ────────────────────────────────────────────────────
+  const ORDER_S=['Aguardando Gerente','Aguardando Evandro','Aguardando Comite','Aguardando Diretoria',
+    'Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação',
+    'Aguardando Aprovação Comite','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente',
+    'Aprovada','Comprada','Entregue'];
+  const flowSteps=s.grupo==='BMMOT'?[
+    {n:1,lbl:'Gerente Área',st:'Aguardando Gerente'},
+    {n:2,lbl:'Aprovação Diretoria',st:'Aguardando Evandro'},
+    {n:3,lbl:'Aprovação Comitê',st:'Aguardando Comite'},
+    {n:4,lbl:'Compras Cotação',st:'Aguardando Orçamento'},
+    {n:5,lbl:'Aprovada',st:'Aprovada'},
+  ]:[
+    {n:1,lbl:'Aprovação Diretoria',st:'Aguardando Diretoria'},
+    {n:2,lbl:'Compras Cotação',st:'Aguardando Orçamento'},
+    {n:3,lbl:'Dir. Aprovação Final',st:'Aguardando Aprovação Diretoria'},
+    {n:4,lbl:'Gerente Aprova',st:'Aguardando Aprovação Gerente'},
+    {n:5,lbl:'Aprovada',st:'Aprovada'},
+  ];
+  const curIdx=ORDER_S.indexOf(s.status);
+  const fluxoHtml=flowSteps.map(step=>{
+    const ei=ORDER_S.indexOf(step.st);
+    const done=curIdx>ei;
+    const cur=s.status===step.st;
+    const bg=done?'#2E7D32':cur?'#1565C0':'#E0E0E0';
+    const fg=done||cur?'#fff':'#9E9E9E';
+    const tc=cur?'#1565C0':done?'#2E7D32':'#9E9E9E';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0F2F5">'
+      +'<div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:'+bg+';color:'+fg+'">'
+      +(done?'✓':step.n)+'</div>'
+      +'<div style="flex:1">'
+      +'<div style="font-size:13px;font-weight:'+(cur?700:400)+';color:'+tc+'">'+step.lbl
+      +(cur?' <span style="font-size:10px;background:#1565C0;color:#fff;padding:1px 6px;border-radius:10px">Atual</span>':'')+'</div>'
+      +'<div style="font-size:11px;color:'+(done?'#2E7D32':cur?'#E65100':'#ccc')+';margin-top:1px">'
+      +(done?'Concluído':cur?'Aguardando aprovação':'Pendente')+'</div>'
+      +'</div></div>';
+  }).join('');
+
+  // ── Histórico ─────────────────────────────────────────────────────────────
+  const hist=[
+    {ico:'👤',txt:'Criado por '+(s.solicitante_nome||'—'),dt:fmtD(s.data_criacao)},
+    s.aprovado_dir_nome?{ico:'✅',txt:'Aprovado por '+s.aprovado_dir_nome,dt:fmtD(s.aprovado_dir_data)}:null,
+    s.aprovado_ger_nome?{ico:'✅',txt:'Aprovado por '+s.aprovado_ger_nome,dt:fmtD(s.aprovado_ger_data)}:null,
+    s.fornecedor?{ico:'🏢',txt:'Fornecedor: '+s.fornecedor,dt:fmtD(s.data_aprovacao)}:null,
+  ].filter(Boolean);
+
+  // ── Área de cotação/escolha ───────────────────────────────────────────────
+  let actionHtml='';
+  if(pCot){
+    actionHtml=`<hr class="hdiv"><div style="background:#E8F5E9;border:1.5px solid #81C784;border-radius:10px;padding:14px;margin-bottom:12px">
+    <div style="font-size:12px;color:#2E7D32;font-weight:700;margin-bottom:8px">🛒 REGISTRAR ORÇAMENTOS</div>
+    <button class="btn bs" style="width:100%" onclick="closeModal();goTo('cotacoes')">📋 Ir para Cotações</button></div>`;
+  }
+  if((pAD||pACom)&&cotVenc){
+    const fns=cotVenc.itens?JSON.parse(typeof cotVenc.itens==='string'?cotVenc.itens:'[]'):[];
+    const fornSet=[...new Set(fns.map(f=>f.forn).filter(Boolean))];
+    const valRef=cotVenc.valor_final||fns.reduce((a,f)=>a+parseFloat(f.val||0),0);
+    actionHtml=`<hr class="hdiv"><div style="background:#FFF8E1;border:1.5px solid #FFD54F;border-radius:10px;padding:14px;margin-bottom:12px">
+    <div style="font-size:12px;color:#E65100;font-weight:700;margin-bottom:8px">📋 ESCOLHA DO FORNECEDOR</div>
+    <div style="display:grid;gap:6px;margin-bottom:12px">
+      ${fornSet.map(f=>`<button class="btn bl" style="text-align:left;padding:10px 14px;border-radius:8px" onclick="hEscolherForn('${cotVenc?.id}','${s.id}','${f.replace(/'/g,"\'")}',${valRef})">✓ ${f}</button>`).join('')}
+    </div></div>`;
+  }
+  if(isCompras()&&s.status==='Comprada'){
+    actionHtml=`<hr class="hdiv"><div style="background:#E0F2F1;border-radius:8px;padding:14px;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:#1565C0">${s.fornecedor||'—'} · R$ ${fmt(s.valor_final||0)}</div></div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <div class="f" style="flex:1;margin:0"><label>Nr. NF</label><input class="inp" id="vNF" placeholder="000000"></div>
+      <div class="f" style="flex:1;margin:0"><label>Data Entrega</label><input type="date" class="inp" id="vDE"></div>
+    </div>
+    <button class="btn bp" style="width:100%" onclick="hEntrega('${s.id}')">✅ Confirmar Entrega</button>`;
+  }
+  if(s.status==='Aguardando Ajuste'&&(isCompras()||isGestor())){
+    actionHtml=`<hr class="hdiv"><div class="ib ibo" style="margin:14px 0">Instrução: ${s.observacoes||'—'}</div>
+    <button class="btn bp" style="width:100%" onclick="hSt('${s.id}','Aguardando Diretoria')">🔄 Reenviar após Ajuste</button>`;
+  }
+
+  openModal(`<div class="modal" style="max-width:920px;max-height:92vh;display:flex;flex-direction:column">
+  <!-- HEADER -->
+  <div style="background:#0F2236;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;border-radius:14px 14px 0 0">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="background:rgba(255,255,255,.2);color:#fff;padding:5px 14px;border-radius:20px;font-size:14px;font-weight:700">${s.numero}</span>
+      <span style="background:#E3F2FD;color:#1565C0;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">Solicitação de Compra</span>
+      <span style="background:#FFF3E0;color:#E65100;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">⏳ ${statusLabel(s.status)}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="background:${s.urgencia==='Alta'?'#C62828':s.urgencia==='Media'||s.urgencia==='Média'?'#E65100':'#2E7D32'};color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">${s.urgencia||'Normal'}</span>
+      <button class="xb" style="color:rgba(255,255,255,.7);font-size:18px" onclick="closeModal()">✕</button>
+    </div>
+  </div>
+
+  <!-- BODY 2-col -->
+  <div style="display:grid;grid-template-columns:1fr 250px;flex:1;overflow:hidden;min-height:0">
+    <!-- LEFT -->
+    <div style="overflow-y:auto;padding:18px">
+      <div style="font-size:20px;font-weight:700;color:#0F2236;margin-bottom:8px">${s.descricao||'Sem descrição'}</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:12px">
+        <span>🏢 ${s.loja_nome||'—'}</span><span>👤 ${s.solicitante_nome||'—'}</span>
+        ${s.area?`<span>🏷️ ${s.area}</span>`:''}<span>📂 ${s.categoria||s.tipo||'—'}</span>
+        <span>📅 ${fmtD(s.data_criacao)}</span>
       </div>
-    </div>`;
-  }
-let dirHtml='';
-  if(pD){
-    const isBmmotDir=s.grupo==='BMMOT';
-    dirHtml=`<hr class="hdiv">
-    <div style="background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:10px;padding:14px;margin-bottom:12px">
-    <div style="font-size:12px;font-weight:700;color:#E65100;margin-bottom:6px">${isBmmotDir?'&#128084; 3&#170; APROVA&#199;&#195;O &mdash; DIRETORIA (SIMONE ou ANDREA)':'&#128084; APROVA&#199;&#195;O DIRETORIA'}</div>
-    <div style="font-size:12px;color:#555;margin-bottom:10px">${isBmmotDir?'Evandro j&#225; aprovou. Sua aprova&#231;&#227;o envia para Compras cotar.':'Aprove para Compras realizar os or&#231;amentos.'}</div>
-    <div class="f"><label>Observacao</label><textarea class="inp" id="ov" placeholder="Instrucao..."></textarea></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-      <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Orçamento')">✅ Aprovar</button>
-      <button class="btn" style="flex:1;background:#FF6F00;color:#fff" onclick="mdAjuste('${s.id}')">⚠️ Pedir Ajuste</button>
-      <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">❌ Reprovar</button>
-    </div>
-    </div>`;
-  }
+      ${s.justificativa?`<div style="background:#FFFDE7;border-left:4px solid #FDD835;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#555"><b>Observação:</b> ${s.justificativa}</div>`:''}
 
-  // Entrega — compras pode confirmar quando status é Comprada
-  const pEntrega=isCompras()&&s.status==='Comprada';
-  let entregaHtml='';
-  if(pEntrega){
-    const pedVenc=S.ped.find(p=>p.solicitacao_id===s.id)||null;
-    entregaHtml=`<hr class="hdiv">
-    <div style="background:#E0F2F1;border-radius:8px;padding:16px;margin-bottom:14px">
-      <div style="font-size:12px;color:#004D40;font-weight:600;margin-bottom:6px">🛒 COMPRA REALIZADA</div>
-      <div style="font-size:15px;font-weight:700">${s.fornecedor||'—'}</div>
-      <div style="font-size:18px;font-weight:700;color:#1565C0;margin-top:4px">${fmt(s.valor_final||0)}</div>
-      <div style="font-size:11px;color:#9E9E9E;margin-top:6px">Comprado por: ${s.comprado_por||'—'}</div>
-      ${pedVenc?`<div style="font-size:11px;color:#9E9E9E">Pedido: ${pedVenc.numero} · Prev. entrega: ${fmtD(pedVenc.prev_entrega)}</div>`:''}
-    </div>
-    <div class="ib ibg">Confirme o recebimento para finalizar a esteira desta solicitação.</div>
-    <div class="fg2" style="margin-bottom:10px">
-      <div class="f" style="margin:0"><label>Nota Fiscal *</label><input class="inp" id="ent-nf" placeholder="NF-000000"></div>
-      <div class="f" style="margin:0"><label>Data de Recebimento</label><input class="inp" type="date" id="ent-dt" value="${new Date().toISOString().slice(0,10)}"></div>
-    </div>
-    <div class="f" style="margin-bottom:10px"><label>Recebido por *</label><input class="inp" id="ent-rec" value="${S.user.nome} ${S.user.sobrenome}" placeholder="Nome de quem recebeu"></div>
-    <div class="f" style="margin-bottom:14px">
-      <label>Condição do item</label>
-      <select class="inp" id="ent-cond">
-        <option>✅ Conforme — item recebido em perfeitas condições</option>
-        <option>⚠️ Parcial — entrega incompleta, aguardando restante</option>
-        <option>❌ Com avaria — item com danos, registrar ocorrência</option>
-      </select>
-    </div>
-    <button class="btn bs" style="width:100%;padding:12px;font-size:14px" onclick="hEntSol('${s.id}','${pedVenc?.id||''}')">
-      📦 Confirmar Entrega e Finalizar
-    </button>`;
-  }
+      <!-- Info + Resumo -->
+      <div style="display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:16px">
+        <div style="background:#F8F9FA;border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${[['Solicitante',s.solicitante_nome||'—'],['Data',fmtD(s.data_criacao)],
+             ['Área',s.area||'—'],['Prioridade',s.urgencia||'Normal'],
+             ['Tipo',s.tipo||'—'],['Categoria',s.categoria||'—'],
+             ['Grupo',s.grupo||'—'],['Previsão',fmtD(s.data_entrega)||'—'],
+            ].map(([l,v])=>`<div><div style="font-size:10px;color:#9E9E9E;font-weight:600;text-transform:uppercase">${l}</div><div style="font-size:13px;color:#333;margin-top:1px">${v}</div></div>`).join('')}
+        </div>
+        <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:8px;padding:14px;min-width:190px">
+          <div style="font-size:12px;font-weight:700;color:#1565C0;margin-bottom:10px">Resumo Financeiro</div>
+          <div style="font-size:12px;color:#555;margin-bottom:4px;display:flex;justify-content:space-between"><span>Total Itens:</span><b>R$ ${totalItens.toLocaleString('pt-BR',{minimumFractionDigits:2})}</b></div>
+          <div style="font-size:12px;color:#9E9E9E;margin-bottom:4px;display:flex;justify-content:space-between"><span>Impostos:</span><span>R$ 0,00</span></div>
+          <div style="font-size:12px;color:#9E9E9E;margin-bottom:8px;display:flex;justify-content:space-between"><span>Frete:</span><span>R$ 0,00</span></div>
+          <div style="border-top:1.5px solid #1565C0;padding-top:8px;display:flex;justify-content:space-between">
+            <b style="font-size:12px;color:#1565C0">Valor Total:</b>
+            <b style="font-size:16px;color:#1565C0">R$ ${(s.valor_estimado||totalItens).toLocaleString('pt-BR',{minimumFractionDigits:2})}</b>
+          </div>
+        </div>
+      </div>
 
-  openModal(`<div class="modal" style="max-width:600px">
-  <div class="mh"><span>${s.numero}</span><button class="xb" onclick="closeModal()">x</button></div>
-  <div class="mb">
-    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">${cs(s.status)} ${cu(s.urgencia)}</div>
-    ${dr('Loja',s.loja_nome)}${dr('Solicitante',s.solicitante_nome)}
-    ${dr('Area',s.area)}${dr('Tipo',s.tipo_compra)}
-    ${dr('Data',fmtD(s.data_criacao))}${dr('Categoria',s.categoria)}
-    ${s.fornecedor?dr('Fornecedor',s.fornecedor):''}
-    ${s.valor_final?dr('Valor Final',fmt(s.valor_final)):''}
-
-    ${(()=>{
-      const itens=s.itens_requisicao||[];
-      if(!itens.length)return `
-        <hr class="hdiv">
-        ${dr('Quantidade',s.quantidade)}
-        ${dr('Valor Estimado',fmt(s.valor_estimado))}
-        <hr class="hdiv">
-        <div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">DESCRICAO</div>
-        <div style="font-size:13px;line-height:1.6;color:#424242;margin-bottom:12px">${s.descricao}</div>`;
-      const total=itens.reduce((a,b)=>a+(b.total||b.qtd*b.val||0),0);
-      return `
-        <hr class="hdiv">
-        <div style="font-size:12px;font-weight:700;color:#0F2236;margin-bottom:10px">ITENS DA REQUISIÇÃO</div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+      <!-- Items table -->
+      ${itens.length?`<div style="border:1px solid #E0E0E0;border-radius:8px;overflow:hidden;margin-bottom:16px">
+        <div style="background:#0F2236;padding:8px 14px;display:flex;justify-content:space-between">
+          <span style="font-size:12px;font-weight:700;color:#fff">Itens da Solicitação</span>
+          <span style="font-size:11px;color:rgba(255,255,255,.6)">${itens.length} item(s)</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse">
           <thead><tr style="background:#F8F9FA">
-            <th style="padding:7px 10px;text-align:left;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0">Item</th>
-            <th style="padding:7px 10px;text-align:center;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0;width:50px">Qtd</th>
-            <th style="padding:7px 10px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0;width:110px">Valor Unit.</th>
-            <th style="padding:7px 10px;text-align:right;color:#9E9E9E;font-weight:600;border-bottom:1px solid #E0E0E0;width:110px">Total</th>
+            <th style="padding:8px 10px;text-align:center;font-size:10px;color:#9E9E9E;width:32px">#</th>
+            <th style="padding:8px 10px;text-align:left;font-size:10px;color:#9E9E9E">DESCRIÇÃO</th>
+            <th style="padding:8px 10px;text-align:center;font-size:10px;color:#9E9E9E;width:55px">UND.</th>
+            <th style="padding:8px 10px;text-align:center;font-size:10px;color:#9E9E9E;width:65px">QTD.</th>
+            <th style="padding:8px 10px;text-align:right;font-size:10px;color:#9E9E9E;width:100px">V.UNIT.</th>
+            <th style="padding:8px 10px;text-align:right;font-size:10px;color:#9E9E9E;width:100px">TOTAL</th>
           </tr></thead>
           <tbody>
-            ${itens.map((i,idx)=>`<tr style="border-bottom:1px solid #F0F2F5">
-              <td style="padding:8px 10px">
-                <span style="font-size:10px;color:#9E9E9E;margin-right:6px">#${idx+1}</span>
-                <strong>${i.desc||i.descricao||'—'}</strong>
-              </td>
-              <td style="padding:8px 10px;text-align:center;color:#555">${i.qtd||1}</td>
-              <td style="padding:8px 10px;text-align:right;color:#555">${i.val>0?fmt(i.val):'—'}</td>
-              <td style="padding:8px 10px;text-align:right;font-weight:600;color:#1565C0">${fmt(i.total||((i.qtd||1)*(i.val||0)))}</td>
-            </tr>`).join('')}
+            ${itens.map((it,ii)=>{
+              const tot=parseFloat(it.qtd||1)*parseFloat(it.val||0);
+              return `<tr style="border-top:1px solid #F0F2F5;background:${ii%2?'#FAFAFA':'#fff'}">
+                <td style="padding:8px 10px;text-align:center;font-size:12px;color:#9E9E9E">${ii+1}</td>
+                <td style="padding:8px 10px"><div style="font-size:13px;font-weight:500">${it.desc||it.descricao||'—'}</div>${it.codigo?`<div style="font-size:10px;color:#9E9E9E">${it.codigo}</div>`:''}</td>
+                <td style="padding:8px 10px;text-align:center;font-size:12px;color:#555">${it.und||it.unidade||'UN'}</td>
+                <td style="padding:8px 10px;text-align:center;font-size:13px;font-weight:600">${it.qtd||1}</td>
+                <td style="padding:8px 10px;text-align:right;font-size:12px;color:#555">${it.val?'R$ '+parseFloat(it.val).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td>
+                <td style="padding:8px 10px;text-align:right;font-size:13px;font-weight:700;color:#1565C0">${tot?'R$ '+tot.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—'}</td>
+              </tr>`;
+            }).join('')}
           </tbody>
-          <tfoot>
-            <tr style="background:#F8F9FA;border-top:2px solid #E0E0E0">
-              <td colspan="3" style="padding:10px;text-align:right;font-weight:700;color:#0F2236">TOTAL ESTIMADO</td>
-              <td style="padding:10px;text-align:right;font-weight:700;font-size:15px;color:#1565C0">${fmt(total)}</td>
-            </tr>
-          </tfoot>
-        </table>`;
-    })()}
+          <tfoot><tr style="background:#EFF6FF;border-top:2px solid #1565C0">
+            <td colspan="5" style="padding:10px 14px;text-align:right;font-size:13px;font-weight:700;color:#1565C0">TOTAL DOS ITENS</td>
+            <td style="padding:10px 14px;text-align:right;font-size:15px;font-weight:700;color:#1565C0">R$ ${totalItens.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+          </tr></tfoot>
+        </table>
+      </div>`:''}
 
-    <hr class="hdiv">
-    <div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">JUSTIFICATIVA</div>
-    <div style="font-size:13px;line-height:1.6;color:#424242">${s.justificativa||'-'}</div>
-    ${s.anexos?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">ANEXOS</div><div style="font-size:12px;color:#1565C0">📎 ${s.anexos}</div>`:''}
-    ${s.observacoes?`<hr class="hdiv"><div style="font-size:11px;font-weight:600;color:#9E9E9E;margin-bottom:4px">OBSERVACOES</div><div style="font-size:13px">${s.observacoes}</div>`:''}
-    ${gerenteInicialHtml}${evandroHtml}${comiteHtml}${dirHtml}${ajusteHtml}${gerenteCotHtml}${evandroCoтHtml}${cotHtml}${gerenteHtml}${comprasHtml}${entregaHtml}
-  </div></div>`);
+      ${actionHtml}
+    </div>
+
+    <!-- RIGHT: fluxo + historico -->
+    <div style="border-left:1px solid #E0E0E0;overflow-y:auto;background:#FAFAFA">
+      <div style="padding:14px">
+        <div style="font-size:11px;font-weight:700;color:#9E9E9E;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Fluxo de Aprovação</div>
+        ${fluxoHtml}
+      </div>
+      ${hist.length?`<div style="padding:14px;border-top:1px solid #E0E0E0">
+        <div style="font-size:11px;font-weight:700;color:#9E9E9E;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Histórico</div>
+        ${hist.map(h=>`<div style="display:flex;gap:8px;margin-bottom:10px"><span style="font-size:16px;flex-shrink:0">${h.ico}</span><div><div style="font-size:12px;color:#333">${h.txt}</div><div style="font-size:11px;color:#9E9E9E">${h.dt}</div></div></div>`).join('')}
+      </div>`:''}
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="padding:14px 18px;background:#fff;border-top:2px solid #E0E0E0;display:flex;gap:10px;flex-shrink:0;border-radius:0 0 14px 14px;flex-wrap:wrap">
+    ${canApprove&&proxSt?`
+      <button class="btn bs" onclick="hSt('${s.id}','${proxSt}')" style="flex:2;padding:12px;font-size:14px;font-weight:700;border-radius:8px;max-width:300px">
+        ✅ Aprovar — Encaminhar para próxima etapa
+      </button>
+      <button class="btn" style="background:#FF6F00;color:#fff;flex:1;padding:12px;font-size:13px;font-weight:700;border-radius:8px;max-width:220px" onclick="mdAjuste('${s.id}')">
+        ⚠️ Solicitar Alterações
+      </button>
+      <button class="btn bd" onclick="hSt('${s.id}','Reprovada')" style="padding:12px 24px;font-size:13px;font-weight:700;border-radius:8px">
+        ✕ Reprovar
+      </button>
+    `:''}
+    <button class="btn bl" onclick="closeModal()" style="padding:12px 20px;font-size:13px;border-radius:8px;margin-left:auto">Fechar</button>
+  </div>
+  </div>`);
 }
 
 function imprimirLista(){
