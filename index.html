@@ -3016,19 +3016,30 @@ async function hSt(id,status){
     const upd={status};
     if(obs)upd.observacoes=obs;
     if(status==='Aprovada')upd.data_aprovacao=new Date().toISOString();
-    console.log('hSt chamado:', id, status, upd);
+    // Testa permissão antes de atualizar
+    const testRead=await sb.from('solicitacoes').select('id,status').eq('id',id).single();
+    if(testRead.error){
+      alert('❌ Sem acesso à solicitação: '+testRead.error.message);
+      return;
+    }
     const {data,error}=await sb.from('solicitacoes').update(upd).eq('id',id).select();
-    console.log('hSt resultado:', data, error);
     if(error){
-      alert('❌ Erro: '+error.message+' (code: '+error.code+')');
+      // Erro específico de RLS
+      if(error.code==='42501'||error.message.includes('permission')||error.message.includes('policy')){
+        alert('❌ Permissão negada. Rode no Supabase: CREATE POLICY sol_all ON public.solicitacoes FOR ALL USING (true) WITH CHECK (true);');
+      } else {
+        alert('❌ Erro ao aprovar: '+error.message+' Código: '+error.code);
+      }
+      return;
+    }
+    if(!data||!data.length){
+      alert('⚠️ Sem registros atualizados — RLS pode estar bloqueando. Rode no Supabase: CREATE POLICY sol_all ON public.solicitacoes FOR ALL USING (true) WITH CHECK (true);');
       return;
     }
     closeModal();
     await loadSol();
     render();
-    console.log('hSt concluído OK');
   }catch(e){
-    console.error('hSt exception:',e);
     alert('❌ Erro inesperado: '+e.message);
   }
 }
