@@ -1642,8 +1642,8 @@ async function hCriarSOL(){
 // ── MODAL DETALHES ────────────────────────────────────────────────────────
 async function vSOL(id){
   const s=S.sol.find(x=>x.id===id);if(!s)return;
-  const pD=isDiretoria()&&s.status==='Aguardando Diretoria';
-  const pAD=isDiretoria()&&s.status==='Aguardando Aprovação Diretoria';
+  const pD=(isDiretoria()||isGestor())&&s.status==='Aguardando Diretoria';
+  const pAD=(isDiretoria()||isGestor())&&s.status==='Aguardando Aprovação Diretoria';
   // ── BMMOT: Evandro (Diretoria step 2) ─────────────────────────────
   let evandroHtml='';
   const pEvandro=(isDiretoria()||isGestor())&&s.status==='Aguardando Evandro';
@@ -1830,6 +1830,7 @@ let dirHtml='';
       <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Orçamento')">✅ Aprovar</button>
       <button class="btn" style="flex:1;background:#FF6F00;color:#fff" onclick="mdAjuste('${s.id}')">⚠️ Pedir Ajuste</button>
       <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">❌ Reprovar</button>
+    </div>
     </div>`;
   }
 
