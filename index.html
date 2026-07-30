@@ -3388,132 +3388,140 @@ async function excluirItem(id){
 }
 
 // ── PÁGINA APROVAÇÕES ─────────────────────────────────────────────────────
-function pgAprovacoes(){
-  // Determina quais status o usuário atual pode aprovar
-  function getMeusPendentes(){
-    const all=S.sol||[];
-    return all.filter(s=>{
-      if(!s||!s.status)return false;
-      if(isGestor())return ['Aguardando Gerente','Aguardando Evandro','Aguardando Diretoria',
-        'Aguardando Gerente Cotação','Aguardando Evandro Cotação',
-        'Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente',
-        'Aguardando Aprovação Comite'].includes(s.status);
-      if(isGerente()&&!isDiretoria()&&!isComite()){
-        if(!podeGerenteAprovarSol(s))return false;
-        return ['Aguardando Gerente','Aguardando Gerente Cotação'].includes(s.status);
-      }
-      if(isDiretoria()&&!isGestor()){
-        return ['Aguardando Evandro','Aguardando Evandro Cotação',
-                'Aguardando Diretoria','Aguardando Aprovação Diretoria',
-                'Aguardando Aprovação Gerente'].includes(s.status);
-      }
-      if(isComite()&&!isGestor()){
-        return ['Aguardando Comite','Aguardando Aprovação Comite'].includes(s.status);
-      }
-      return false;
-    });
-  }
+let _aprovPendentes=[];
+function aprovarDireto(idx){
+  const s=_aprovPendentes[idx];
+  if(!s)return alert('Solicitação não encontrada');
+  const prox=getProxStatus(s.numero,s.status,s.grupo,s.area||'');
+  hSt(s.id,prox);
+}
+function reprovarDireto(idx){
+  const s=_aprovPendentes[idx];
+  if(!s)return;
+  hSt(s.id,'Reprovada');
+}
+function escolherFornDireto(idx){
+  const s=_aprovPendentes[idx];
+  if(!s)return;
+  vSOL(s.id);
+}
 
-  const pendentes=getMeusPendentes();
+function pgAprovacoes(){
+  const mySol=S.sol||[];
+  _aprovPendentes=mySol.filter(s=>{
+    if(!s||!s.status)return false;
+    if(isGestor())return['Aguardando Gerente','Aguardando Evandro','Aguardando Diretoria',
+      'Aguardando Comite','Aguardando Gerente Cotacao','Aguardando Evandro Cotacao',
+      'Aguardando Aprovacao Diretoria','Aguardando Aprovacao Gerente',
+      'Aguardando Aprovacao Comite'].includes(s.status)||
+      ['Aguardando Gerente Cotação','Aguardando Evandro Cotação',
+       'Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente',
+       'Aguardando Aprovação Comite'].includes(s.status);
+    if(isGerente()&&!isDiretoria()&&!isComite()){
+      if(!podeGerenteAprovarSol(s))return false;
+      return['Aguardando Gerente','Aguardando Gerente Cotação'].includes(s.status);
+    }
+    if(isDiretoria())return['Aguardando Evandro','Aguardando Evandro Cotação',
+      'Aguardando Diretoria','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente'].includes(s.status);
+    if(isComite())return['Aguardando Comite','Aguardando Aprovação Comite'].includes(s.status);
+    return false;
+  });
+
   const prioColor={Alta:'#C62828',Media:'#E65100',Média:'#E65100',Baixa:'#2E7D32',Normal:'#1565C0'};
 
-  function cardAprov(s){
+  function getItensHtml(s){
+    try{
+      const itens=typeof s.itens==='string'?JSON.parse(s.itens):(s.itens||[]);
+      if(!itens.length)return '';
+      let html='<div style="margin-top:10px;background:#F8F9FA;border-radius:8px;padding:8px 12px;border-left:3px solid #1565C0">';
+      html+='<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:6px;text-transform:uppercase">Itens da Solicitação</div>';
+      html+='<table style="width:100%;border-collapse:collapse">';
+      html+='<tr style="font-size:10px;color:#9E9E9E"><th style="text-align:left;padding:2px 4px">Item</th><th style="text-align:center;padding:2px 4px">Qtd</th><th style="text-align:right;padding:2px 4px">Unit.</th><th style="text-align:right;padding:2px 4px">Total</th></tr>';
+      itens.slice(0,4).forEach(i=>{
+        const total=parseFloat(i.qtd||1)*parseFloat(i.val||0);
+        html+='<tr style="font-size:12px;border-top:1px solid #E0E0E0">'
+          +'<td style="padding:4px;color:#333">'+(i.desc||i.descricao||'—')+'</td>'
+          +'<td style="padding:4px;text-align:center;color:#555">'+(i.qtd||1)+'</td>'
+          +'<td style="padding:4px;text-align:right;color:#555">'+(i.val?'R$ '+parseFloat(i.val).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
+          +'<td style="padding:4px;text-align:right;font-weight:600;color:#1565C0">'+(total?'R$ '+total.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
+          +'</tr>';
+      });
+      if(itens.length>4)html+='<tr><td colspan="4" style="padding:4px;font-size:11px;color:#9E9E9E">...e mais '+(itens.length-4)+' item(s)</td></tr>';
+      html+='</table></div>';
+      return html;
+    }catch(e){return '';}
+  }
+
+  if(!_aprovPendentes.length){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+      +'<div><div style="font-size:18px;font-weight:700;color:#0F2236">Minhas Aprovações</div>'
+      +'<div style="font-size:12px;color:#9E9E9E">Nenhuma pendência</div></div>'
+      +'<button class="btn bp" onclick="goTo(\'solicitacoes\')" style="padding:8px 16px;font-size:12px">Ver Todas</button>'
+      +'</div>'
+      +'<div class="card" style="text-align:center;padding:48px;color:#9E9E9E">'
+      +'<div style="font-size:48px;margin-bottom:12px">✅</div>'
+      +'<div style="font-size:16px;font-weight:600">Tudo em dia!</div>'
+      +'<div style="font-size:13px;margin-top:8px">Nenhuma aprovação pendente para você.</div>'
+      +'</div>';
+  }
+
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    +'<div><div style="font-size:18px;font-weight:700;color:#0F2236">Minhas Aprovações</div>'
+    +'<div style="font-size:12px;color:#9E9E9E">'+_aprovPendentes.length+' pendente(s)</div></div>'
+    +'<button class="btn bp" onclick="goTo(\'solicitacoes\')" style="padding:8px 16px;font-size:12px">Ver Todas</button>'
+    +'</div>';
+
+  _aprovPendentes.forEach((s,i)=>{
     const isCot=['Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Comite','Aguardando Aprovação Diretoria'].includes(s.status);
-    const proxSt=getProxStatus(s.numero,s.status,s.grupo,s.area||'');
     const stLabel=statusLabel(s.status);
     const prio=s.urgencia||'Normal';
     const pc=prioColor[prio]||'#555';
-    return '<div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;overflow:hidden;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)">'
+
+    html+='<div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;overflow:hidden;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)">'
       // Header
       +'<div style="background:#0F2236;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">'
       +'<div style="display:flex;align-items:center;gap:8px">'
       +'<span style="background:rgba(255,255,255,.2);color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">'+s.numero+'</span>'
-      +'<span style="background:'+(isCot?'#FFF3E0':'#E3F2FD')+';color:'+(isCot?'#E65100':'#1565C0')+';padding:3px 10px;border-radius:20px;font-size:11px">'+(isCot?'📋 Cotação':'📝 Solicitação')+'</span>'
+      +'<span style="background:'+(isCot?'#FFF3E0':'#E3F2FD')+';color:'+(isCot?'#E65100':'#1565C0')+';padding:3px 10px;border-radius:20px;font-size:11px">'
+      +(isCot?'📋 Cotação':'📝 Solicitação')+'</span>'
       +'</div>'
       +'<span style="background:'+pc+';color:#fff;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600">'+prio+'</span>'
       +'</div>'
       // Body
       +'<div style="padding:14px 16px">'
-      +'<div style="display:flex;gap:16px;align-items:flex-start">'
-      // Info
+      +'<div style="display:flex;gap:12px;align-items:flex-start">'
       +'<div style="flex:1">'
       +'<div style="font-size:15px;font-weight:700;color:#0F2236;margin-bottom:6px">'+(s.descricao||s.itens_resumo||'Sem descrição').substring(0,80)+'</div>'
-      +'<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:8px">'
+      +'<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:6px">'
       +'<span>🏢 '+(s.loja_nome||'—')+'</span>'
       +'<span>👤 '+(s.solicitante_nome||'—')+'</span>'
       +(s.area?'<span>🏷️ '+s.area+'</span>':'')
       +'<span>📅 '+new Date(s.data_criacao).toLocaleDateString('pt-BR')+'</span>'
       +'</div>'
       +(s.valor_estimado?'<div style="font-size:16px;font-weight:700;color:#1565C0">R$ '+parseFloat(s.valor_estimado).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>':'')
-      +(()=>{
-        try{
-          const itens=typeof s.itens==='string'?JSON.parse(s.itens):s.itens||[];
-          if(!itens.length)return '';
-          return '<div style="margin-top:8px;background:#F8F9FA;border-radius:6px;padding:8px 10px">'
-            +'<div style="font-size:10px;color:#9E9E9E;font-weight:700;margin-bottom:4px">ITENS</div>'
-            +itens.slice(0,3).map(i=>'<div style="font-size:12px;color:#333;padding:2px 0;display:flex;justify-content:space-between">'
-              +'<span>'+i.qtd+'x '+i.desc+'</span>'
-              +(i.val?'<span style="color:#1565C0;font-weight:600">R$ '+parseFloat(i.qtd*i.val).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>':'')
-              +'</div>').join('')
-            +(itens.length>3?'<div style="font-size:11px;color:#9E9E9E">...+'+(itens.length-3)+' item(s)</div>':'')
-            +'</div>';
-        }catch(e){return '';}
-      })()
-      // Status chip
-      +'<div style="margin-top:8px">'
-      +'<span style="background:#FFF3E0;color:#E65100;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">⏳ '+stLabel+'</span>'
-      +'</div>'
+      +'<div style="margin-top:6px"><span style="background:#FFF3E0;color:#E65100;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">⏳ '+stLabel+'</span></div>'
+      +getItensHtml(s)
       +'</div>'
       // Fluxo lateral
-      +'<div style="min-width:170px;background:#F8F9FA;border-radius:8px;padding:10px 12px;flex-shrink:0">'
-      +'<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:8px;text-transform:uppercase">Fluxo de Aprovação</div>'
+      +'<div style="min-width:160px;background:#F8F9FA;border-radius:8px;padding:10px 12px;flex-shrink:0">'
+      +'<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:8px;text-transform:uppercase">Fluxo</div>'
       +buildFlowSidebar(s,isCot)
       +'</div>'
       +'</div>'
-      // Botões
+      // Botões com onclick direto - sem event delegation, sem caracteres especiais
       +'<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #F0F2F5;flex-wrap:wrap">'
-      +'<button class="btn bl aprov-btn" data-id="'+s.id+'" data-action="ver" style="padding:8px 14px;font-size:12px">🔍 Ver Detalhes</button>'
+      +'<button class="btn bl" onclick="vSOL(\"'+s.id+'\")" style="padding:8px 14px;font-size:12px">🔍 Ver Detalhes</button>'
       +(s.status==='Aguardando Aprovação Comite'
-        ?'<button class="btn aprov-btn" data-id="'+s.id+'" data-action="comite" style="background:#6A1B9A;color:#fff;padding:8px 16px;font-size:12px">🟣 Escolher Fornecedor</button>'
-        :'<button class="btn bs aprov-btn" data-id="'+s.id+'" data-prox="'+proxSt+'" data-num="'+s.numero+'" data-action="aprovar" style="padding:8px 20px;font-size:12px">✅ Aprovar</button>'
-        +'<button class="btn bd aprov-btn" data-id="'+s.id+'" data-num="'+s.numero+'" data-action="reprovar" style="padding:8px 14px;font-size:12px">❌ Reprovar</button>')
+        ?'<button class="btn" style="background:#6A1B9A;color:#fff;padding:8px 16px;font-size:12px" onclick="escolherFornDireto('+i+')">🟣 Escolher Fornecedor</button>'
+        :'<button class="btn bs" onclick="aprovarDireto('+i+')" style="padding:8px 20px;font-size:12px;font-weight:700">✅ Aprovar</button>'
+        +'<button class="btn bd" onclick="reprovarDireto('+i+')" style="padding:8px 14px;font-size:12px">❌ Reprovar</button>')
       +'</div>'
       +'</div>'
       +'</div>';
-  }
+  });
 
-  return '<div>'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
-    +'<div><div style="font-size:18px;font-weight:700;color:#0F2236">Minhas Aprovações</div>'
-    +'<div style="font-size:12px;color:#9E9E9E;margin-top:2px">'+pendentes.length+' pendente(s) aguardando sua ação</div></div>'
-    +'<button class="btn bp" onclick="goTo(\'solicitacoes\')" style="padding:8px 16px;font-size:12px">Ver Todas Solicitações</button>'
-    +'</div>'
-    +(pendentes.length===0
-      ?'<div class="card" style="text-align:center;padding:48px;color:#9E9E9E">'
-        +'<div style="font-size:48px;margin-bottom:12px">✅</div>'
-        +'<div style="font-size:16px;font-weight:600;margin-bottom:8px">Tudo em dia!</div>'
-        +'<div style="font-size:13px">Nenhuma aprovação pendente para você no momento.</div>'
-        +'</div>'
-      :pendentes.map(s=>cardAprov(s)).join(''))
-    +'</div>';
-}
-
-function confirmarAprovacao(id,numero,proxSt){hSt(id,proxSt);}
-function confirmarReprovacao(id,numero){hSt(id,'Reprovada');}
-
-// Event delegation for approval buttons
-document.addEventListener('click',function(e){
-  const btn=e.target.closest('.aprov-btn');
-  if(!btn)return;
-  const id=btn.dataset.id;
-  const action=btn.dataset.action;
-  const num=btn.dataset.num||'';
-  const prox=btn.dataset.prox||'';
-  if(action==='ver')vSOL(id);
-  else if(action==='comite')vSOL(id);
-  else if(action==='aprovar')confirmarAprovacao(id,num,prox);
-  else if(action==='reprovar')confirmarReprovacao(id,num);
-});
+  return html;
+};
 
 // Helper: build approval flow sidebar
 function buildFlowSidebar(s,isCot){
