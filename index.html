@@ -708,7 +708,7 @@ function buildApp(){
       n+=mySol.filter(s=>['Aguardando Evandro','Aguardando Evandro Cotação'].includes(s.status)).length;
     }
     if(isComite()){
-      n+=mySol.filter(s=>['Aguardando Aprovação Comite'].includes(s.status)).length;
+      n+=mySol.filter(s=>['Aguardando Comite','Aguardando Aprovação Comite'].includes(s.status)).length;
     }
     return n||0;
   })();
