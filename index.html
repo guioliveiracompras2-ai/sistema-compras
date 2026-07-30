@@ -356,7 +356,7 @@ const PERFIS={
 const STATUS_LABEL={
   'Aguardando Evandro':'Aguardando Aprovação Diretoria',
   'Aguardando Evandro Cotação':'Aguardando Aprovação Diretoria',
-  'Aguardando Comite':'Aguardando Aprovação Comitê',
+  'Aguardando Comite':'Aguardando Aprovação Comitê (Solicitação)',
   'Aguardando Aprovação Comite':'Aguardando Aprovação Comitê',
   'Aguardando Gerente':'Aguardando Aprovação Gerente',
   'Aguardando Gerente Cotação':'Aguardando Aprovação Gerente',
@@ -1121,7 +1121,7 @@ function pgSol(){
     return true;
   });
 
-  const STATUS=['Aguardando Gerente','Aguardando Evandro','Aguardando Diretoria','Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Comite','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue','Reprovada'];
+  const STATUS=['Aguardando Gerente','Aguardando Evandro','Aguardando Comite','Aguardando Diretoria','Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Comite','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue','Reprovada'];
   const GRUPOS_USER=['DHG','BMMOT','UNIC'].filter(g=>podeVerGrupo(g));
   const grupoOptsHtml=GRUPOS_USER.map(g=>`<option value="${g}"${solFiltro.grupo===g?' selected':''} >${g}</option>`).join('');
   const lojaOpts=S.lojas.map(l=>`<option value="${l.id}"${solFiltro.loja===l.id?' selected':''}>${l.nome}</option>`).join('');
@@ -1653,7 +1653,7 @@ async function vSOL(id){
       <div style="font-size:12px;color:#3949AB;font-weight:700;margin-bottom:8px">&#128084; APROVA&#199;&#195;O DIRETORIA (BMMOT)</div>
       <div style="font-size:12px;color:#555;margin-bottom:12px">Gerente aprovou. Sua aprova&#231;&#227;o envia para o Comit&#234;.</div>
       <div style="display:flex;gap:8px">
-        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Orçamento')">&#10003; Aprovar</button>
+        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Comite')">&#10003; Aprovar</button>
         <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
       </div>
     </div>`;
@@ -1806,14 +1806,14 @@ async function vSOL(id){
   }
 
     let comiteHtml='';
-  const pComite=false&&s.status==='Aguardando Comite'; // Removido do fluxo de solicitação
+  const pComite=(isComite()||isGestor())&&s.status==='Aguardando Comite';
   if(pComite){
     comiteHtml=`<hr class="hdiv">
     <div style="background:#F3E5F5;border:1.5px solid #CE93D8;border-radius:10px;padding:14px;margin-bottom:12px">
       <div style="font-size:12px;color:#6A1B9A;font-weight:700;margin-bottom:8px">&#128100; 3&#170; APROVA&#199;&#195;O &#8212; COMIT&#202; (SIMONE ou ANDREA)</div>
       <div style="font-size:12px;color:#555;margin-bottom:12px">Evandro aprovou. Aguardando aprovação do Comitê para prosseguir.</div>
       <div style="display:flex;gap:8px">
-        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Orçamento')">&#10003; Aprovar</button>
+        <button class="btn bs" style="flex:1" onclick="hSt('${s.id}','Aguardando Comite')">&#10003; Aprovar</button>
         <button class="btn bd" style="flex:1" onclick="hSt('${s.id}','Reprovada')">&#10007; Reprovar</button>
       </div>
     </div>`;
@@ -3396,7 +3396,7 @@ function pgAprovacoes(){
                 'Aguardando Aprovação Gerente'].includes(s.status);
       }
       if(isComite()&&!isGestor()){
-        return ['Aguardando Aprovação Comite'].includes(s.status);
+        return ['Aguardando Comite','Aguardando Aprovação Comite'].includes(s.status);
       }
       return false;
     });
@@ -3499,6 +3499,7 @@ function buildFlowSidebar(s,isCot){
   const steps=s.grupo==='BMMOT'?[
     {lbl:'Gerente Área',st:'Aguardando Gerente'},
     {lbl:'Aprovação Diretoria',st:'Aguardando Evandro'},
+    {lbl:'Aprovação Comitê',st:'Aguardando Comite'},
     {lbl:'Compras Cotação',st:'Aguardando Orçamento'},
     ...(isCot?[
       {lbl:'Gerente Cot.',st:'Aguardando Gerente Cotação'},
@@ -3533,7 +3534,7 @@ function buildFlowSidebar(s,isCot){
 function getProxStatus(numero, status, grupo, area){
   const map={
     'Aguardando Gerente': grupo==='BMMOT'?'Aguardando Evandro':'Aguardando Diretoria',
-    'Aguardando Evandro': 'Aguardando Orçamento',
+    'Aguardando Evandro': 'Aguardando Comite',
     'Aguardando Diretoria': 'Aguardando Orçamento',
     'Aguardando Gerente Cotação': 'Aguardando Evandro Cotação',
     'Aguardando Evandro Cotação': 'Aguardando Aprovação Comite',
