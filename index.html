@@ -352,6 +352,15 @@ const PERFIS={
   requisitante:{label:'Requisitante',color:'#424242', bg:'#F5F5F5'},
   comite:     {label:'Comitê',        color:'#6A1B9A', bg:'#F3E5F5'},
 };
+// Labels amigáveis para os status (sem expor nomes pessoais)
+const STATUS_LABEL={
+  'Aguardando Evandro':'Aguardando Diretoria',
+  'Aguardando Evandro Cotação':'Aguardando Diretoria Cotação',
+  'Aguardando Comite':'Aguardando Comitê',
+  'Aguardando Aprovação Comite':'Aguardando Aprovação Comitê',
+};
+function statusLabel(st){return STATUS_LABEL[st]||st;}
+
 const SC={
   'Aguardando Diretoria':         'background:#E3F2FD;color:#0D47A1',
   'Reprovada':                    'background:#FFEBEE;color:#B71C1C',
@@ -360,9 +369,9 @@ const SC={
   'Aguardando Gerente': 'background:#E8EAF6;color:#3949AB',
   'Aguardando Comite': 'background:#F3E5F5;color:#6A1B9A',
   'Aguardando Aprovação Comite': 'background:#F3E5F5;color:#6A1B9A',
-  'Aguardando Evandro': 'background:#E8EAF6;color:#3949AB',
+  'Aguardando Evandro': 'background:#E3F2FD;color:#0D47A1',
   'Aguardando Gerente Cotação': 'background:#EDE7F6;color:#6A1B9A',
-  'Aguardando Evandro Cotação': 'background:#EDE7F6;color:#6A1B9A',
+  'Aguardando Evandro Cotação': 'background:#FFF8E1;color:#F57F17',
   'Aguardando Aprovação Gerente': 'background:#E8EAF6;color:#3949AB',
   'Aprovada':                     'background:#E8F5E9;color:#1B5E20',
   'Comprada':                     'background:#E0F2F1;color:#004D40',
@@ -390,7 +399,11 @@ const podeGerenteAprovarSol=s=>{
   if(!isGerente())return false;
   if(isGestor())return true;
   const ua=S.user?.area;
+  // Se usuário tem "Todos" ou sem área → aprova tudo
   if(!ua||ua==='Todos')return true;
+  // Se a solicitação não tem área definida → qualquer Gerente pode aprovar
+  if(!s.area||s.area===''||s.area==='Todos')return true;
+  // Gerente só aprova sua área
   return ua===s.area;
 };
 const pLabel=p=>PERFIS[p]?.label||p;
@@ -531,7 +544,7 @@ async function loadPage(page){
   S.loading=true;render();
   try{
     if(!S.lojas.length)await loadLojas();
-    if(['dashboard','solicitacoes','cotacoes','relatorios'].includes(page))await loadSol();
+    if(['dashboard','solicitacoes','cotacoes','relatorios','aprovacoes'].includes(page))await loadSol();
     if(['fornecedores','cotacoes','dashboard'].includes(page))await loadForn();
     if(page==='cotacoes'){await loadCot();if(!S.sol.length)await loadSol();}
     if(['pedidos','dashboard'].includes(page))await loadPed();
@@ -681,6 +694,22 @@ function buildApp(){
   const pO=S.sol.filter(s=>s.status==='Aguardando Orçamento').length;
   const pAD=S.sol.filter(s=>s.status==='Aguardando Aprovação Diretoria').length;
   const pG=S.sol.filter(s=>s.status==='Aguardando Aprovação Gerente').length;
+  // Badge para aba Aprovações
+  const badgeAprov=(()=>{
+    const mySol=filtrarPorAcesso(S.sol);
+    let n=0;
+    if(isGerente()){
+      n+=mySol.filter(s=>podeGerenteAprovarSol(s)&&s.status==='Aguardando Gerente').length;
+      n+=mySol.filter(s=>podeGerenteAprovarSol(s)&&s.status==='Aguardando Gerente Cotação').length;
+    }
+    if(isDiretoria()){
+      n+=mySol.filter(s=>['Aguardando Evandro','Aguardando Evandro Cotação'].includes(s.status)).length;
+    }
+    if(isComite()){
+      n+=mySol.filter(s=>['Aguardando Aprovação Comite'].includes(s.status)).length;
+    }
+    return n||0;
+  })();
   const tot=(isDiretoria()?pD+pAD:0)+(isGerente()?pG:0)+(isCompras()?pO:0);
 
   const nav=[
@@ -692,6 +721,7 @@ function buildApp(){
       {id:'pedidos',icon:'🚚',label:'Pedidos'},
     ]:[]),
     ...(isGestor()||isCompras()?[{id:'itens',icon:'🏷️',label:'Banco de Itens'}]:[]),
+    ...(isGerente()||isDiretoria()||isComite()?[{id:'aprovacoes',icon:'✅',label:'Aprovações',badge:badgeAprov}]:[]),
     ...(isDiretoria()||isCompras()||isGestor()||isComite()?[{id:'relatorios',icon:'📈',label:'Relatórios'}]:[]),
     ...(isGestor()?[{id:'usuarios',icon:'👥',label:'Usuários'}]:[]),
   ];
@@ -726,7 +756,7 @@ function buildApp(){
 }
 
 function buildPage(){
-  return({dashboard:pgDash,solicitacoes:pgSol,fornecedores:pgForn,cotacoes:pgCot,pedidos:pgPed,relatorios:pgRel,usuarios:pgUsers,itens:pgItens}[S.page]||pgDash)();
+  return({dashboard:pgDash,solicitacoes:pgSol,fornecedores:pgForn,cotacoes:pgCot,pedidos:pgPed,relatorios:pgRel,usuarios:pgUsers,itens:pgItens,aprovacoes:pgAprovacoes}[S.page]||pgDash)();
 }
 
 function buildTimeline(s){
@@ -1170,9 +1200,13 @@ ${!lista.length?`<div class="card" style="text-align:center;padding:48px;color:#
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap">
       <button class="sm bl" onclick="vSOL('${s.id}')">Ver detalhes</button>
       ${isDiretoria()&&s.status==='Aguardando Diretoria'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar</button>`:''}
+      ${(isDiretoria()||isGestor())&&s.status==='Aguardando Evandro'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar Diretoria</button>`:''}
+      ${(isDiretoria()||isGestor())&&s.status==='Aguardando Evandro Cotação'?`<button class="sm ok" onclick="vSOL('${s.id}')">📋 Aprovar Cotação Dir.</button>`:''}
       ${isDiretoria()&&s.status==='Aguardando Aprovação Diretoria'?`<button class="sm ok" onclick="vSOL('${s.id}')">📋 Ver Orçamentos</button>`:''}
+      ${(isComite()||isGestor())&&s.status==='Aguardando Aprovação Comite'?`<button class="sm" style="background:#6A1B9A;color:#fff" onclick="vSOL('${s.id}')">🟣 Escolher Fornecedor</button>`:''}
       ${isGerente()&&s.status==='Aguardando Aprovação Gerente'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar Final</button>`:''}
       ${(isGerente()||isGestor())&&s.status==='Aguardando Gerente'?`<button class="sm" style="background:#3949AB;color:#fff" onclick="vSOL('${s.id}')">👔 Aprovar</button>`:''}
+      ${(isGerente()||isGestor())&&s.status==='Aguardando Gerente Cotação'?`<button class="sm" style="background:#3949AB;color:#fff" onclick="vSOL('${s.id}')">👔 Aprovar Cot.</button>`:''}
       ${isCompras()&&s.status==='Aprovada'?`<button class="sm or" onclick="vSOL('${s.id}')">🛒 Gerar Ordem de Compra</button>`:''}
       ${isCompras()&&s.status==='Comprada'?`<button class="sm ok" onclick="mdEntSol('${s.id}')">📦 Confirmar Entrega</button>`:''}
       ${s.status==='Aguardando Ajuste'?`<button class="sm" style="background:#FF6F00;color:#fff" onclick="vSOL('${s.id}')">⚠️ Ajuste Solicitado</button>`:''}
@@ -3337,6 +3371,168 @@ async function toggleItem(id,status){
 async function excluirItem(id){
   await sb.from('itens').delete().eq('id',id);
   closeModal();await loadItens();render();
+}
+
+// ── PÁGINA APROVAÇÕES ─────────────────────────────────────────────────────
+function pgAprovacoes(){
+  const mySol=filtrarPorAcesso(S.sol);
+
+  // Pendentes para o usuário logado
+  const pendentes=mySol.filter(s=>{
+    if(isGestor())return ['Aguardando Gerente','Aguardando Evandro','Aguardando Aprovação Comite','Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aguardando Diretoria'].includes(s.status);
+    if(isGerente()&&podeGerenteAprovarSol(s))return ['Aguardando Gerente','Aguardando Gerente Cotação'].includes(s.status);
+    if(isDiretoria())return ['Aguardando Evandro','Aguardando Evandro Cotação'].includes(s.status);
+    if(isComite())return ['Aguardando Aprovação Comite'].includes(s.status);
+    return false;
+  });
+
+  const aprovadas=mySol.filter(s=>['Aprovada','Comprada','Entregue'].includes(s.status)).slice(0,5);
+
+  const prioColor={'Alta':'#C62828','Media':'#E65100','Média':'#E65100','Baixa':'#2E7D32'};
+
+  return `<div>
+  <!-- HEADER -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <div style="font-size:18px;font-weight:700;color:#0F2236">Minhas Aprovações</div>
+      <div style="font-size:12px;color:#9E9E9E;margin-top:2px">${pendentes.length} pendente(s) aguardando sua ação</div>
+    </div>
+    <button class="btn bp" onclick="goTo('solicitacoes')" style="padding:8px 16px;font-size:12px">Ver Todas Solicitações</button>
+  </div>
+
+  ${!pendentes.length?`
+  <div class="card" style="text-align:center;padding:48px;color:#9E9E9E">
+    <div style="font-size:48px;margin-bottom:12px">✅</div>
+    <div style="font-size:16px;font-weight:600;margin-bottom:8px">Tudo em dia!</div>
+    <div style="font-size:13px">Nenhuma aprovação pendente no momento.</div>
+  </div>`:
+  `<div style="display:grid;gap:12px">
+    ${pendentes.map(s=>{
+      const isCot=['Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Comite'].includes(s.status);
+      const etapa=isCot?'Cotação':'Solicitação';
+      const acaoLabel=s.status==='Aguardando Aprovação Comite'?'Escolher Fornecedor':'Aprovar';
+      const cot=isCot?S.cot.find(c=>c.solicitacao_id===s.id):null;
+      const totalItens=(s.itens&&typeof s.itens==='string'?JSON.parse(s.itens):s.itens||[]).length;
+      return `
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+        <!-- Header do card -->
+        <div style="background:#0F2236;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="background:rgba(255,255,255,.15);color:#fff;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600">${s.numero}</span>
+            <span style="background:${isCot?'#FFF3E0':'#E3F2FD'};color:${isCot?'#E65100':'#1565C0'};padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600">
+              ${isCot?'📋 Aprovação Cotação':'📝 Aprovação Solicitação'}
+            </span>
+          </div>
+          <span style="background:${prioColor[s.urgencia]||'#555'};color:#fff;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600">${s.urgencia||'Normal'}</span>
+        </div>
+
+        <!-- Corpo -->
+        <div style="padding:14px 16px">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#0F2236;margin-bottom:6px">${s.descricao||s.itens_resumo||'Sem descrição'}</div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#555">
+                <span>🏢 ${s.loja_nome||'—'}</span>
+                <span>👤 ${s.solicitante_nome||'—'}</span>
+                <span>📂 ${s.categoria||s.tipo||'—'}</span>
+                <span>🗓️ ${new Date(s.data_criacao).toLocaleDateString('pt-BR')}</span>
+                ${s.area?`<span>🏷️ ${s.area}</span>`:''}
+              </div>
+              ${s.valor_estimado?`<div style="font-size:15px;font-weight:700;color:#1565C0;margin-top:8px">R$ ${parseFloat(s.valor_estimado).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>`:''}
+              ${s.justificativa?`<div style="font-size:12px;color:#9E9E9E;margin-top:6px;font-style:italic">"${(s.justificativa||'').substring(0,100)}${(s.justificativa||'').length>100?'...':''}"</div>`:''}
+            </div>
+
+            <!-- Fluxo de aprovação lateral -->
+            <div style="min-width:180px;background:#F8F9FA;border-radius:8px;padding:10px 12px">
+              <div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:8px;letter-spacing:.5px">FLUXO DE APROVAÇÃO</div>
+              ${buildFlowSidebar(s,isCot)}
+            </div>
+          </div>
+
+          <!-- Botões de ação -->
+          <div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid #F0F2F5;flex-wrap:wrap">
+            <button class="btn bl" onclick="vSOL('${s.id}')" style="padding:8px 16px;font-size:12px">🔍 Ver Detalhes</button>
+            ${s.status==='Aguardando Aprovação Comite'?`
+              <button class="btn" style="background:#6A1B9A;color:#fff;padding:8px 16px;font-size:12px" onclick="vSOL('${s.id}')">🟣 Escolher Fornecedor</button>
+            `:`
+              <button class="btn bs" onclick="if(confirm('Confirmar aprovação de ${s.numero}?')){hSt('${s.id}',getProxStatus('${s.numero}','${s.status}','${s.grupo}','${s.area||''}'))}" style="padding:8px 20px;font-size:12px">✅ Aprovar</button>
+              <button class="btn bd" onclick="if(confirm('Reprovar ${s.numero}?')){hSt('${s.id}','Reprovada')}" style="padding:8px 16px;font-size:12px">❌ Reprovar</button>
+            `}
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`}
+
+  <!-- APROVADAS RECENTEMENTE -->
+  ${aprovadas.length?`
+  <div style="margin-top:24px">
+    <div style="font-size:13px;font-weight:700;color:#9E9E9E;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Aprovadas Recentemente</div>
+    <div style="display:grid;gap:8px">
+      ${aprovadas.map(s=>`
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="vSOL('${s.id}')">
+        <div>
+          <span style="font-family:monospace;font-size:12px;color:#1565C0;font-weight:600">${s.numero}</span>
+          <span style="font-size:12px;color:#555;margin-left:10px">${s.descricao||s.itens_resumo||'—'}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;color:#9E9E9E">${s.loja_nome||'—'}</span>
+          ${chipSt(s.status)}
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>`:''}
+  </div>`;
+}
+
+// Helper: build approval flow sidebar
+function buildFlowSidebar(s,isCot){
+  const ORDER_S=['Aguardando Gerente','Aguardando Evandro','Aguardando Diretoria','Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Comite','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue'];
+  const steps=s.grupo==='BMMOT'?[
+    {lbl:'Gerente Área',st:'Aguardando Gerente'},
+    {lbl:'Diretoria',st:'Aguardando Evandro'},
+    {lbl:'Compras',st:'Aguardando Orçamento'},
+    ...(isCot?[
+      {lbl:'Gerente Cot.',st:'Aguardando Gerente Cotação'},
+      {lbl:'Diretoria Cot.',st:'Aguardando Evandro Cotação'},
+      {lbl:'Comitê Escolhe',st:'Aguardando Aprovação Comite'},
+    ]:[]),
+    {lbl:'Aprovada',st:'Aprovada'}
+  ]:[
+    {lbl:'Diretoria',st:'Aguardando Diretoria'},
+    {lbl:'Compras',st:'Aguardando Orçamento'},
+    {lbl:'Dir. Aprovação',st:'Aguardando Aprovação Diretoria'},
+    {lbl:'Gerente',st:'Aguardando Aprovação Gerente'},
+    {lbl:'Aprovada',st:'Aprovada'}
+  ];
+  const curIdx=ORDER_S.indexOf(s.status);
+  return steps.map((step,i)=>{
+    const etpIdx=ORDER_S.indexOf(step.st);
+    const done=curIdx>etpIdx;
+    const current=s.status===step.st;
+    const bg=done?'#2E7D32':current?'#1565C0':'#E0E0E0';
+    const fg=done||current?'#fff':'#9E9E9E';
+    const tc=current?'#1565C0':done?'#2E7D32':'#9E9E9E';
+    const fw=current?700:400;
+    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+      +'<div style="width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;background:'+bg+';color:'+fg+'">'+(done?'✓':i+1)+'</div>'
+      +'<span style="font-size:11px;color:'+tc+';font-weight:'+fw+'">'+step.lbl+(current?' ◀':'')+'</span>'
+      +'</div>';
+  }).join('');
+}
+
+// Helper: retorna próximo status baseado no atual
+function getProxStatus(numero, status, grupo, area){
+  const map={
+    'Aguardando Gerente': grupo==='BMMOT'?'Aguardando Evandro':'Aguardando Diretoria',
+    'Aguardando Evandro': 'Aguardando Orçamento',
+    'Aguardando Diretoria': 'Aguardando Orçamento',
+    'Aguardando Gerente Cotação': 'Aguardando Evandro Cotação',
+    'Aguardando Evandro Cotação': 'Aguardando Aprovação Comite',
+    'Aguardando Aprovação Diretoria': grupo==='BMMOT'?'Aprovada':'Aguardando Aprovação Gerente',
+    'Aguardando Aprovação Gerente': 'Aprovada',
+  };
+  return map[status]||status;
 }
 
 let fornFiltro={q:'',grupo:'',status:''};
