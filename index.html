@@ -3445,6 +3445,20 @@ function pgAprovacoes(){
       +'<span>📅 '+new Date(s.data_criacao).toLocaleDateString('pt-BR')+'</span>'
       +'</div>'
       +(s.valor_estimado?'<div style="font-size:16px;font-weight:700;color:#1565C0">R$ '+parseFloat(s.valor_estimado).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>':'')
+      +(()=>{
+        try{
+          const itens=typeof s.itens==='string'?JSON.parse(s.itens):s.itens||[];
+          if(!itens.length)return '';
+          return '<div style="margin-top:8px;background:#F8F9FA;border-radius:6px;padding:8px 10px">'
+            +'<div style="font-size:10px;color:#9E9E9E;font-weight:700;margin-bottom:4px">ITENS</div>'
+            +itens.slice(0,3).map(i=>'<div style="font-size:12px;color:#333;padding:2px 0;display:flex;justify-content:space-between">'
+              +'<span>'+i.qtd+'x '+i.desc+'</span>'
+              +(i.val?'<span style="color:#1565C0;font-weight:600">R$ '+parseFloat(i.qtd*i.val).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>':'')
+              +'</div>').join('')
+            +(itens.length>3?'<div style="font-size:11px;color:#9E9E9E">...+'+(itens.length-3)+' item(s)</div>':'')
+            +'</div>';
+        }catch(e){return '';}
+      })()
       // Status chip
       +'<div style="margin-top:8px">'
       +'<span style="background:#FFF3E0;color:#E65100;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">⏳ '+stLabel+'</span>'
@@ -3484,12 +3498,8 @@ function pgAprovacoes(){
     +'</div>';
 }
 
-function confirmarAprovacao(id,numero,proxSt){
-  if(confirm('Confirmar aprovação de '+numero+'?')){hSt(id,proxSt);}
-}
-function confirmarReprovacao(id,numero){
-  if(confirm('Reprovar '+numero+'? Esta ação não pode ser desfeita.')){hSt(id,'Reprovada');}
-}
+function confirmarAprovacao(id,numero,proxSt){hSt(id,proxSt);}
+function confirmarReprovacao(id,numero){hSt(id,'Reprovada');}
 
 // Event delegation for approval buttons
 document.addEventListener('click',function(e){
