@@ -3565,7 +3565,7 @@ function pgAprovacoes(){
 
       // Items table
       +(()=>{
-      // Parse itens vindos do Supabase - tenta todos os formatos
+      // ── TABELA UNIFICADA: Itens + Cotações por Fornecedor ──────────────────
       let parsedItens=[];
       try{
         const raw=s.itens_requisicao;
@@ -3574,116 +3574,134 @@ function pgAprovacoes(){
         else if(raw&&typeof raw==='object') parsedItens=[raw];
       }catch(e){}
       parsedItens=parsedItens.map(it=>({
-        desc: it.desc||it.descricao||it.description||it.nome||'Item',
-        qtd:  parseFloat(it.qtd||it.quantidade||it.qty||1),
-        val:  parseFloat(it.val||it.valor||it.valor_unitario||it.preco||it.price||0),
-        und:  it.und||it.unidade||it.unit||'UN',
+        desc:it.desc||it.descricao||it.description||it.nome||'Item',
+        qtd: parseFloat(it.qtd||it.quantidade||1),
+        val: parseFloat(it.val||it.valor||it.valor_unitario||0),
+        und: it.und||it.unidade||'UN',
       }));
 
-      if(!parsedItens.length) return '';
-
-      const totalGeral=parsedItens.reduce((a,it)=>a+it.qtd*it.val,0);
-
-      let html='<div style="margin-bottom:16px">'
-        +'<div style="background:#0F2236;padding:10px 16px;border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:center">'
-        +'<span style="color:#fff;font-size:13px;font-weight:700">📦 Itens da Solicitação</span>'
-        +'<span style="background:rgba(255,255,255,.2);color:#fff;padding:2px 10px;border-radius:20px;font-size:12px">'+parsedItens.length+' item(s)</span>'
-        +'</div>'
-        +'<div style="border:1px solid #0F2236;border-top:none;border-radius:0 0 8px 8px;overflow:hidden">'
-        +'<table style="width:100%;border-collapse:collapse">'
-        +'<thead><tr style="background:#F0F4FF">'
-        +'<th style="padding:10px 12px;text-align:left;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236">DESCRIÇÃO DO ITEM</th>'
-        +'<th style="padding:10px 12px;text-align:center;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236;width:80px">QTD.</th>'
-        +'<th style="padding:10px 12px;text-align:right;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236;width:120px">V. UNITÁRIO</th>'
-        +'<th style="padding:10px 12px;text-align:right;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236;width:120px">V. TOTAL</th>'
-        +'</tr></thead>'
-        +'<tbody>';
-
-      parsedItens.forEach((it,ii)=>{
-        const tot=it.qtd*it.val;
-        html+='<tr style="border-bottom:1px solid #E8ECF0;background:'+(ii%2===0?'#fff':'#F8FAFF')+'">'
-          +'<td style="padding:12px 14px">'
-          +'<div style="font-size:14px;font-weight:600;color:#0F2236">'+it.desc+'</div>'
-          +(it.und&&it.und!=='UN'?'<div style="font-size:11px;color:#9E9E9E;margin-top:2px">Unidade: '+it.und+'</div>':'')
-          +'</td>'
-          +'<td style="padding:12px 14px;text-align:center;font-size:15px;font-weight:700;color:#333">'+it.qtd+'</td>'
-          +'<td style="padding:12px 14px;text-align:right;font-size:14px;color:#555">'+(it.val?'R$ '+it.val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
-          +'<td style="padding:12px 14px;text-align:right;font-size:14px;font-weight:700;color:#1565C0">'+(tot?'R$ '+tot.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
-          +'</tr>';
-      });
-
-      html+='</tbody>'
-        +'<tfoot><tr style="background:#EFF6FF;border-top:2px solid #1565C0">'
-        +'<td colspan="3" style="padding:12px 14px;font-size:14px;font-weight:700;color:#1565C0;text-align:right">TOTAL GERAL DA SOLICITAÇÃO</td>'
-        +'<td style="padding:12px 14px;text-align:right;font-size:18px;font-weight:700;color:#1565C0">R$ '+totalGeral.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>'
-        +'</tr></tfoot>'
-        +'</table></div></div>';
-      return html;
-    })()
-      +'</div>'
-      +'</div>'
-
-      +(()=>{
-        // Mostra cotações quando status for de aprovação de cotação
-        const statusCot=['Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Comite'];
-        if(!statusCot.includes(s.status)) return '';
-        const cot=S.cot.find(c=>c.solicitacao_id===s.id);
-        if(!cot) return '<div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;color:#E65100">⚠️ Cotação não encontrada. Verifique na aba Cotações.</div>';
-        let cotItens=[];
+      // Cotações dos fornecedores (se existir)
+      const statusCot=['Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Comite'];
+      const temCot=statusCot.includes(s.status);
+      const cot=S.cot.find(c=>c.solicitacao_id===s.id);
+      let fornEntries=[];
+      if(temCot&&cot){
         try{
           const raw=cot.itens;
-          if(Array.isArray(raw)) cotItens=raw;
-          else if(typeof raw==='string') cotItens=JSON.parse(raw||'[]');
+          const arr=Array.isArray(raw)?raw:(typeof raw==='string'?JSON.parse(raw||'[]'):[]);
+          fornEntries=arr.filter(f=>f.forn||f.fornecedor).map(f=>({
+            forn:f.forn||f.fornecedor,
+            cnpj:f.cnpj||'',
+            pgto:f.pgto||'',
+            obs:f.obs||'',
+            total:parseFloat(f.val||f.valor||0),
+            itens:(f.itens||[]).map(it=>({
+              desc:it.desc||it.descricao||'—',
+              qtd:parseFloat(it.qtd||1),
+              vunit:parseFloat(it.vunit||it.val||it.valor_unitario||0),
+              total:parseFloat(it.total||0),
+            }))
+          }));
         }catch(e){}
-        // Agrupa por fornecedor
-        const fornMap={};
-        cotItens.forEach(it=>{
-          const f=it.forn||it.fornecedor||'Sem fornecedor';
-          if(!fornMap[f]) fornMap[f]={forn:f,itens:[],total:0};
-          const val=parseFloat(it.val||it.valor||0);
-          const qtd=parseFloat(it.qtd||it.quantidade||1);
-          fornMap[f].itens.push({desc:it.desc||it.descricao||'—',qtd,val,total:qtd*val,und:it.und||'UN'});
-          fornMap[f].total+=qtd*val;
+      }
+
+      if(!parsedItens.length&&!fornEntries.length) return '';
+
+      const totalOrig=parsedItens.reduce((a,it)=>a+it.qtd*it.val,0);
+      const melhor=fornEntries.length?fornEntries.reduce((a,b)=>a.total<b.total?a:b,fornEntries[0]):null;
+
+      // ── Cabeçalho da tabela ──────────────────────────────────────────────
+      let html='<div style="border:1px solid #0F2236;border-radius:10px;overflow:hidden;margin-bottom:16px">'
+        +'<div style="background:#0F2236;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="color:#fff;font-size:13px;font-weight:700">📦 Itens da Solicitação'
+        +(fornEntries.length?' + Orçamentos':'')+'</span>'
+        +'<span style="background:rgba(255,255,255,.2);color:#fff;padding:2px 10px;border-radius:20px;font-size:12px">'+parsedItens.length+' item(s)</span>'
+        +'</div>'
+        +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:'+(fornEntries.length?'600':'400')+'px">'
+        +'<thead><tr style="background:#F0F4FF">'
+        +'<th style="padding:10px 12px;text-align:left;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236">DESCRIÇÃO</th>'
+        +'<th style="padding:10px 12px;text-align:center;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236;width:55px">QTD</th>';
+
+      // Colunas dos fornecedores
+      if(fornEntries.length){
+        fornEntries.forEach(f=>{
+          const isBest=f===melhor;
+          html+='<th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;border-bottom:2px solid '+(isBest?'#2E7D32':'#0F2236')+';color:'+(isBest?'#2E7D32':'#0F2236')+';min-width:120px">'
+            +(isBest?'⭐ ':'')
+            +f.forn.split(' ').slice(0,3).join(' ')
+            +(isBest?'<br><span style="font-size:9px;background:#2E7D32;color:#fff;padding:1px 5px;border-radius:10px">Menor Preço</span>':'')
+            +'</th>';
         });
-        const forns=Object.values(fornMap);
-        if(!forns.length) return '<div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;color:#E65100">⚠️ Cotação sem itens cadastrados.</div>';
-        const melhor=forns.reduce((a,b)=>a.total<b.total?a:b,forns[0]);
-        let html='<div style="margin-bottom:16px;border:2px solid #1565C0;border-radius:10px;overflow:hidden">'
-          +'<div style="background:#1565C0;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">'
-          +'<span style="color:#fff;font-size:13px;font-weight:700">📋 Orçamentos Recebidos</span>'
-          +'<span style="background:rgba(255,255,255,.2);color:#fff;padding:2px 10px;border-radius:20px;font-size:12px">'+forns.length+' fornecedor(es)</span>'
-          +'</div>';
-        forns.forEach((f,fi)=>{
-          const isBest=f===melhor&&forns.length>1;
-          html+='<div style="padding:12px 16px;border-bottom:1px solid #E0E0E0;background:'+(isBest?'#F0FFF4':'#fff')+'">'
-            +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
-            +'<span style="font-size:14px;font-weight:700;color:#0F2236">🏢 '+f.forn+'</span>'
-            +(isBest?'<span style="background:#2E7D32;color:#fff;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600">⭐ Menor preço</span>':'')
-            +'</div>'
-            +'<table style="width:100%;border-collapse:collapse;margin-bottom:8px">'
-            +'<thead><tr style="background:#F8F9FA"><th style="padding:6px 10px;text-align:left;font-size:10px;color:#9E9E9E">ITEM</th>'
-            +'<th style="padding:6px 10px;text-align:center;font-size:10px;color:#9E9E9E;width:55px">QTD</th>'
-            +'<th style="padding:6px 10px;text-align:right;font-size:10px;color:#9E9E9E;width:100px">V.UNIT.</th>'
-            +'<th style="padding:6px 10px;text-align:right;font-size:10px;color:#9E9E9E;width:100px">TOTAL</th></tr></thead><tbody>'
-            +f.itens.map(it=>'<tr style="border-top:1px solid #F0F2F5">'
-              +'<td style="padding:6px 10px;font-size:12px">'+it.desc+'</td>'
-              +'<td style="padding:6px 10px;text-align:center;font-size:12px">'+it.qtd+'</td>'
-              +'<td style="padding:6px 10px;text-align:right;font-size:12px;color:#555">R$ '+it.val.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>'
-              +'<td style="padding:6px 10px;text-align:right;font-size:13px;font-weight:600;color:#1565C0">R$ '+it.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>'
-              +'</tr>').join('')
-            +'</tbody><tfoot><tr style="background:#EFF6FF;border-top:2px solid #1565C0">'
-            +'<td colspan="3" style="padding:8px 10px;font-size:12px;font-weight:700;color:#1565C0;text-align:right">TOTAL '+f.forn.toUpperCase()+'</td>'
-            +'<td style="padding:8px 10px;text-align:right;font-size:15px;font-weight:700;color:#1565C0">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>'
-            +'</tr></tfoot></table>'
-            // Botão escolher fornecedor (só para Comitê)
-            +(s.status==='Aguardando Aprovação Comite'?
-              '<button class="btn bs" style="width:100%;margin-top:4px" onclick="hEscolherForn(\''+cot.id+'\',\''+s.id+'\',\''+f.forn.replace(/'/g,"\\'")+'\',' +f.total+')">✅ Escolher este Fornecedor</button>'
-              :'')
-            +'</div>';
+      } else {
+        html+='<th style="padding:10px 12px;text-align:right;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236;width:100px">V.UNIT.</th>'
+          +'<th style="padding:10px 12px;text-align:right;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236;width:100px">TOTAL</th>';
+      }
+      html+='</tr></thead><tbody>';
+
+      // ── Linhas de itens ──────────────────────────────────────────────────
+      parsedItens.forEach((it,ii)=>{
+        const rowBg=ii%2===0?'#fff':'#FAFAFA';
+        html+='<tr style="border-top:1px solid #F0F2F5;background:'+rowBg+'">'
+          +'<td style="padding:10px 12px"><div style="font-size:13px;font-weight:600;color:#0F2236">'+it.desc+'</div>'
+          +(it.und&&it.und!=='UN'?'<div style="font-size:10px;color:#9E9E9E">'+it.und+'</div>':'')
+          +'</td>'
+          +'<td style="padding:10px 12px;text-align:center;font-size:14px;font-weight:700;color:#333">'+it.qtd+'</td>';
+
+        if(fornEntries.length){
+          // Preço de cada fornecedor para este item
+          fornEntries.forEach(f=>{
+            const isBest=f===melhor;
+            const cotItem=f.itens[ii];
+            const cotVal=cotItem?cotItem.vunit:0;
+            const cotTotal=cotItem?cotItem.total:(cotVal*it.qtd);
+            html+='<td style="padding:10px 12px;text-align:right;background:'+(isBest?'rgba(46,125,50,.05)':'inherit')+'">'
+              +(cotVal?'<div style="font-size:12px;color:#777">R$ '+cotVal.toLocaleString('pt-BR',{minimumFractionDigits:2})+'/un</div>':'')
+              +'<div style="font-size:14px;font-weight:700;color:'+(isBest?'#2E7D32':'#1565C0')+'">'
+              +(cotTotal?'R$ '+cotTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</div>'
+              +'</td>';
+          });
+        } else {
+          const tot=it.qtd*it.val;
+          html+='<td style="padding:10px 12px;text-align:right;font-size:13px;color:#555">'
+            +(it.val?'R$ '+it.val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
+            +'<td style="padding:10px 12px;text-align:right;font-size:14px;font-weight:700;color:#1565C0">'
+            +(tot?'R$ '+tot.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>';
+        }
+        html+='</tr>';
+      });
+
+      // ── Linha de totais ──────────────────────────────────────────────────
+      html+='</tbody><tfoot><tr style="background:#EFF6FF;border-top:2px solid #0F2236">'
+        +'<td colspan="2" style="padding:10px 12px;font-size:13px;font-weight:700;color:#0F2236">TOTAL GERAL</td>';
+      if(fornEntries.length){
+        fornEntries.forEach(f=>{
+          const isBest=f===melhor;
+          html+='<td style="padding:10px 12px;text-align:right;background:'+(isBest?'#E8F5E9':'#EFF6FF')+'">'
+            +'<div style="font-size:16px;font-weight:700;color:'+(isBest?'#2E7D32':'#1565C0')+'">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+(isBest?' ✓':'')+'</div>'
+            +(f.pgto?'<div style="font-size:10px;color:#9E9E9E">'+f.pgto+'</div>':'')
+            +'</td>';
+        });
+      } else {
+        html+='<td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:700;color:#1565C0" colspan="1">—</td>'
+          +'<td style="padding:10px 12px;text-align:right;font-size:16px;font-weight:700;color:#1565C0">R$ '+totalOrig.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>';
+      }
+      html+='</tr></tfoot></table></div>';
+
+      // Botões escolher fornecedor (Comitê)
+      if(s.status==='Aguardando Aprovação Comite'&&fornEntries.length&&cot){
+        html+='<div style="display:grid;grid-template-columns:repeat('+fornEntries.length+',1fr);gap:10px;margin-top:10px">';
+        fornEntries.forEach(f=>{
+          const isBest=f===melhor;
+          html+='<button class="btn '+(isBest?'bs':'bl')+' escolher-forn-btn" data-cotid="'+cot.id+'" data-solid="'+s.id+'" data-forn="'+f.forn.replace(/"/g,'&quot;')+'" data-val="'+f.total+'" style="padding:10px;font-weight:700;border-radius:8px">'
+            +(isBest?'⭐ ':'✓ ')+'Escolher '+f.forn.split(' ')[0]+'<br><span style="font-size:11px">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>'
+            +'</button>';
         });
         html+='</div>';
-        return html;
-      })()
+      }
+      html+='</div>';
+      return html;
+    })()
+
 
       // ── FOOTER BUTTONS ──
       +'<div style="padding:14px 18px;background:#fff;border-top:2px solid #E0E0E0;display:flex;gap:10px;flex-wrap:wrap">'
