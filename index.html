@@ -770,60 +770,42 @@ function buildTimeline(s){
   const status=typeof s==='string'?s:(s?.status||'');
   const obj=typeof s==='object'&&s!==null?s:null;
   const sid=obj?.id||'';
-  const ORDER=[
-    'Aguardando Diretoria',
-    'Aguardando Orçamento',
-    'Aguardando Aprovação Diretoria',
-    'Aguardando Aprovação Gerente',
-    'Aprovada',
-    'Comprada',
-    'Entregue'
+  // Pipeline differs by grupo
+  const responsavelAtual=(()=>{const m={'Aguardando Gerente':'Gerente de Área',
+    'Aguardando Evandro':'Diretoria (BMMOT)','Aguardando Comite':'Comitê',
+    'Aguardando Diretoria':'Diretoria','Aguardando Orçamento':'Compras — Cotação',
+    'Aguardando Gerente Cotação':'Gerente (Cotação)','Aguardando Evandro Cotação':'Diretoria (Cotação)',
+    'Aguardando Aprovação Comite':'Comitê — Escolha Fornecedor',
+    'Aguardando Aprovação Diretoria':'Diretoria — Escolha Fornecedor',
+    'Aguardando Aprovação Gerente':'Gerente — Aprovação Final',
+    'Aprovada':'✅ Aprovada','Comprada':'🛒 Comprada','Entregue':'📦 Entregue','Reprovada':'❌ Reprovada'};
+    return m[status]||status;})();
+  const grupo=obj?.grupo||'DHG';
+  const ORDER_BMMOT=['Aguardando Gerente','Aguardando Evandro','Aguardando Comite',
+    'Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação',
+    'Aguardando Aprovação Comite','Aprovada','Comprada','Entregue'];
+  const ORDER_DHG=['Aguardando Diretoria','Aguardando Orçamento',
+    'Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue'];
+  const ORDER=grupo==='BMMOT'?ORDER_BMMOT:ORDER_DHG;
+  const steps_bmmot=[
+    {key:'Aguardando Gerente',lbl:'Gerente',icon:'👔',sub:obj?.aprovado_ger_nome?fmtD(obj.aprovado_ger_data)+'<br>'+obj.aprovado_ger_nome.split(' ')[0]:''},
+    {key:'Aguardando Evandro',lbl:'Diretoria',icon:'🏛️',sub:obj?.aprovado_dir_nome&&ORDER_BMMOT.indexOf(status)>1?fmtD(obj.aprovado_dir_data)+'<br>'+obj.aprovado_dir_nome.split(' ')[0]:''},
+    {key:'Aguardando Comite',lbl:'Comitê',icon:'🟣',sub:''},
+    {key:'Aguardando Orçamento',lbl:'Compras Cot.',icon:'📋',sub:obj?.cotacao_por?fmtD(obj.cotacao_data)+'<br>'+obj.cotacao_por.split(' ')[0]:''},
+    {key:'Aguardando Aprovação Comite',lbl:'Comitê Escolhe',icon:'🏢',sub:''},
+    {key:'Aprovada',lbl:'Aprovada',icon:'✅',sub:''},
+    {key:'Comprada',lbl:'Comprada',icon:'🛒',sub:obj?.comprado_por?fmtD(obj.comprado_em)+'<br>'+obj.comprado_por.split(' ')[0]:''},
+    {key:'Entregue',lbl:'Entregue',icon:'📦',sub:obj?.entregue_por?fmtD(obj.entregue_em)+'<br>'+obj.entregue_por.split(' ')[0]:''},
   ];
-  const steps=[
-    {
-      key:'Aguardando Diretoria',
-      label:'Solicitação Aberta',
-      icon:'📝',
-      sub:obj?`${fmtD(obj.data_criacao)}<br>${(obj.solicitante_nome||'').split(' ')[0]}`:'' ,
-      action:sid?`<button onclick="mdVerSol('${sid}')" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;margin-top:3px" title="Ver solicitação">🔍</button>`:''
-    },
-    {
-      key:'Aguardando Orçamento',
-      label:'Aprovação Diretoria',
-      icon:'👔',
-      sub:obj&&obj.aprovado_dir_nome?`${fmtD(obj.aprovado_dir_data)}<br>${obj.aprovado_dir_nome.split(' ')[0]}`:'',
-      action:''
-    },
-    {
-      key:'Aguardando Aprovação Diretoria',
-      label:'Cotação Compras',
-      icon:'📋',
-      sub:obj&&obj.cotacao_por?`${fmtD(obj.cotacao_data)}<br>${obj.cotacao_por.split(' ')[0]}`:'',
-      action:sid?`<button onclick="mdVerCot('${sid}')" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;margin-top:3px" title="Ver orçamentos">🔍</button>`:''
-    },
-    {
-      key:'Aguardando Aprovação Gerente',
-      label:'Aprovação Final',
-      icon:'✅',
-      sub:obj&&obj.aprovado_ger_nome?`${fmtD(obj.aprovado_ger_data)}<br>Dir: ${(obj.aprovado_dir_nome||'').split(' ')[0]}<br>Ger: ${obj.aprovado_ger_nome.split(' ')[0]}`:'',
-      action:''
-    },
-    {
-      key:'Comprada',
-      label:'Compra Realizada',
-      icon:'🛒',
-      sub:obj&&obj.comprado_por?`${fmtD(obj.comprado_em)}<br>${obj.comprado_por.split(' ')[0]}`:'',
-      action:sid?`<button onclick="mdVerCompra('${sid}')" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;margin-top:3px" title="Ver relatório da compra">📊</button>`:''
-    },
-    {
-      key:'Entregue',
-      label:'Entregue',
-      icon:'📦',
-      sub:obj&&obj.entregue_por?`${fmtD(obj.entregue_em)}<br>${obj.entregue_por.split(' ')[0]}`:'',
-      action:sid?`<button onclick="mdVerEntrega('${sid}')" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;margin-top:3px" title="Ver dados da entrega">🔍</button>`:''
-    },
+  const steps_dhg=[
+    {key:'Aguardando Diretoria',lbl:'Diretoria',icon:'🏛️',sub:obj?.aprovado_dir_nome?fmtD(obj.aprovado_dir_data)+'<br>'+obj.aprovado_dir_nome.split(' ')[0]:''},
+    {key:'Aguardando Orçamento',lbl:'Compras Cot.',icon:'📋',sub:obj?.cotacao_por?fmtD(obj.cotacao_data)+'<br>'+obj.cotacao_por.split(' ')[0]:''},
+    {key:'Aguardando Aprovação Gerente',lbl:'Gerente',icon:'👔',sub:obj?.aprovado_ger_nome?fmtD(obj.aprovado_ger_data)+'<br>'+obj.aprovado_ger_nome.split(' ')[0]:''},
+    {key:'Aprovada',lbl:'Aprovada',icon:'✅',sub:''},
+    {key:'Comprada',lbl:'Comprada',icon:'🛒',sub:obj?.comprado_por?fmtD(obj.comprado_em)+'<br>'+obj.comprado_por.split(' ')[0]:''},
+    {key:'Entregue',lbl:'Entregue',icon:'📦',sub:obj?.entregue_por?fmtD(obj.entregue_em)+'<br>'+obj.entregue_por.split(' ')[0]:''},
   ];
-
+  const steps=grupo==='BMMOT'?steps_bmmot:steps_dhg;
   const isReprovada=status==='Reprovada';
   const curIdx=ORDER.indexOf(status);
 
@@ -1204,19 +1186,16 @@ ${!lista.length?`<div class="card" style="text-align:center;padding:48px;color:#
     ${s.status==='Reprovada'?`<div style="background:#FFEBEE;border-left:3px solid #C62828;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#B71C1C;margin-top:4px">❌ <strong>Reprovada.</strong>${s.observacoes?' Motivo: '+s.observacoes:''}</div>`:''}
     ${s.status==='Entregue'?`<div style="background:#E8F5E9;border-left:3px solid #2E7D32;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#1B5E20;margin-top:4px">✅ <strong>Entregue!</strong> Valor final: ${fmt(s.valor_final)}</div>`:''}
     ${s.fornecedor&&['Aprovada','Comprada','Entregue'].includes(s.status)?`<div style="background:#E3F2FD;border-left:3px solid #1565C0;border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:#0D47A1;margin-top:4px">🏢 <strong>Fornecedor escolhido:</strong> ${s.fornecedor} · ${fmt(s.valor_final)}</div>`:''}
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap">
-      <button class="sm bl" onclick="vSOL('${s.id}')">Ver detalhes</button>
-      ${isDiretoria()&&s.status==='Aguardando Diretoria'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar</button>`:''}
-      ${(isDiretoria()||isGestor())&&s.status==='Aguardando Evandro'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar Diretoria</button>`:''}
-      ${(isDiretoria()||isGestor())&&s.status==='Aguardando Evandro Cotação'?`<button class="sm ok" onclick="vSOL('${s.id}')">📋 Aprovar Cotação Dir.</button>`:''}
-      ${isDiretoria()&&s.status==='Aguardando Aprovação Diretoria'?`<button class="sm ok" onclick="vSOL('${s.id}')">📋 Ver Orçamentos</button>`:''}
-      ${(isComite()||isGestor())&&s.status==='Aguardando Aprovação Comite'?`<button class="sm" style="background:#6A1B9A;color:#fff" onclick="vSOL('${s.id}')">🟣 Escolher Fornecedor</button>`:''}
-      ${isGerente()&&s.status==='Aguardando Aprovação Gerente'?`<button class="sm ok" onclick="vSOL('${s.id}')">✓ Aprovar Final</button>`:''}
-      ${(isGerente()||isGestor())&&s.status==='Aguardando Gerente'?`<button class="sm" style="background:#3949AB;color:#fff" onclick="vSOL('${s.id}')">👔 Aprovar</button>`:''}
-      ${(isGerente()||isGestor())&&s.status==='Aguardando Gerente Cotação'?`<button class="sm" style="background:#3949AB;color:#fff" onclick="vSOL('${s.id}')">👔 Aprovar Cot.</button>`:''}
-      ${isCompras()&&s.status==='Aprovada'?`<button class="sm or" onclick="vSOL('${s.id}')">🛒 Gerar Ordem de Compra</button>`:''}
-      ${isCompras()&&s.status==='Comprada'?`<button class="sm ok" onclick="mdEntSol('${s.id}')">📦 Confirmar Entrega</button>`:''}
-      ${s.status==='Aguardando Ajuste'?`<button class="sm" style="background:#FF6F00;color:#fff" onclick="vSOL('${s.id}')">⚠️ Ajuste Solicitado</button>`:''}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        ${s.status==='Aguardando Ajuste'?`<span style="background:#FF6F00;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">⚠️ Ajuste Solicitado</span>`:''}
+        ${s.status==='Aprovada'&&isCompras()?`<span style="background:#2E7D32;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">✅ Aprovada — Gerar OC</span>`:''}
+      </div>
+      <div style="display:flex;gap:8px">
+        ${isCompras()&&s.status==='Aprovada'?`<button class="sm or" onclick="vSOL('${s.id}')">🛒 Gerar Ordem de Compra</button>`:''}
+        ${isCompras()&&s.status==='Comprada'?`<button class="sm ok" onclick="mdEntSol('${s.id}')">📦 Confirmar Entrega</button>`:''}
+        <button class="sm bl" onclick="vSOL('${s.id}')">🔍 Ver Detalhes</button>
+      </div>
     </div>
   </div>`).join('')}
 </div>`}`;
@@ -3371,6 +3350,7 @@ function aprovarDireto(idx){
   const s=_aprovPendentes[idx];
   if(!s)return alert('Solicitação não encontrada');
   const prox=getProxStatus(s.numero,s.status,s.grupo,s.area||'');
+  if(!prox)return alert('Próximo status não encontrado para: '+s.status);
   hSt(s.id,prox);
 }
 function reprovarDireto(idx){
@@ -3382,6 +3362,30 @@ function escolherFornDireto(idx){
   const s=_aprovPendentes[idx];
   if(!s)return;
   vSOL(s.id);
+}
+function ajusteDireto(idx){
+  const s=_aprovPendentes[idx];
+  if(!s)return;
+  mdAjuste(s.id);
+}
+function verDetalhesDireto(idx){
+  const s=_aprovPendentes[idx];
+  if(!s)return;
+  vSOL(s.id);
+}
+function getProxStatus(numero,status,grupo,area){
+  const map={
+    'Aguardando Gerente':          grupo==='BMMOT'?'Aguardando Evandro':'Aguardando Diretoria',
+    'Aguardando Evandro':          'Aguardando Comite',
+    'Aguardando Comite':           'Aguardando Orçamento',
+    'Aguardando Diretoria':        'Aguardando Orçamento',
+    'Aguardando Gerente Cotação':  'Aguardando Evandro Cotação',
+    'Aguardando Evandro Cotação':  'Aguardando Aprovação Comite',
+    'Aguardando Aprovação Comite': 'Aprovada',
+    'Aguardando Aprovação Diretoria': grupo==='BMMOT'?'Aprovada':'Aguardando Aprovação Gerente',
+    'Aguardando Aprovação Gerente':'Aprovada',
+  };
+  return map[status]||'';
 }
 
 function pgAprovacoes(){
@@ -3670,18 +3674,6 @@ function buildFlowSidebar(s,isCot){
 }
 
 // Helper: retorna próximo status baseado no atual
-function getProxStatus(numero, status, grupo, area){
-  const map={
-    'Aguardando Gerente': grupo==='BMMOT'?'Aguardando Evandro':'Aguardando Diretoria',
-    'Aguardando Evandro': 'Aguardando Comite',
-    'Aguardando Diretoria': 'Aguardando Orçamento',
-    'Aguardando Gerente Cotação': 'Aguardando Evandro Cotação',
-    'Aguardando Evandro Cotação': 'Aguardando Aprovação Comite',
-    'Aguardando Aprovação Diretoria': grupo==='BMMOT'?'Aprovada':'Aguardando Aprovação Gerente',
-    'Aguardando Aprovação Gerente': 'Aprovada',
-  };
-  return map[status]||status;
-}
 
 let fornFiltro={q:'',grupo:'',status:''};
 function pgForn(){
