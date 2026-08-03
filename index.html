@@ -1726,10 +1726,13 @@ async function vSOL(id){
 
   // ── Histórico ─────────────────────────────────────────────────────────────
   const hist=[
-    {ico:'👤',txt:'Criado por '+(s.solicitante_nome||'—'),dt:fmtD(s.data_criacao)},
-    s.aprovado_dir_nome?{ico:'✅',txt:'Aprovado por '+s.aprovado_dir_nome,dt:fmtD(s.aprovado_dir_data)}:null,
-    s.aprovado_ger_nome?{ico:'✅',txt:'Aprovado por '+s.aprovado_ger_nome,dt:fmtD(s.aprovado_ger_data)}:null,
-    s.fornecedor?{ico:'🏢',txt:'Fornecedor: '+s.fornecedor,dt:fmtD(s.data_aprovacao)}:null,
+    {ico:'👤',bg:'#E3F2FD',cor:'#1565C0',txt:'Solicitado por '+(s.solicitante_nome||'—'),dt:fmtD(s.data_criacao)},
+    s.aprovado_ger_nome?{ico:'✅',bg:'#E8F5E9',cor:'#2E7D32',txt:'Gerente: '+s.aprovado_ger_nome,dt:fmtD(s.aprovado_ger_data)}:null,
+    s.aprovado_dir_nome?{ico:'✅',bg:'#E8F5E9',cor:'#2E7D32',txt:'Diretoria: '+s.aprovado_dir_nome,dt:fmtD(s.aprovado_dir_data)}:null,
+    s.cotacao_por?{ico:'📋',bg:'#FFF3E0',cor:'#E65100',txt:'Cotação: '+s.cotacao_por,dt:fmtD(s.cotacao_data)}:null,
+    s.fornecedor?{ico:'🏢',bg:'#F3E5F5',cor:'#6A1B9A',txt:'Fornecedor: '+s.fornecedor,dt:fmtD(s.data_aprovacao)}:null,
+    s.comprado_por?{ico:'🛒',bg:'#E8F5E9',cor:'#2E7D32',txt:'Comprado: '+s.comprado_por,dt:fmtD(s.comprado_em)}:null,
+    s.entregue_por?{ico:'📦',bg:'#E8F5E9',cor:'#2E7D32',txt:'Entregue: '+s.entregue_por,dt:fmtD(s.entregue_em)}:null,
   ].filter(Boolean);
 
   // ── Área de cotação/escolha ───────────────────────────────────────────────
@@ -1856,7 +1859,12 @@ async function vSOL(id){
       </div>
       ${hist.length?`<div style="padding:14px;border-top:1px solid #E0E0E0">
         <div style="font-size:11px;font-weight:700;color:#9E9E9E;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Histórico</div>
-        ${hist.map(h=>`<div style="display:flex;gap:8px;margin-bottom:10px"><span style="font-size:16px;flex-shrink:0">${h.ico}</span><div><div style="font-size:12px;color:#333">${h.txt}</div><div style="font-size:11px;color:#9E9E9E">${h.dt}</div></div></div>`).join('')}
+        ${hist.map(h=>`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-start">
+          <div style="width:28px;height:28px;border-radius:50%;background:${h.bg||'#F5F5F5'};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${h.ico}</div>
+          <div style="flex:1;background:${h.bg||'#F5F5F5'};border-radius:8px;padding:6px 10px">
+            <div style="font-size:12px;font-weight:600;color:${h.cor||'#333'}">${h.txt}</div>
+            <div style="font-size:11px;color:#9E9E9E;margin-top:1px">${h.dt}</div>
+          </div></div>`).join('')}
       </div>`:''}
     </div>
   </div>
@@ -3437,16 +3445,27 @@ function pgAprovacoes(){
       const bg=done?'#2E7D32':cur?'#1565C0':'#E0E0E0';
       const fg=done||cur?'#fff':'#9E9E9E';
       const tc=cur?'#1565C0':done?'#2E7D32':'#9E9E9E';
+      // Who approved this step?
+      let stepDetail='';
+      if(done){
+        if(step.st==='Aguardando Gerente'&&s.aprovado_ger_nome) stepDetail=s.aprovado_ger_nome;
+        else if(step.st==='Aguardando Evandro'&&s.aprovado_dir_nome) stepDetail=s.aprovado_dir_nome;
+        else stepDetail='Concluído';
+      }
       return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0F2F5">'
         +'<div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:'+bg+';color:'+fg+'">'+(done?'✓':step.n)+'</div>'
         +'<div style="flex:1"><div style="font-size:13px;font-weight:'+(cur?700:400)+';color:'+tc+'">'+step.lbl+(cur?' <span style="font-size:10px;background:#1565C0;color:#fff;padding:1px 6px;border-radius:10px">Atual</span>':'')+'</div>'
-        +'<div style="font-size:11px;color:'+(done?'#2E7D32':cur?'#E65100':'#ccc')+';margin-top:1px">'+(done?'Concluído':cur?'Aguardando aprovação':'Pendente')+'</div></div></div>';
+        +'<div style="font-size:11px;color:'+(done?'#2E7D32':cur?'#E65100':'#ccc')+';margin-top:1px">'+(done?stepDetail:cur?'Aguardando aprovação':'Pendente')+'</div></div></div>';
     }).join('');
 
     const hist=[
-      {ico:'👤',txt:'Criado por '+(s.solicitante_nome||'—'),dt:fmtD(s.data_criacao)},
-      s.aprovado_dir_nome?{ico:'✅',txt:'Aprovado por '+s.aprovado_dir_nome,dt:fmtD(s.aprovado_dir_data)}:null,
-      s.aprovado_ger_nome?{ico:'✅',txt:'Aprovado por '+s.aprovado_ger_nome,dt:fmtD(s.aprovado_ger_data)}:null,
+      {ico:'👤',bg:'#E3F2FD',cor:'#1565C0',txt:'Solicitado por '+( s.solicitante_nome||'—'),dt:fmtD(s.data_criacao)},
+      s.aprovado_dir_nome?{ico:'✅',bg:'#E8F5E9',cor:'#2E7D32',txt:'Aprovação Diretoria: '+s.aprovado_dir_nome,dt:fmtD(s.aprovado_dir_data)}:null,
+      s.aprovado_ger_nome?{ico:'✅',bg:'#E8F5E9',cor:'#2E7D32',txt:'Aprovação Gerente: '+s.aprovado_ger_nome,dt:fmtD(s.aprovado_ger_data)}:null,
+      s.cotacao_por?{ico:'📋',bg:'#FFF3E0',cor:'#E65100',txt:'Cotação por: '+s.cotacao_por,dt:fmtD(s.cotacao_data)}:null,
+      s.fornecedor?{ico:'🏢',bg:'#F3E5F5',cor:'#6A1B9A',txt:'Fornecedor escolhido: '+s.fornecedor,dt:fmtD(s.data_aprovacao)}:null,
+      s.comprado_por?{ico:'🛒',bg:'#E8F5E9',cor:'#2E7D32',txt:'Comprado por: '+s.comprado_por,dt:fmtD(s.comprado_em)}:null,
+      s.entregue_por?{ico:'📦',bg:'#E8F5E9',cor:'#2E7D32',txt:'Entregue por: '+s.entregue_por,dt:fmtD(s.entregue_em)}:null,
     ].filter(Boolean);
 
     return '<div style="background:#fff;border:1px solid #E0E0E0;border-radius:14px;overflow:hidden;margin-bottom:24px;box-shadow:0 4px 16px rgba(0,0,0,.1)">'
@@ -3461,9 +3480,23 @@ function pgAprovacoes(){
       +'</div>'
 
       // ── BODY 2-col ──
-      +'<div style="display:grid;grid-template-columns:1fr 240px">'
-      // LEFT
-      +'<div style="padding:18px;border-right:1px solid #F0F2F5">'
+      +'<div style="display:grid;grid-template-columns:1fr 220px">'
+      // RIGHT: fluxo + hist
+      +'<div style="background:#FAFAFA;border-left:1px solid #E0E0E0;padding:16px;order:2">'
+      +'<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Fluxo de Aprovação</div>'
+      +fluxoHtml
+      +(hist.length?'<div style="margin-top:14px;border-top:1px solid #E0E0E0;padding-top:12px">'
+        +'<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Histórico</div>'
+        +hist.map(h=>'<div style="display:flex;gap:6px;margin-bottom:8px;align-items:flex-start">'
+          +'<div style="width:24px;height:24px;border-radius:50%;background:'+(h.bg||'#F0F4FF')+';display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">'+h.ico+'</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:11px;font-weight:600;color:'+(h.cor||'#333')+';word-break:break-word">'+h.txt+'</div>'
+          +'<div style="font-size:10px;color:#9E9E9E;margin-top:1px">'+h.dt+'</div>'
+          +'</div></div>').join('')
+        +'</div>':'')
+      +'</div>'
+      // LEFT: conteúdo
+      +'<div style="padding:18px;border-right:1px solid #E0E0E0;order:1">'
       +'<div style="font-size:20px;font-weight:700;color:#0F2236;margin-bottom:8px">'+(s.descricao||'Sem descrição')+'</div>'
       +'<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:12px">'
       +'<span>🏢 '+(s.loja_nome||'—')+'</span>'
