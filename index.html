@@ -1673,10 +1673,10 @@ async function vSOL(id){
   // ── Parse itens ───────────────────────────────────────────────────────────
   let itens=[];
   try{
-    if(typeof s.itens==='string'&&s.itens.trim().startsWith('['))
-      itens=JSON.parse(s.itens);
-    else if(Array.isArray(s.itens))
-      itens=s.itens;
+    const raw=s.itens_requisicao;
+    if(Array.isArray(raw)) itens=raw;
+    else if(typeof raw==='string'&&raw.trim().startsWith('[')) itens=JSON.parse(raw);
+    else if(raw&&typeof raw==='object') itens=[raw];
   }catch(e){itens=[];}
   itens=itens.map(it=>({
     desc: it.desc||it.descricao||it.description||it.nome||'—',
@@ -1784,7 +1784,7 @@ async function vSOL(id){
       <div style="font-size:20px;font-weight:700;color:#0F2236;margin-bottom:8px">${s.descricao||'Sem descrição'}</div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:12px">
         <span>🏢 ${s.loja_nome||'—'}</span><span>👤 ${s.solicitante_nome||'—'}</span>
-        ${s.area?`<span>🏷️ ${s.area}</span>`:''}<span>📂 ${s.categoria||s.tipo||'—'}</span>
+        ${s.area?`<span>🏷️ ${s.area}</span>`:''}<span>📂 ${s.categoria||s.tipo_compra||'—'}</span>
         <span>📅 ${fmtD(s.data_criacao)}</span>
       </div>
       ${s.justificativa?`<div style="background:#FFFDE7;border-left:4px solid #FDD835;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#555"><b>Observação:</b> ${s.justificativa}</div>`:''}
@@ -1794,8 +1794,8 @@ async function vSOL(id){
         <div style="background:#F8F9FA;border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
           ${[['Solicitante',s.solicitante_nome||'—'],['Data',fmtD(s.data_criacao)],
              ['Área',s.area||'—'],['Prioridade',s.urgencia||'Normal'],
-             ['Tipo',s.tipo||'—'],['Categoria',s.categoria||'—'],
-             ['Grupo',s.grupo||'—'],['Previsão',fmtD(s.data_entrega)||'—'],
+             ['Tipo',s.tipo_compra||'—'],['Categoria',s.categoria||'—'],
+             ['Grupo',s.grupo||'—'],['Previsão',fmtD(s.data_estimada)||'—'],
             ].map(([l,v])=>`<div><div style="font-size:10px;color:#9E9E9E;font-weight:600;text-transform:uppercase">${l}</div><div style="font-size:13px;color:#333;margin-top:1px">${v}</div></div>`).join('')}
         </div>
         <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:8px;padding:14px;min-width:190px">
@@ -3395,12 +3395,12 @@ function pgAprovacoes(){
     // Parse itens - robusto para todos formatos
     let itens=[];
     try{
-      if(typeof s.itens==='string'&&s.itens.trim().startsWith('['))
-        itens=JSON.parse(s.itens);
-      else if(Array.isArray(s.itens))
-        itens=s.itens;
-      else if(typeof s.itens==='object'&&s.itens!==null)
-        itens=[s.itens];
+      if(typeof s.itens_requisicao==='string'&&s.itens_requisicao.trim().startsWith('['))
+        itens=JSON.parse(s.itens_requisicao);
+      else if(Array.isArray(s.itens_requisicao))
+        itens=s.itens_requisicao;
+      else if(typeof s.itens_requisicao==='object'&&s.itens_requisicao!==null)
+        itens=[s.itens_requisicao];
     }catch(e){itens=[];}
     // Normaliza campos (desc/descricao, val/valor/valor_unitario, und/unidade)
     itens=itens.map(it=>({
@@ -3469,7 +3469,7 @@ function pgAprovacoes(){
       +'<span>🏢 '+(s.loja_nome||'—')+'</span>'
       +'<span>👤 '+(s.solicitante_nome||'—')+'</span>'
       +(s.area?'<span>🏷️ '+s.area+'</span>':'')
-      +'<span>📂 '+(s.categoria||s.tipo||'—')+'</span>'
+      +'<span>📂 '+(s.categoria||s.tipo_compra||'—')+'</span>'
       +'<span>📅 '+fmtD(s.data_criacao)+'</span>'
       +'</div>'
       +(s.justificativa?'<div style="background:#FFFDE7;border-left:4px solid #FDD835;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#555"><b>Observação:</b> '+s.justificativa+'</div>':'')
@@ -3479,8 +3479,8 @@ function pgAprovacoes(){
       +'<div style="background:#F8F9FA;border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">'
       +[['Solicitante',s.solicitante_nome||'—'],['Data',fmtD(s.data_criacao)],
         ['Área',s.area||'—'],['Prioridade',s.urgencia||'Normal'],
-        ['Tipo',s.tipo||'—'],['Categoria',s.categoria||'—'],
-        ['Grupo',s.grupo||'—'],['Previsão',fmtD(s.data_entrega)||'—'],
+        ['Tipo',s.tipo_compra||'—'],['Categoria',s.categoria||'—'],
+        ['Grupo',s.grupo||'—'],['Previsão',fmtD(s.data_estimada)||'—'],
       ].map(([l,v])=>'<div><div style="font-size:10px;color:#9E9E9E;font-weight:600;text-transform:uppercase">'+l+'</div><div style="font-size:13px;color:#333;margin-top:1px">'+v+'</div></div>').join('')
       +'</div>'
       +'<div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:8px;padding:14px;min-width:190px">'
@@ -3498,10 +3498,10 @@ function pgAprovacoes(){
       // Parse itens vindos do Supabase - tenta todos os formatos
       let parsedItens=[];
       try{
-        if(typeof s.itens==='string'&&s.itens.trim().startsWith('['))
-          parsedItens=JSON.parse(s.itens);
-        else if(Array.isArray(s.itens))
-          parsedItens=s.itens;
+        const raw=s.itens_requisicao;
+        if(Array.isArray(raw)) parsedItens=raw;
+        else if(typeof raw==='string'&&raw.trim().startsWith('[')) parsedItens=JSON.parse(raw);
+        else if(raw&&typeof raw==='object') parsedItens=[raw];
       }catch(e){}
       parsedItens=parsedItens.map(it=>({
         desc: it.desc||it.descricao||it.description||it.nome||'Item',
