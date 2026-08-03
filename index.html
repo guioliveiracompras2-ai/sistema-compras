@@ -788,22 +788,22 @@ function buildTimeline(s){
     'Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente','Aprovada','Comprada','Entregue'];
   const ORDER=grupo==='BMMOT'?ORDER_BMMOT:ORDER_DHG;
   const steps_bmmot=[
-    {key:'Aguardando Gerente',lbl:'Gerente',icon:'👔',sub:obj?.aprovado_ger_nome?fmtD(obj.aprovado_ger_data)+'<br>'+obj.aprovado_ger_nome.split(' ')[0]:''},
-    {key:'Aguardando Evandro',lbl:'Diretoria',icon:'🏛️',sub:obj?.aprovado_dir_nome&&ORDER_BMMOT.indexOf(status)>1?fmtD(obj.aprovado_dir_data)+'<br>'+obj.aprovado_dir_nome.split(' ')[0]:''},
-    {key:'Aguardando Comite',lbl:'Comitê',icon:'🟣',sub:''},
-    {key:'Aguardando Orçamento',lbl:'Compras Cot.',icon:'📋',sub:obj?.cotacao_por?fmtD(obj.cotacao_data)+'<br>'+obj.cotacao_por.split(' ')[0]:''},
-    {key:'Aguardando Aprovação Comite',lbl:'Comitê Escolhe',icon:'🏢',sub:''},
-    {key:'Aprovada',lbl:'Aprovada',icon:'✅',sub:''},
-    {key:'Comprada',lbl:'Comprada',icon:'🛒',sub:obj?.comprado_por?fmtD(obj.comprado_em)+'<br>'+obj.comprado_por.split(' ')[0]:''},
-    {key:'Entregue',lbl:'Entregue',icon:'📦',sub:obj?.entregue_por?fmtD(obj.entregue_em)+'<br>'+obj.entregue_por.split(' ')[0]:''},
+    {key:'Aguardando Gerente',label:'Gerente',icon:'👔',sub:obj?.aprovado_ger_nome?fmtD(obj.aprovado_ger_data)+'<br>'+obj.aprovado_ger_nome.split(' ')[0]:''},
+    {key:'Aguardando Evandro',label:'Diretoria',icon:'🏛️',sub:obj?.aprovado_dir_nome&&ORDER_BMMOT.indexOf(status)>1?fmtD(obj.aprovado_dir_data)+'<br>'+obj.aprovado_dir_nome.split(' ')[0]:''},
+    {key:'Aguardando Comite',label:'Comitê',icon:'🟣',sub:''},
+    {key:'Aguardando Orçamento',label:'Compras Cot.',icon:'📋',sub:obj?.cotacao_por?fmtD(obj.cotacao_data)+'<br>'+obj.cotacao_por.split(' ')[0]:''},
+    {key:'Aguardando Aprovação Comite',label:'Comitê Escolhe',icon:'🏢',sub:''},
+    {key:'Aprovada',label:'Aprovada',icon:'✅',sub:''},
+    {key:'Comprada',label:'Comprada',icon:'🛒',sub:obj?.comprado_por?fmtD(obj.comprado_em)+'<br>'+obj.comprado_por.split(' ')[0]:''},
+    {key:'Entregue',label:'Entregue',icon:'📦',sub:obj?.entregue_por?fmtD(obj.entregue_em)+'<br>'+obj.entregue_por.split(' ')[0]:''},
   ];
   const steps_dhg=[
-    {key:'Aguardando Diretoria',lbl:'Diretoria',icon:'🏛️',sub:obj?.aprovado_dir_nome?fmtD(obj.aprovado_dir_data)+'<br>'+obj.aprovado_dir_nome.split(' ')[0]:''},
-    {key:'Aguardando Orçamento',lbl:'Compras Cot.',icon:'📋',sub:obj?.cotacao_por?fmtD(obj.cotacao_data)+'<br>'+obj.cotacao_por.split(' ')[0]:''},
-    {key:'Aguardando Aprovação Gerente',lbl:'Gerente',icon:'👔',sub:obj?.aprovado_ger_nome?fmtD(obj.aprovado_ger_data)+'<br>'+obj.aprovado_ger_nome.split(' ')[0]:''},
-    {key:'Aprovada',lbl:'Aprovada',icon:'✅',sub:''},
-    {key:'Comprada',lbl:'Comprada',icon:'🛒',sub:obj?.comprado_por?fmtD(obj.comprado_em)+'<br>'+obj.comprado_por.split(' ')[0]:''},
-    {key:'Entregue',lbl:'Entregue',icon:'📦',sub:obj?.entregue_por?fmtD(obj.entregue_em)+'<br>'+obj.entregue_por.split(' ')[0]:''},
+    {key:'Aguardando Diretoria',label:'Diretoria',icon:'🏛️',sub:obj?.aprovado_dir_nome?fmtD(obj.aprovado_dir_data)+'<br>'+obj.aprovado_dir_nome.split(' ')[0]:''},
+    {key:'Aguardando Orçamento',label:'Compras Cot.',icon:'📋',sub:obj?.cotacao_por?fmtD(obj.cotacao_data)+'<br>'+obj.cotacao_por.split(' ')[0]:''},
+    {key:'Aguardando Aprovação Gerente',label:'Gerente',icon:'👔',sub:obj?.aprovado_ger_nome?fmtD(obj.aprovado_ger_data)+'<br>'+obj.aprovado_ger_nome.split(' ')[0]:''},
+    {key:'Aprovada',label:'Aprovada',icon:'✅',sub:''},
+    {key:'Comprada',label:'Comprada',icon:'🛒',sub:obj?.comprado_por?fmtD(obj.comprado_em)+'<br>'+obj.comprado_por.split(' ')[0]:''},
+    {key:'Entregue',label:'Entregue',icon:'📦',sub:obj?.entregue_por?fmtD(obj.entregue_em)+'<br>'+obj.entregue_por.split(' ')[0]:''},
   ];
   const steps=grupo==='BMMOT'?steps_bmmot:steps_dhg;
   const isReprovada=status==='Reprovada';
