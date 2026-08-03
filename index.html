@@ -572,7 +572,7 @@ async function criarSol(f){
   const solBase={
     numero:num,loja_id:f.loja_id,loja_nome:loja?.nome,
     solicitante_nome:solNome,
-    area:S.user.area||f.area,
+    area:f.area||S.user.area,
     categoria:f.cat,descricao:f.desc,
     quantidade:parseInt(f.qtd)||1,
     valor_estimado:parseFloat(f.val)||null,
@@ -1672,8 +1672,20 @@ async function vSOL(id){
 
   // ── Parse itens ───────────────────────────────────────────────────────────
   let itens=[];
-  try{itens=typeof s.itens==='string'?JSON.parse(s.itens):(s.itens||[]);}catch(e){}
-  const totalItens=itens.reduce((a,i)=>a+parseFloat(i.qtd||1)*parseFloat(i.val||0),0);
+  try{
+    if(typeof s.itens==='string'&&s.itens.trim().startsWith('['))
+      itens=JSON.parse(s.itens);
+    else if(Array.isArray(s.itens))
+      itens=s.itens;
+  }catch(e){itens=[];}
+  itens=itens.map(it=>({
+    desc: it.desc||it.descricao||it.description||it.nome||'—',
+    qtd:  parseFloat(it.qtd||it.quantidade||it.qty||1),
+    val:  parseFloat(it.val||it.valor||it.valor_unitario||it.price||0),
+    und:  it.und||it.unidade||it.unit||'UN',
+    codigo: it.codigo||it.code||'',
+  }));
+  const totalItens=itens.reduce((a,i)=>a+i.qtd*i.val,0);
 
   // ── Fluxo de aprovação ────────────────────────────────────────────────────
   const ORDER_S=['Aguardando Gerente','Aguardando Evandro','Aguardando Comite','Aguardando Diretoria',
@@ -3380,10 +3392,25 @@ function pgAprovacoes(){
     const proxSt=proxMap[s.status]||'';
     const pc=s.urgencia==='Alta'?'#C62828':s.urgencia==='Media'||s.urgencia==='Média'?'#E65100':'#2E7D32';
 
-    // Parse itens
+    // Parse itens - robusto para todos formatos
     let itens=[];
-    try{itens=typeof s.itens==='string'?JSON.parse(s.itens):(s.itens||[]);}catch(e){}
-    const totalItens=itens.reduce((a,it)=>a+parseFloat(it.qtd||1)*parseFloat(it.val||0),0);
+    try{
+      if(typeof s.itens==='string'&&s.itens.trim().startsWith('['))
+        itens=JSON.parse(s.itens);
+      else if(Array.isArray(s.itens))
+        itens=s.itens;
+      else if(typeof s.itens==='object'&&s.itens!==null)
+        itens=[s.itens];
+    }catch(e){itens=[];}
+    // Normaliza campos (desc/descricao, val/valor/valor_unitario, und/unidade)
+    itens=itens.map(it=>({
+      desc: it.desc||it.descricao||it.description||it.nome||'—',
+      qtd:  parseFloat(it.qtd||it.quantidade||it.qty||1),
+      val:  parseFloat(it.val||it.valor||it.valor_unitario||it.price||0),
+      und:  it.und||it.unidade||it.unit||'UN',
+      codigo: it.codigo||it.code||'',
+    }));
+    const totalItens=itens.reduce((a,it)=>a+it.qtd*it.val,0);
 
     // Flow steps
     const ORDER_S=['Aguardando Gerente','Aguardando Evandro','Aguardando Comite','Aguardando Diretoria',
@@ -3483,13 +3510,14 @@ function pgAprovacoes(){
         +'</tr></thead><tbody>'
         +itens.map((it,ii)=>{
           const tot=parseFloat(it.qtd||1)*parseFloat(it.val||0);
+          const tot2=it.qtd*it.val;
           return '<tr style="border-top:1px solid #F0F2F5;background:'+(ii%2?'#FAFAFA':'#fff')+'">'
             +'<td style="padding:8px 10px;text-align:center;font-size:12px;color:#9E9E9E">'+(ii+1)+'</td>'
-            +'<td style="padding:8px 10px"><div style="font-size:13px;font-weight:500">'+(it.desc||it.descricao||'—')+'</div></td>'
-            +'<td style="padding:8px 10px;text-align:center;font-size:12px;color:#555">'+(it.und||it.unidade||'UN')+'</td>'
-            +'<td style="padding:8px 10px;text-align:center;font-size:13px;font-weight:600">'+(it.qtd||1)+'</td>'
-            +'<td style="padding:8px 10px;text-align:right;font-size:12px;color:#555">'+(it.val?'R$ '+parseFloat(it.val).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
-            +'<td style="padding:8px 10px;text-align:right;font-size:13px;font-weight:700;color:#1565C0">'+(tot?'R$ '+tot.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
+            +'<td style="padding:8px 10px"><div style="font-size:13px;font-weight:500">'+it.desc+'</div>'+(it.codigo?'<div style="font-size:10px;color:#9E9E9E">'+it.codigo+'</div>':'')+'</td>'
+            +'<td style="padding:8px 10px;text-align:center;font-size:12px;color:#555">'+it.und+'</td>'
+            +'<td style="padding:8px 10px;text-align:center;font-size:13px;font-weight:600">'+it.qtd+'</td>'
+            +'<td style="padding:8px 10px;text-align:right;font-size:12px;color:#555">'+(it.val?'R$ '+it.val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
+            +'<td style="padding:8px 10px;text-align:right;font-size:13px;font-weight:700;color:#1565C0">'+(tot2?'R$ '+tot2.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
             +'</tr>';
         }).join('')
         +'</tbody><tfoot><tr style="background:#EFF6FF;border-top:2px solid #1565C0">'
