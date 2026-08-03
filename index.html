@@ -385,6 +385,11 @@ const PTITLES={dashboard:'Dashboard',solicitacoes:'Solicitações',fornecedores:
 // ── UTILS ─────────────────────────────────────────────────────────────────
 const fmt=v=>v==null?'—':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);
 const fmtD=d=>d?new Date(d).toLocaleDateString('pt-BR'):'—';
+const fmtDT=d=>{
+  if(!d)return'—';
+  const dt=new Date(d);
+  return dt.toLocaleDateString('pt-BR')+' às '+dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+};
 const slug=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'.').replace(/[^a-z0-9.]/g,'');
 const ini=(a,b)=>`${(a||'?')[0]}${(b||'?')[0]}`.toUpperCase();
 const cs=s=>`<span class="chip" style="${SC[s]||'background:#eee;color:#666'}">${s||'—'}</span>`;
@@ -1713,6 +1718,12 @@ async function vSOL(id){
     const bg=done?'#2E7D32':cur?'#1565C0':'#E0E0E0';
     const fg=done||cur?'#fff':'#9E9E9E';
     const tc=cur?'#1565C0':done?'#2E7D32':'#9E9E9E';
+    let quem='';
+    if(done){
+      if(['Aguardando Gerente','Aguardando Gerente Cotação'].includes(step.st)&&s.aprovado_ger_nome) quem=s.aprovado_ger_nome;
+      else if(['Aguardando Evandro','Aguardando Evandro Cotação','Aguardando Diretoria','Aguardando Comite'].includes(step.st)&&s.aprovado_dir_nome) quem=s.aprovado_dir_nome;
+      else quem='Concluído';
+    }
     return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0F2F5">'
       +'<div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:'+bg+';color:'+fg+'">'
       +(done?'✓':step.n)+'</div>'
@@ -1720,19 +1731,19 @@ async function vSOL(id){
       +'<div style="font-size:13px;font-weight:'+(cur?700:400)+';color:'+tc+'">'+step.lbl
       +(cur?' <span style="font-size:10px;background:#1565C0;color:#fff;padding:1px 6px;border-radius:10px">Atual</span>':'')+'</div>'
       +'<div style="font-size:11px;color:'+(done?'#2E7D32':cur?'#E65100':'#ccc')+';margin-top:1px">'
-      +(done?'Concluído':cur?'Aguardando aprovação':'Pendente')+'</div>'
+      +(done?quem:cur?'Aguardando aprovação':'Pendente')+'</div>'
       +'</div></div>';
   }).join('');
 
   // ── Histórico ─────────────────────────────────────────────────────────────
   const hist=[
-    {ico:'👤',bg:'#E3F2FD',cor:'#1565C0',txt:'Solicitado por '+(s.solicitante_nome||'—'),dt:fmtD(s.data_criacao)},
-    s.aprovado_ger_nome?{ico:'✅',bg:'#E8F5E9',cor:'#2E7D32',txt:'Gerente: '+s.aprovado_ger_nome,dt:fmtD(s.aprovado_ger_data)}:null,
-    s.aprovado_dir_nome?{ico:'✅',bg:'#E8F5E9',cor:'#2E7D32',txt:'Diretoria: '+s.aprovado_dir_nome,dt:fmtD(s.aprovado_dir_data)}:null,
-    s.cotacao_por?{ico:'📋',bg:'#FFF3E0',cor:'#E65100',txt:'Cotação: '+s.cotacao_por,dt:fmtD(s.cotacao_data)}:null,
-    s.fornecedor?{ico:'🏢',bg:'#F3E5F5',cor:'#6A1B9A',txt:'Fornecedor: '+s.fornecedor,dt:fmtD(s.data_aprovacao)}:null,
-    s.comprado_por?{ico:'🛒',bg:'#E8F5E9',cor:'#2E7D32',txt:'Comprado: '+s.comprado_por,dt:fmtD(s.comprado_em)}:null,
-    s.entregue_por?{ico:'📦',bg:'#E8F5E9',cor:'#2E7D32',txt:'Entregue: '+s.entregue_por,dt:fmtD(s.entregue_em)}:null,
+    {ico:'👤',bg:'#E3F2FD',cor:'#1565C0',txt:'Solicitado por '+(s.solicitante_nome||'—'),dt:fmtDT(s.data_criacao)},
+    s.aprovado_ger_nome?{ico:'👔',bg:'#E8F5E9',cor:'#2E7D32',txt:'Gerente aprovado: '+s.aprovado_ger_nome,dt:fmtDT(s.aprovado_ger_data)}:null,
+    s.aprovado_dir_nome?{ico:'🏛️',bg:'#E3F2FD',cor:'#1565C0',txt:'Diretoria aprovado: '+s.aprovado_dir_nome,dt:fmtDT(s.aprovado_dir_data)}:null,
+    s.cotacao_por?{ico:'📋',bg:'#FFF3E0',cor:'#E65100',txt:'Cotação por: '+s.cotacao_por,dt:fmtDT(s.cotacao_data)}:null,
+    s.fornecedor?{ico:'🏢',bg:'#F3E5F5',cor:'#6A1B9A',txt:'Fornecedor: '+s.fornecedor,dt:fmtDT(s.data_aprovacao)}:null,
+    s.comprado_por?{ico:'🛒',bg:'#E3F2FD',cor:'#1565C0',txt:'OC gerada por: '+s.comprado_por,dt:fmtDT(s.comprado_em)}:null,
+    s.entregue_por?{ico:'📦',bg:'#E8F5E9',cor:'#2E7D32',txt:'Entrega confirmada: '+s.entregue_por,dt:fmtDT(s.entregue_em)}:null,
   ].filter(Boolean);
 
   // ── Área de cotação/escolha ───────────────────────────────────────────────
@@ -2973,11 +2984,29 @@ async function salvarEdicaoAjuste(solId,numItens){
 }
 
 async function hSt(id,status){
-  // Feedback visual imediato
   document.querySelectorAll('.aprov-btn-aprovar').forEach(b=>{b.disabled=true;b.textContent='Aprovando...';});
   try{
+    const nome=(S.user?.nome||'')+' '+(S.user?.sobrenome||'');
+    const agora=new Date().toISOString();
     const upd={status};
-    if(status==='Aprovada')upd.data_aprovacao=new Date().toISOString();
+    if(status==='Aprovada')upd.data_aprovacao=agora;
+
+    // Salva nome do aprovador por etapa
+    const etapasGerente=['Aguardando Evandro','Aguardando Diretoria','Reprovada'];
+    const etapasDir=['Aguardando Comite','Aguardando Orçamento','Aguardando Aprovação Comite'];
+    if(etapasGerente.includes(status)){
+      upd.aprovado_ger_nome=nome.trim();
+      upd.aprovado_ger_data=agora;
+    }
+    if(etapasDir.includes(status)){
+      upd.aprovado_dir_nome=nome.trim();
+      upd.aprovado_dir_data=agora;
+    }
+    if(status==='Aprovada'&&isComite()){
+      upd.aprovado_dir_nome=nome.trim(); // Comitê usa campo dir para cotação
+      upd.aprovado_dir_data=agora;
+    }
+
     const res=await sb.from('solicitacoes').update(upd).eq('id',id);
     if(res.error){
       alert('Erro: '+res.error.message+' | Código: '+res.error.code);
@@ -3448,9 +3477,13 @@ function pgAprovacoes(){
       // Who approved this step?
       let stepDetail='';
       if(done){
-        if(step.st==='Aguardando Gerente'&&s.aprovado_ger_nome) stepDetail=s.aprovado_ger_nome;
-        else if(step.st==='Aguardando Evandro'&&s.aprovado_dir_nome) stepDetail=s.aprovado_dir_nome;
-        else stepDetail='Concluído';
+        if((step.st==='Aguardando Gerente'||step.st==='Aguardando Gerente Cotação')&&s.aprovado_ger_nome)
+          stepDetail=s.aprovado_ger_nome;
+        else if((step.st==='Aguardando Evandro'||step.st==='Aguardando Evandro Cotação'||step.st==='Aguardando Diretoria')&&s.aprovado_dir_nome)
+          stepDetail=s.aprovado_dir_nome;
+        else if(step.st==='Aguardando Comite'&&s.aprovado_dir_nome)
+          stepDetail=s.aprovado_dir_nome;
+        else stepDetail='Concluído ✓';
       }
       return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0F2F5">'
         +'<div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:'+bg+';color:'+fg+'">'+(done?'✓':step.n)+'</div>'
@@ -3459,13 +3492,13 @@ function pgAprovacoes(){
     }).join('');
 
     const hist=[
-      {ico:'👤',bg:'#E3F2FD',cor:'#1565C0',txt:'Solicitado por '+( s.solicitante_nome||'—'),dt:fmtD(s.data_criacao)},
-      s.aprovado_dir_nome?{ico:'✅',bg:'#E8F5E9',cor:'#2E7D32',txt:'Aprovação Diretoria: '+s.aprovado_dir_nome,dt:fmtD(s.aprovado_dir_data)}:null,
-      s.aprovado_ger_nome?{ico:'✅',bg:'#E8F5E9',cor:'#2E7D32',txt:'Aprovação Gerente: '+s.aprovado_ger_nome,dt:fmtD(s.aprovado_ger_data)}:null,
-      s.cotacao_por?{ico:'📋',bg:'#FFF3E0',cor:'#E65100',txt:'Cotação por: '+s.cotacao_por,dt:fmtD(s.cotacao_data)}:null,
-      s.fornecedor?{ico:'🏢',bg:'#F3E5F5',cor:'#6A1B9A',txt:'Fornecedor escolhido: '+s.fornecedor,dt:fmtD(s.data_aprovacao)}:null,
-      s.comprado_por?{ico:'🛒',bg:'#E8F5E9',cor:'#2E7D32',txt:'Comprado por: '+s.comprado_por,dt:fmtD(s.comprado_em)}:null,
-      s.entregue_por?{ico:'📦',bg:'#E8F5E9',cor:'#2E7D32',txt:'Entregue por: '+s.entregue_por,dt:fmtD(s.entregue_em)}:null,
+      {ico:'👤',bg:'#E3F2FD',cor:'#1565C0',txt:'Solicitado por '+(s.solicitante_nome||'—'),dt:fmtDT(s.data_criacao)},
+      s.aprovado_ger_nome?{ico:'👔',bg:'#E8F5E9',cor:'#2E7D32',txt:'Gerente aprovado: '+s.aprovado_ger_nome,dt:fmtDT(s.aprovado_ger_data)}:null,
+      s.aprovado_dir_nome?{ico:'🏛️',bg:'#E8F5E9',cor:'#1565C0',txt:'Diretoria aprovado: '+s.aprovado_dir_nome,dt:fmtDT(s.aprovado_dir_data)}:null,
+      s.cotacao_por?{ico:'📋',bg:'#FFF3E0',cor:'#E65100',txt:'Cotação registrada por: '+s.cotacao_por,dt:fmtDT(s.cotacao_data)}:null,
+      s.fornecedor?{ico:'🏢',bg:'#F3E5F5',cor:'#6A1B9A',txt:'Fornecedor aprovado: '+s.fornecedor,dt:fmtDT(s.data_aprovacao)}:null,
+      s.comprado_por?{ico:'🛒',bg:'#E3F2FD',cor:'#1565C0',txt:'OC gerada por: '+s.comprado_por,dt:fmtDT(s.comprado_em)}:null,
+      s.entregue_por?{ico:'📦',bg:'#E8F5E9',cor:'#2E7D32',txt:'Entrega confirmada por: '+s.entregue_por,dt:fmtDT(s.entregue_em)}:null,
     ].filter(Boolean);
 
     return '<div style="background:#fff;border:1px solid #E0E0E0;border-radius:14px;overflow:hidden;margin-bottom:24px;box-shadow:0 4px 16px rgba(0,0,0,.1)">'
