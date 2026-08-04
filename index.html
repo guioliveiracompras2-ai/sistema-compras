@@ -3416,319 +3416,183 @@ function pgAprovacoes(){
   });
 
   if(!_aprovPendentes.length){
-    return '<div style="text-align:center;padding:80px 20px">'
-      +'<div style="font-size:64px;margin-bottom:16px">✅</div>'
-      +'<div style="font-size:22px;font-weight:700;color:#0F2236;margin-bottom:8px">Tudo em dia!</div>'
-      +'<div style="font-size:14px;color:#9E9E9E">Nenhuma aprovação pendente para você no momento.</div>'
+    return '<div style="text-align:center;padding:60px 20px">'
+      +'<div style="font-size:56px;margin-bottom:12px">✅</div>'
+      +'<div style="font-size:18px;font-weight:700;color:#0F2236;margin-bottom:6px">Tudo em dia!</div>'
+      +'<div style="font-size:13px;color:#9E9E9E">Nenhuma aprovação pendente para você.</div>'
       +'</div>';
   }
 
-  // Render each pending as full detail card
-  return _aprovPendentes.map((s,i)=>{
+  let html='<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">'
+    +'<div style="font-size:16px;font-weight:700;color:#0F2236">Minhas Aprovações <span style="background:#E65100;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px">'+_aprovPendentes.length+'</span></div>'
+    +'</div>';
+
+  _aprovPendentes.forEach((s,i)=>{
     const isCot=['Aguardando Gerente Cotação','Aguardando Evandro Cotação',
       'Aguardando Aprovação Comite','Aguardando Aprovação Diretoria'].includes(s.status);
     const stLabel=statusLabel(s.status);
+    const grupo=s.grupo||'DHG';
     const proxMap={
-      'Aguardando Gerente':'Aguardando Evandro',
+      'Aguardando Gerente':grupo==='BMMOT'?'Aguardando Evandro':'Aguardando Diretoria',
       'Aguardando Evandro':'Aguardando Comite',
       'Aguardando Comite':'Aguardando Orçamento',
       'Aguardando Diretoria':'Aguardando Orçamento',
       'Aguardando Gerente Cotação':'Aguardando Evandro Cotação',
       'Aguardando Evandro Cotação':'Aguardando Aprovação Comite',
       'Aguardando Aprovação Comite':'Aprovada',
-      'Aguardando Aprovação Diretoria':s.grupo==='BMMOT'?'Aprovada':'Aguardando Aprovação Gerente',
+      'Aguardando Aprovação Diretoria':grupo==='BMMOT'?'Aprovada':'Aguardando Aprovação Gerente',
       'Aguardando Aprovação Gerente':'Aprovada',
     };
-    const proxSt=proxMap[s.status]||'';
+    const prox=proxMap[s.status]||'';
     const pc=s.urgencia==='Alta'?'#C62828':s.urgencia==='Media'||s.urgencia==='Média'?'#E65100':'#2E7D32';
 
-    // Parse itens - robusto para todos formatos
-    let itens=[];
-    try{
-      if(typeof s.itens_requisicao==='string'&&s.itens_requisicao.trim().startsWith('['))
-        itens=JSON.parse(s.itens_requisicao);
-      else if(Array.isArray(s.itens_requisicao))
-        itens=s.itens_requisicao;
-      else if(typeof s.itens_requisicao==='object'&&s.itens_requisicao!==null)
-        itens=[s.itens_requisicao];
-    }catch(e){itens=[];}
-    // Normaliza campos (desc/descricao, val/valor/valor_unitario, und/unidade)
-    itens=itens.map(it=>({
-      desc: it.desc||it.descricao||it.description||it.nome||'—',
-      qtd:  parseFloat(it.qtd||it.quantidade||it.qty||1),
-      val:  parseFloat(it.val||it.valor||it.valor_unitario||it.price||0),
-      und:  it.und||it.unidade||it.unit||'UN',
-      codigo: it.codigo||it.code||'',
-    }));
-    const totalItens=itens.reduce((a,it)=>a+it.qtd*it.val,0);
-
-    // Flow steps
+    // Fluxo compacto horizontal
     const ORDER_S=['Aguardando Gerente','Aguardando Evandro','Aguardando Comite','Aguardando Diretoria',
       'Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação',
       'Aguardando Aprovação Comite','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente',
       'Aprovada','Comprada','Entregue'];
-    const steps=s.grupo==='BMMOT'?[
-      {n:1,lbl:'Gerente Área',st:'Aguardando Gerente'},
-      {n:2,lbl:'Aprovação Diretoria',st:'Aguardando Evandro'},
-      {n:3,lbl:'Aprovação Comitê',st:'Aguardando Comite'},
-      {n:4,lbl:'Compras Cotação',st:'Aguardando Orçamento'},
-      {n:5,lbl:'Aprovada',st:'Aprovada'},
-    ]:[
-      {n:1,lbl:'Aprovação Diretoria',st:'Aguardando Diretoria'},
-      {n:2,lbl:'Compras Cotação',st:'Aguardando Orçamento'},
-      {n:3,lbl:'Dir. Final',st:'Aguardando Aprovação Diretoria'},
-      {n:4,lbl:'Gerente',st:'Aguardando Aprovação Gerente'},
-      {n:5,lbl:'Aprovada',st:'Aprovada'},
-    ];
+    const fsteps=grupo==='BMMOT'
+      ?[{n:1,lbl:'Gerente',st:'Aguardando Gerente'},{n:2,lbl:'Diretoria',st:'Aguardando Evandro'},
+        {n:3,lbl:'Comitê',st:'Aguardando Comite'},{n:4,lbl:'Compras',st:'Aguardando Orçamento'},
+        ...(isCot?[{n:5,lbl:'Ger.Cot',st:'Aguardando Gerente Cotação'},{n:6,lbl:'Dir.Cot',st:'Aguardando Evandro Cotação'},{n:7,lbl:'Comitê',st:'Aguardando Aprovação Comite'}]:[]),
+        {n:isCot?8:5,lbl:'Aprovada',st:'Aprovada'}]
+      :[{n:1,lbl:'Diretoria',st:'Aguardando Diretoria'},{n:2,lbl:'Compras',st:'Aguardando Orçamento'},
+        {n:3,lbl:'Dir.Final',st:'Aguardando Aprovação Diretoria'},{n:4,lbl:'Gerente',st:'Aguardando Aprovação Gerente'},
+        {n:5,lbl:'Aprovada',st:'Aprovada'}];
     const curIdx=ORDER_S.indexOf(s.status);
-    const fluxoHtml=steps.map(step=>{
-      const ei=ORDER_S.indexOf(step.st);
-      const done=curIdx>ei, cur=s.status===step.st;
-      const bg=done?'#2E7D32':cur?'#1565C0':'#E0E0E0';
-      const fg=done||cur?'#fff':'#9E9E9E';
-      const tc=cur?'#1565C0':done?'#2E7D32':'#9E9E9E';
-      // Who approved this step?
-      let stepDetail='';
-      if(done){
-        if((step.st==='Aguardando Gerente'||step.st==='Aguardando Gerente Cotação')&&s.aprovado_ger_nome)
-          stepDetail=s.aprovado_ger_nome;
-        else if((step.st==='Aguardando Evandro'||step.st==='Aguardando Evandro Cotação'||step.st==='Aguardando Diretoria')&&s.aprovado_dir_nome)
-          stepDetail=s.aprovado_dir_nome;
-        else if(step.st==='Aguardando Comite'&&s.aprovado_dir_nome)
-          stepDetail=s.aprovado_dir_nome;
-        else stepDetail='Concluído ✓';
-      }
-      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0F2F5">'
-        +'<div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:'+bg+';color:'+fg+'">'+(done?'✓':step.n)+'</div>'
-        +'<div style="flex:1"><div style="font-size:13px;font-weight:'+(cur?700:400)+';color:'+tc+'">'+step.lbl+(cur?' <span style="font-size:10px;background:#1565C0;color:#fff;padding:1px 6px;border-radius:10px">Atual</span>':'')+'</div>'
-        +'<div style="font-size:11px;color:'+(done?'#2E7D32':cur?'#E65100':'#ccc')+';margin-top:1px">'+(done?stepDetail:cur?'Aguardando aprovação':'Pendente')+'</div></div></div>';
-    }).join('');
+    const fluxoHtml='<div style="display:flex;align-items:center;gap:0;overflow-x:auto;padding:8px 0">'
+      +fsteps.map((step,si)=>{
+        const ei=ORDER_S.indexOf(step.st);
+        const done=curIdx>ei, cur=s.status===step.st;
+        const bg=done?'#2E7D32':cur?'#1565C0':'#E0E0E0';
+        const fg=done||cur?'#fff':'#9E9E9E';
+        const tc=done?'#2E7D32':cur?'#1565C0':'#9E9E9E';
+        return (si>0?'<div style="flex:1;height:2px;background:'+(done||cur?'#1565C0':'#E0E0E0')+';min-width:8px;margin-top:-12px"></div>':'')
+          +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'
+          +'<div style="width:22px;height:22px;border-radius:50%;background:'+bg+';color:'+fg+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+(done?'✓':step.n)+'</div>'
+          +'<div style="font-size:9px;color:'+tc+';text-align:center;white-space:nowrap;font-weight:'+(cur?700:400)+';max-width:50px;overflow:hidden;text-overflow:ellipsis">'+step.lbl+'</div>'
+          +'</div>';
+      }).join('')
+      +'</div>';
 
-    const hist=[
-      {ico:'👤',bg:'#E3F2FD',cor:'#1565C0',txt:'Solicitado por '+(s.solicitante_nome||'—'),dt:fmtDT(s.data_criacao)},
-      s.aprovado_ger_nome?{ico:'👔',bg:'#E8F5E9',cor:'#2E7D32',txt:'Gerente aprovado: '+s.aprovado_ger_nome,dt:fmtDT(s.aprovado_ger_data)}:null,
-      s.aprovado_dir_nome?{ico:'🏛️',bg:'#E8F5E9',cor:'#1565C0',txt:'Diretoria aprovado: '+s.aprovado_dir_nome,dt:fmtDT(s.aprovado_dir_data)}:null,
-      s.cotacao_por?{ico:'📋',bg:'#FFF3E0',cor:'#E65100',txt:'Cotação registrada por: '+s.cotacao_por,dt:fmtDT(s.cotacao_data)}:null,
-      s.fornecedor?{ico:'🏢',bg:'#F3E5F5',cor:'#6A1B9A',txt:'Fornecedor aprovado: '+s.fornecedor,dt:fmtDT(s.data_aprovacao)}:null,
-      s.comprado_por?{ico:'🛒',bg:'#E3F2FD',cor:'#1565C0',txt:'OC gerada por: '+s.comprado_por,dt:fmtDT(s.comprado_em)}:null,
-      s.entregue_por?{ico:'📦',bg:'#E8F5E9',cor:'#2E7D32',txt:'Entrega confirmada por: '+s.entregue_por,dt:fmtDT(s.entregue_em)}:null,
-    ].filter(Boolean);
-
-    return '<div style="background:#fff;border:1px solid #E0E0E0;border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.08)" id="aprov-card-'+i+'">'
-      // ── HEADER CLICÁVEL (clica para expandir/recolher) ──
-      +'<div style="background:#0F2236;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none" onclick="toggleAprovCard('+i+')">'
-      +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-      +'<span style="background:rgba(255,255,255,.2);color:#fff;padding:5px 14px;border-radius:20px;font-size:14px;font-weight:700">'+s.numero+'</span>'
-      +'<span style="background:#E3F2FD;color:#1565C0;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">'+(isCot?'📋 Cotação':'📝 Solicitação')+'</span>'
-      +'<span style="background:#FFF3E0;color:#E65100;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">⏳ '+stLabel+'</span>'
-      +'<span style="color:rgba(255,255,255,.6);font-size:12px">'+s.loja_nome+'</span>'
-      +'</div>'
-      +'<div style="display:flex;align-items:center;gap:10px">'
-      +'<span style="background:'+pc+';color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">'+(s.urgencia||'Normal')+'</span>'
-      +'<span id="aprov-toggle-'+i+'" style="background:rgba(255,255,255,.2);color:#fff;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0">−</span>'
-      +'</div>'
-      +'</div>'
-
-      // ── BODY COLAPSÁVEL ──
-      +'<div id="aprov-body-'+i+'">'
-      +'<div style="display:grid;grid-template-columns:1fr 220px">'
-      // RIGHT: fluxo + hist
-      +'<div style="background:#FAFAFA;border-left:1px solid #E0E0E0;padding:16px;order:2">'
-      +'<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Fluxo de Aprovação</div>'
-      +fluxoHtml
-      +(hist.length?'<div style="margin-top:14px;border-top:1px solid #E0E0E0;padding-top:12px">'
-        +'<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Histórico</div>'
-        +hist.map(h=>'<div style="display:flex;gap:6px;margin-bottom:8px;align-items:flex-start">'
-          +'<div style="width:24px;height:24px;border-radius:50%;background:'+(h.bg||'#F0F4FF')+';display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">'+h.ico+'</div>'
-          +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:11px;font-weight:600;color:'+(h.cor||'#333')+';word-break:break-word">'+h.txt+'</div>'
-          +'<div style="font-size:10px;color:#9E9E9E;margin-top:1px">'+h.dt+'</div>'
-          +'</div></div>').join('')
-        +'</div>':'')
-      +'</div>'
-      // LEFT: conteúdo
-      +'<div style="padding:18px;border-right:1px solid #E0E0E0;order:1">'
-      +'<div style="font-size:20px;font-weight:700;color:#0F2236;margin-bottom:8px">'+(s.descricao||'Sem descrição')+'</div>'
-      +'<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:12px">'
-      +'<span>🏢 '+(s.loja_nome||'—')+'</span>'
-      +'<span>👤 '+(s.solicitante_nome||'—')+'</span>'
-      +(s.area?'<span>🏷️ '+s.area+'</span>':'')
-      +'<span>📂 '+(s.categoria||s.tipo_compra||'—')+'</span>'
-      +'<span>📅 '+fmtD(s.data_criacao)+'</span>'
-      +'</div>'
-      +(s.justificativa?'<div style="background:#FFFDE7;border-left:4px solid #FDD835;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#555"><b>Observação:</b> '+s.justificativa+'</div>':'')
-
-      // Info grid + Resumo
-      +'<div style="display:grid;grid-template-columns:1fr auto;gap:12px;margin-bottom:16px">'
-      +'<div style="background:#F8F9FA;border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-      +[['Solicitante',s.solicitante_nome||'—'],['Data',fmtD(s.data_criacao)],
-        ['Área',s.area||'—'],['Prioridade',s.urgencia||'Normal'],
-        ['Tipo',s.tipo_compra||'—'],['Categoria',s.categoria||'—'],
-        ['Grupo',s.grupo||'—'],['Previsão',fmtD(s.data_estimada)||'—'],
-      ].map(([l,v])=>'<div><div style="font-size:10px;color:#9E9E9E;font-weight:600;text-transform:uppercase">'+l+'</div><div style="font-size:13px;color:#333;margin-top:1px">'+v+'</div></div>').join('')
-      +'</div>'
-      +'<div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:8px;padding:14px;min-width:190px">'
-      +'<div style="font-size:12px;font-weight:700;color:#1565C0;margin-bottom:10px">Resumo Financeiro</div>'
-      +'<div style="font-size:12px;color:#555;margin-bottom:4px;display:flex;justify-content:space-between"><span>Total Itens:</span><b>R$ '+totalItens.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</b></div>'
-      +'<div style="font-size:12px;color:#9E9E9E;margin-bottom:4px;display:flex;justify-content:space-between"><span>Impostos:</span><span>R$ 0,00</span></div>'
-      +'<div style="font-size:12px;color:#9E9E9E;margin-bottom:8px;display:flex;justify-content:space-between"><span>Frete:</span><span>R$ 0,00</span></div>'
-      +'<div style="border-top:1.5px solid #1565C0;padding-top:8px;display:flex;justify-content:space-between">'
-      +'<b style="font-size:12px;color:#1565C0">Valor Total:</b>'
-      +'<b style="font-size:16px;color:#1565C0">R$ '+(s.valor_estimado||totalItens).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</b>'
-      +'</div></div></div>'
-
-      // Items table
-      +(()=>{
-      // ── TABELA UNIFICADA: Itens + Cotações por Fornecedor ──────────────────
-      let parsedItens=[];
+    // Itens e cotações
+    let itens=[];
+    try{const raw=s.itens_requisicao;if(Array.isArray(raw))itens=raw;else if(typeof raw==='string'&&raw.trim().startsWith('['))itens=JSON.parse(raw);}catch(e){}
+    itens=itens.map(it=>({desc:it.desc||it.descricao||'—',qtd:parseFloat(it.qtd||1),val:parseFloat(it.val||it.valor||0),und:it.und||'UN'}));
+    const totalItens=itens.reduce((a,it)=>a+it.qtd*it.val,0);
+    const cot=S.cot&&S.cot.find?S.cot.find(c=>c.solicitacao_id===s.id):null;
+    let fornEntries=[];
+    if(isCot&&cot){
       try{
-        const raw=s.itens_requisicao;
-        if(Array.isArray(raw)) parsedItens=raw;
-        else if(typeof raw==='string'&&raw.trim().startsWith('[')) parsedItens=JSON.parse(raw);
-        else if(raw&&typeof raw==='object') parsedItens=[raw];
+        const arr=Array.isArray(cot.itens)?cot.itens:(typeof cot.itens==='string'?JSON.parse(cot.itens||'[]'):[]);
+        fornEntries=arr.filter(f=>f.forn||f.fornecedor).map(f=>({
+          forn:f.forn||f.fornecedor,total:parseFloat(f.val||0),pgto:f.pgto||'',
+          itens:(f.itens||[]).map(it=>({desc:it.desc||'—',qtd:parseFloat(it.qtd||1),vunit:parseFloat(it.vunit||0),total:parseFloat(it.total||0)}))
+        }));
       }catch(e){}
-      parsedItens=parsedItens.map(it=>({
-        desc:it.desc||it.descricao||it.description||it.nome||'Item',
-        qtd: parseFloat(it.qtd||it.quantidade||1),
-        val: parseFloat(it.val||it.valor||it.valor_unitario||0),
-        und: it.und||it.unidade||'UN',
-      }));
+    }
+    const melhor=fornEntries.length?fornEntries.reduce((a,b)=>a.total<b.total?a:b,fornEntries[0]):null;
 
-      // Cotações dos fornecedores (se existir)
-      const statusCot=['Aguardando Gerente Cotação','Aguardando Evandro Cotação','Aguardando Aprovação Comite'];
-      const temCot=statusCot.includes(s.status);
-      const cot=S.cot.find(c=>c.solicitacao_id===s.id);
-      let fornEntries=[];
-      if(temCot&&cot){
-        try{
-          const raw=cot.itens;
-          const arr=Array.isArray(raw)?raw:(typeof raw==='string'?JSON.parse(raw||'[]'):[]);
-          fornEntries=arr.filter(f=>f.forn||f.fornecedor).map(f=>({
-            forn:f.forn||f.fornecedor,
-            cnpj:f.cnpj||'',
-            pgto:f.pgto||'',
-            obs:f.obs||'',
-            total:parseFloat(f.val||f.valor||0),
-            itens:(f.itens||[]).map(it=>({
-              desc:it.desc||it.descricao||'—',
-              qtd:parseFloat(it.qtd||1),
-              vunit:parseFloat(it.vunit||it.val||it.valor_unitario||0),
-              total:parseFloat(it.total||0),
-            }))
-          }));
-        }catch(e){}
-      }
-
-      if(!parsedItens.length&&!fornEntries.length) return '';
-
-      const totalOrig=parsedItens.reduce((a,it)=>a+it.qtd*it.val,0);
-      const melhor=fornEntries.length?fornEntries.reduce((a,b)=>a.total<b.total?a:b,fornEntries[0]):null;
-
-      // ── Cabeçalho da tabela ──────────────────────────────────────────────
-      let html='<div style="border:1px solid #0F2236;border-radius:10px;overflow:hidden;margin-bottom:16px">'
-        +'<div style="background:#0F2236;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">'
-        +'<span style="color:#fff;font-size:13px;font-weight:700">📦 Itens da Solicitação'
-        +(fornEntries.length?' + Orçamentos':'')+'</span>'
-        +'<span style="background:rgba(255,255,255,.2);color:#fff;padding:2px 10px;border-radius:20px;font-size:12px">'+parsedItens.length+' item(s)</span>'
+    // Tabela itens + cotações
+    let tabelaHtml='';
+    if(itens.length||fornEntries.length){
+      tabelaHtml='<div style="border:1px solid #E0E0E0;border-radius:8px;overflow:hidden;margin-top:10px">'
+        +'<div style="background:#0F2236;padding:6px 12px;display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="color:#fff;font-size:11px;font-weight:700">📦 Itens'+(fornEntries.length?' + Orçamentos':'')+'</span>'
+        +'<span style="color:rgba(255,255,255,.6);font-size:10px">'+itens.length+' item(s)</span>'
         +'</div>'
-        +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:'+(fornEntries.length?'600':'400')+'px">'
-        +'<thead><tr style="background:#F0F4FF">'
-        +'<th style="padding:10px 12px;text-align:left;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236">DESCRIÇÃO</th>'
-        +'<th style="padding:10px 12px;text-align:center;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236;width:55px">QTD</th>';
-
-      // Colunas dos fornecedores
+        +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'
+        +'<thead><tr style="background:#F8F9FA">'
+        +'<th style="padding:6px 8px;text-align:left;color:#555;font-weight:600">Item</th>'
+        +'<th style="padding:6px 8px;text-align:center;color:#555;font-weight:600;width:40px">Qtd</th>';
       if(fornEntries.length){
         fornEntries.forEach(f=>{
           const isBest=f===melhor;
-          html+='<th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;border-bottom:2px solid '+(isBest?'#2E7D32':'#0F2236')+';color:'+(isBest?'#2E7D32':'#0F2236')+';min-width:120px">'
-            +(isBest?'⭐ ':'')
-            +f.forn.split(' ').slice(0,3).join(' ')
-            +(isBest?'<br><span style="font-size:9px;background:#2E7D32;color:#fff;padding:1px 5px;border-radius:10px">Menor Preço</span>':'')
-            +'</th>';
+          tabelaHtml+='<th style="padding:6px 8px;text-align:right;color:'+(isBest?'#2E7D32':'#555')+';font-weight:'+(isBest?700:600)+';min-width:90px">'+(isBest?'⭐ ':'')+f.forn.split(' ')[0]+'</th>';
         });
       } else {
-        html+='<th style="padding:10px 12px;text-align:right;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236;width:100px">V.UNIT.</th>'
-          +'<th style="padding:10px 12px;text-align:right;font-size:11px;color:#0F2236;font-weight:700;border-bottom:2px solid #0F2236;width:100px">TOTAL</th>';
+        tabelaHtml+='<th style="padding:6px 8px;text-align:right;color:#555;font-weight:600;width:80px">V.Unit</th>'
+          +'<th style="padding:6px 8px;text-align:right;color:#555;font-weight:600;width:80px">Total</th>';
       }
-      html+='</tr></thead><tbody>';
-
-      // ── Linhas de itens ──────────────────────────────────────────────────
-      parsedItens.forEach((it,ii)=>{
-        const rowBg=ii%2===0?'#fff':'#FAFAFA';
-        html+='<tr style="border-top:1px solid #F0F2F5;background:'+rowBg+'">'
-          +'<td style="padding:10px 12px"><div style="font-size:13px;font-weight:600;color:#0F2236">'+it.desc+'</div>'
-          +(it.und&&it.und!=='UN'?'<div style="font-size:10px;color:#9E9E9E">'+it.und+'</div>':'')
-          +'</td>'
-          +'<td style="padding:10px 12px;text-align:center;font-size:14px;font-weight:700;color:#333">'+it.qtd+'</td>';
-
+      tabelaHtml+='</tr></thead><tbody>';
+      itens.forEach((it,ii)=>{
+        tabelaHtml+='<tr style="border-top:1px solid #F0F2F5;background:'+(ii%2?'#FAFAFA':'#fff')+'">'
+          +'<td style="padding:6px 8px;color:#333">'+it.desc+'</td>'
+          +'<td style="padding:6px 8px;text-align:center;font-weight:600">'+it.qtd+'</td>';
         if(fornEntries.length){
-          // Preço de cada fornecedor para este item
           fornEntries.forEach(f=>{
             const isBest=f===melhor;
-            const cotItem=f.itens[ii];
-            const cotVal=cotItem?cotItem.vunit:0;
-            const cotTotal=cotItem?cotItem.total:(cotVal*it.qtd);
-            html+='<td style="padding:10px 12px;text-align:right;background:'+(isBest?'rgba(46,125,50,.05)':'inherit')+'">'
-              +(cotVal?'<div style="font-size:12px;color:#777">R$ '+cotVal.toLocaleString('pt-BR',{minimumFractionDigits:2})+'/un</div>':'')
-              +'<div style="font-size:14px;font-weight:700;color:'+(isBest?'#2E7D32':'#1565C0')+'">'
-              +(cotTotal?'R$ '+cotTotal.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</div>'
-              +'</td>';
+            const ci=f.itens[ii];
+            tabelaHtml+='<td style="padding:6px 8px;text-align:right;background:'+(isBest?'rgba(46,125,50,.05)':'inherit')+';font-weight:700;color:'+(isBest?'#2E7D32':'#1565C0')+'">'
+              +(ci&&ci.total?'R$ '+ci.total.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>';
           });
         } else {
           const tot=it.qtd*it.val;
-          html+='<td style="padding:10px 12px;text-align:right;font-size:13px;color:#555">'
-            +(it.val?'R$ '+it.val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
-            +'<td style="padding:10px 12px;text-align:right;font-size:14px;font-weight:700;color:#1565C0">'
-            +(tot?'R$ '+tot.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>';
+          tabelaHtml+='<td style="padding:6px 8px;text-align:right;color:#555">'+(it.val?'R$ '+it.val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
+            +'<td style="padding:6px 8px;text-align:right;font-weight:700;color:#1565C0">'+(tot?'R$ '+tot.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>';
         }
-        html+='</tr>';
+        tabelaHtml+='</tr>';
       });
-
-      // ── Linha de totais ──────────────────────────────────────────────────
-      html+='</tbody><tfoot><tr style="background:#EFF6FF;border-top:2px solid #0F2236">'
-        +'<td colspan="2" style="padding:10px 12px;font-size:13px;font-weight:700;color:#0F2236">TOTAL GERAL</td>';
+      tabelaHtml+='</tbody><tfoot><tr style="background:#EFF6FF;border-top:2px solid #0F2236">'
+        +'<td colspan="2" style="padding:6px 8px;font-weight:700;color:#0F2236;font-size:11px">TOTAL</td>';
       if(fornEntries.length){
         fornEntries.forEach(f=>{
           const isBest=f===melhor;
-          html+='<td style="padding:10px 12px;text-align:right;background:'+(isBest?'#E8F5E9':'#EFF6FF')+'">'
-            +'<div style="font-size:16px;font-weight:700;color:'+(isBest?'#2E7D32':'#1565C0')+'">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+(isBest?' ✓':'')+'</div>'
-            +(f.pgto?'<div style="font-size:10px;color:#9E9E9E">'+f.pgto+'</div>':'')
-            +'</td>';
+          tabelaHtml+='<td style="padding:6px 8px;text-align:right;background:'+(isBest?'#E8F5E9':'#EFF6FF')+';font-size:13px;font-weight:700;color:'+(isBest?'#2E7D32':'#1565C0')+'">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+(isBest?' ✓':'')+'</td>';
         });
       } else {
-        html+='<td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:700;color:#1565C0" colspan="1">—</td>'
-          +'<td style="padding:10px 12px;text-align:right;font-size:16px;font-weight:700;color:#1565C0">R$ '+totalOrig.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>';
+        tabelaHtml+='<td colspan="2" style="padding:6px 8px;text-align:right;font-size:13px;font-weight:700;color:#1565C0">R$ '+totalItens.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>';
       }
-      html+='</tr></tfoot></table></div>';
-
-      // Botões escolher fornecedor (Comitê)
-      if(s.status==='Aguardando Aprovação Comite'&&fornEntries.length&&cot){
-        html+='<div style="display:grid;grid-template-columns:repeat('+fornEntries.length+',1fr);gap:10px;margin-top:10px">';
+      tabelaHtml+='</tr></tfoot></table></div></div>';
+      // Botões escolher fornecedor
+      if(s.status==='Aguardando Aprovação Comite'&&cot&&fornEntries.length){
+        tabelaHtml+='<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">';
         fornEntries.forEach(f=>{
           const isBest=f===melhor;
-          html+='<button class="btn '+(isBest?'bs':'bl')+' escolher-forn-btn" data-cotid="'+cot.id+'" data-solid="'+s.id+'" data-forn="'+f.forn.replace(/"/g,'&quot;')+'" data-val="'+f.total+'" style="padding:10px;font-weight:700;border-radius:8px">'
-            +(isBest?'⭐ ':'✓ ')+'Escolher '+f.forn.split(' ')[0]+'<br><span style="font-size:11px">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>'
-            +'</button>';
+          tabelaHtml+='<button class="btn '+(isBest?'bs':'bl')+' escolher-forn-btn" data-cotid="'+cot.id+'" data-solid="'+s.id+'" data-forn="'+f.forn.replace(/"/g,'&quot;')+'" data-val="'+f.total+'" style="padding:5px 12px;font-size:11px;border-radius:6px">'+(isBest?'⭐ ':'')+'Escolher '+f.forn.split(' ').slice(0,2).join(' ')+'</button>';
         });
-        html+='</div>';
+        tabelaHtml+='</div>';
       }
-      html+='</div>';
-      return html;
-    })()
+    }
 
-
-      +'</div>' // fecha body colapsável
-      // ── FOOTER BUTTONS ──
-      +'<div style="padding:14px 18px;background:#fff;border-top:2px solid #E0E0E0;display:flex;gap:10px;flex-wrap:wrap">'
+    html+='<div style="border:1px solid #D0D5DD;border-radius:10px;overflow:hidden;margin-bottom:12px">'
+      // ── HEADER ──
+      +'<div style="background:#0F2236;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="display:flex;align-items:center;gap:8px;min-width:0">'
+      +'<span style="background:rgba(255,255,255,.25);color:#fff;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700;white-space:nowrap">'+s.numero+'</span>'
+      +'<span style="color:rgba(255,255,255,.8);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">'+(s.descricao||'').substring(0,50)+'</span>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
+      +'<span style="background:'+pc+';color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">'+(s.urgencia||'Normal')+'</span>'
+      +(s.valor_estimado?'<span style="color:rgba(255,255,255,.8);font-size:11px;font-weight:600">R$ '+parseFloat(s.valor_estimado).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>':'')
+      +'</div>'
+      +'</div>'
+      // ── STATUS + FLUXO ──
+      +'<div style="padding:8px 14px;background:#F8F9FA;border-bottom:1px solid #E0E0E0">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+      +'<span style="background:#FFF3E0;color:#E65100;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">⏳ '+stLabel+'</span>'
+      +'<span style="font-size:11px;color:#777">🏢 '+(s.loja_nome||'—')+'</span>'
+      +(s.area?'<span style="font-size:11px;color:#777">🏷️ '+s.area+'</span>':'')
+      +'</div>'
+      +fluxoHtml
+      +'</div>'
+      // ── CORPO: info + itens ──
+      +'<div style="padding:10px 14px">'
+      +(s.justificativa?'<div style="background:#FFFDE7;border-left:3px solid #FDD835;padding:5px 10px;border-radius:4px;font-size:11px;color:#555;margin-bottom:8px">📋 '+s.justificativa+'</div>':'')
+      +tabelaHtml
+      +'</div>'
+      // ── BOTÕES COMPACTOS ──
+      +'<div style="padding:8px 14px;background:#fff;border-top:1px solid #E0E0E0;display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
       +(s.status==='Aguardando Aprovação Comite'
-        ?'<button class="btn" style="background:#6A1B9A;color:#fff;flex:2;padding:13px;font-size:14px;font-weight:700;border-radius:8px;max-width:280px" onclick="escolherFornDireto('+i+')">🟣 Escolher Fornecedor</button>'
-        :('<button class="btn bs aprov-btn-aprovar" onclick="aprovarDireto('+i+')" style="flex:2;padding:13px;font-size:14px;font-weight:700;border-radius:8px;max-width:300px">✅ Aprovar — Encaminhar para próxima etapa</button>'
-          +'<button class="btn" style="background:#FF6F00;color:#fff;flex:1;padding:13px;font-size:13px;font-weight:700;border-radius:8px;max-width:220px" onclick="ajusteDireto('+i+')">⚠️ Solicitar Alterações</button>'
-          +'<button class="btn bd" onclick="reprovarDireto('+i+')" style="padding:13px 24px;font-size:13px;font-weight:700;border-radius:8px">✕ Reprovar</button>'))
-      +'<button class="btn bl" onclick="verDetalhesDireto('+i+')" style="padding:13px 20px;font-size:13px;border-radius:8px;margin-left:auto">🔍 Ver Detalhes</button>'
+        ?'<button class="btn" style="background:#6A1B9A;color:#fff;padding:5px 14px;font-size:12px;font-weight:600;border-radius:6px" onclick="escolherFornDireto('+i+')">🟣 Escolher Fornecedor</button>'
+        :'<button class="btn bs aprov-btn-aprovar" onclick="aprovarDireto('+i+')" style="padding:5px 14px;font-size:12px;font-weight:700;border-radius:6px">✅ Aprovar</button>'
+        +'<button class="btn" style="background:#FF6F00;color:#fff;padding:5px 12px;font-size:12px;border-radius:6px" onclick="ajusteDireto('+i+')">⚠️ Alteração</button>'
+        +'<button class="btn bd" onclick="reprovarDireto('+i+')" style="padding:5px 12px;font-size:12px;border-radius:6px">✕ Reprovar</button>')
+      +'<button class="btn bl" onclick="verDetalhesDireto('+i+')" style="padding:5px 12px;font-size:11px;border-radius:6px;margin-left:auto">🔍 Detalhes</button>'
       +'</div>'
       +'</div>';
-  }).join('');
+  });
+  return html;
 };
 
 // Helper: build approval flow sidebar
