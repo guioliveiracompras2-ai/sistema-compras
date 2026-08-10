@@ -2965,38 +2965,38 @@ async function salvarEdicaoAjuste(solId,numItens){
 async function hSt(id,status){
   document.querySelectorAll('.aprov-btn-aprovar').forEach(b=>{b.disabled=true;b.textContent='Aprovando...';});
   try{
-    const nome=(S.user?.nome||'')+' '+(S.user?.sobrenome||'');
+    // Nome com fallback robusto
+    const nomeBase=((S.user?.nome||'').trim()+' '+(S.user?.sobrenome||'').trim()).trim();
+    const nome=nomeBase||S.user?.login||'Sistema';
     const agora=new Date().toISOString();
+
+    // Atualiza status (operação principal)
     const upd={status};
     if(status==='Aprovada')upd.data_aprovacao=agora;
+    if(status==='Reprovada')upd.data_aprovacao=agora;
 
-    // Salva nome do aprovador por etapa
-    const etapasGerente=['Aguardando Evandro','Aguardando Diretoria','Reprovada'];
-    const etapasDir=['Aguardando Comite','Aguardando Orçamento','Aguardando Aprovação Comite'];
-    if(etapasGerente.includes(status)){
-      upd.aprovado_ger_nome=nome.trim();
-      upd.aprovado_ger_data=agora;
-    }
-    if(etapasDir.includes(status)){
-      upd.aprovado_dir_nome=nome.trim();
-      upd.aprovado_dir_data=agora;
-    }
-    if(status==='Aprovada'&&isComite()){
-      upd.aprovado_dir_nome=nome.trim(); // Comitê usa campo dir para cotação
-      upd.aprovado_dir_data=agora;
-    }
+    // Salva aprovador (ignora erro se coluna não aceitar)
+    const etapasGerente=['Aguardando Evandro','Aguardando Evandro Cotação','Aguardando Diretoria','Reprovada'];
+    const etapasDir=['Aguardando Comite','Aguardando Orçamento','Aguardando Aprovação Comite','Aprovada'];
+    if(etapasGerente.includes(status)&&nome){upd.aprovado_ger_nome=nome;upd.aprovado_ger_data=agora;}
+    if(etapasDir.includes(status)&&nome){upd.aprovado_dir_nome=nome;upd.aprovado_dir_data=agora;}
+
+    console.log('[hSt] id='+id+' status='+status+' nome='+nome);
 
     const res=await sb.from('solicitacoes').update(upd).eq('id',id);
     if(res.error){
-      alert('Erro: '+res.error.message+' | Código: '+res.error.code);
+      console.error('[hSt] Erro:', res.error);
+      alert('❌ Erro ao aprovar:\n'+res.error.message+'\nCódigo: '+res.error.code+'\n\nVerifique o RLS no Supabase.');
       document.querySelectorAll('.aprov-btn-aprovar').forEach(b=>{b.disabled=false;b.textContent='✅ Aprovar';});
       return;
     }
+    console.log('[hSt] Sucesso!');
     closeModal();
     await loadSol();
     render();
   }catch(e){
-    alert('Erro: '+e.message);
+    console.error('[hSt] Exception:', e);
+    alert('❌ Erro inesperado: '+e.message);
     document.querySelectorAll('.aprov-btn-aprovar').forEach(b=>{b.disabled=false;b.textContent='✅ Aprovar';});
   }
 }
