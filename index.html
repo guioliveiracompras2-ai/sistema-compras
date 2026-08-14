@@ -3002,25 +3002,44 @@ async function hSt(id,status){
 }
 
 async function hEscolherForn(cotId,solId,forn,val){
-  if(!isDiretoria())return alert('⛔ Apenas a Diretoria pode escolher o fornecedor.');
-  if(!confirm('Confirma escolha de '+forn+' por '+fmt(val)+'?'))return;
-  const obs=V('ov');
-  const nome=`${S.user.nome} ${S.user.sobrenome}`;
-  const agora=new Date().toISOString();
+  // Apenas Comitê ou Gestor podem escolher fornecedor
+  if(!isComite()&&!isGestor())return alert('⛔ Apenas o Comitê pode escolher o fornecedor.');
+  if(!confirm('Confirmar escolha de:\n\n🏢 '+forn+'\n💰 R$ '+parseFloat(val).toLocaleString('pt-BR',{minimumFractionDigits:2})))return;
   try{
-    // Apenas marca o vencedor — não fecha a cotação ainda
-    if(cotId)await sb.from('cotacoes').update({vencedor:forn}).eq('id',cotId);
-    // Base - sempre funciona
+    const nomeBase=((S.user?.nome||'').trim()+' '+(S.user?.sobrenome||'').trim()).trim();
+    const nome=nomeBase||S.user?.login||'Sistema';
+    const agora=new Date().toISOString();
     const sol=S.sol.find(s=>s.id===solId);
-    const novoStatusEsc=(sol?.grupo==='BMMOT'||sol?.status==='Aguardando Aprovação Comite')?'Aprovada':'Aguardando Aprovação Gerente';
-    const upd={status:novoStatusEsc,fornecedor:forn,valor_final:val};
-    if(obs)upd.observacoes=obs;
-    await sb.from('solicitacoes').update(upd).eq('id',solId);
-    // Auditoria - não bloqueia se colunas não existem
-    await sb.from('solicitacoes').update({aprovado_dir_nome:nome,aprovado_dir_data:agora}).eq('id',solId).then(()=>{}).catch(()=>{});
-    closeModal();await loadSol();await loadCot();render();
-    alert('✅ '+forn+' escolhido! Enviado para aprovação do Gerente.');
-  }catch(e){alert(e.message);}
+    const novoStatus='Aprovada';
+
+    // 1. Marca vencedor na cotação
+    if(cotId){
+      await sb.from('cotacoes').update({vencedor:forn,valor_final:val}).eq('id',cotId);
+    }
+    // 2. Atualiza solicitação
+    const upd={
+      status:novoStatus,
+      fornecedor:forn,
+      valor_final:parseFloat(val),
+      aprovado_dir_nome:nome,
+      aprovado_dir_data:agora,
+      data_aprovacao:agora,
+    };
+    const res=await sb.from('solicitacoes').update(upd).eq('id',solId);
+    if(res.error){
+      console.error('[hEscolherForn]',res.error);
+      return alert('❌ Erro ao escolher fornecedor:\n'+res.error.message);
+    }
+    console.log('[hEscolherForn] Sucesso! '+forn+' → '+novoStatus);
+    closeModal();
+    await loadSol();
+    await loadCot();
+    render();
+    alert('✅ Fornecedor escolhido!\n\n🏢 '+forn+'\n💰 R$ '+parseFloat(val).toLocaleString('pt-BR',{minimumFractionDigits:2})+'\n\n📋 Solicitação Aprovada!');
+  }catch(e){
+    console.error('[hEscolherForn] Exception:',e);
+    alert('❌ Erro: '+e.message);
+  }
 }
 
 async function qSt(id,status){
@@ -3540,7 +3559,24 @@ function pgAprovacoes(){
           const isBest=f===melhor;
           tabelaHtml+='<td style="padding:6px 8px;text-align:right;background:'+(isBest?'#E8F5E9':'#EFF6FF')+';font-size:13px;font-weight:700;color:'+(isBest?'#2E7D32':'#1565C0')+'">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+(isBest?' ✓':'')+'</td>';
         });
-      } else {
+      }
+      // Botão ESCOLHER por fornecedor dentro da tabela
+      if(s.status==='Aguardando Aprovação Comite'&&cot&&fornEntries.length){
+        tabelaHtml+='</tr></tfoot></table></div>';
+        tabelaHtml+='<div style="display:grid;grid-template-columns:repeat('+fornEntries.length+',1fr);gap:8px;padding:10px 0 4px">';
+        fornEntries.forEach(f=>{
+          const isBest=f===melhor;
+          tabelaHtml+='<button class="btn escolher-forn-btn" data-cotid="'+(cot?cot.id:'')+'" data-solid="'+s.id+'" data-forn="'+f.forn.replace(/"/g,'&quot;')+'" data-val="'+f.total
+            +'" style="padding:10px;font-size:12px;font-weight:700;border-radius:8px;background:'+(isBest?'#2E7D32':'#1565C0')+';color:#fff;border:none;cursor:pointer;position:relative">'
+            +(isBest?'⭐ Escolher (Menor Preço)<br>':'Escolher<br>')
+            +'<span style="font-size:14px">'+f.forn.split(' ').slice(0,2).join(' ')+'</span><br>'
+            +'<span style="font-size:13px;font-weight:800">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>'
+            +'</button>';
+        });
+        tabelaHtml+='</div>';
+        return '<div>'+tabelaHtml+'</div>';
+      }
+      if(!fornEntries.length){
         tabelaHtml+='<td colspan="2" style="padding:6px 8px;text-align:right;font-size:13px;font-weight:700;color:#1565C0">R$ '+totalItens.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>';
       }
       tabelaHtml+='</tr></tfoot></table></div></div>';
@@ -3582,13 +3618,13 @@ function pgAprovacoes(){
       +tabelaHtml
       +'</div>'
       // ── BOTÕES COMPACTOS ──
-      +'<div style="padding:8px 14px;background:#fff;border-top:1px solid #E0E0E0;display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+      +'<div style="padding:8px 14px;background:#F8F9FA;border-top:2px solid #E0E0E0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
       +(s.status==='Aguardando Aprovação Comite'
-        ?'<button class="btn" style="background:#6A1B9A;color:#fff;padding:5px 14px;font-size:12px;font-weight:600;border-radius:6px" onclick="escolherFornDireto('+i+')">🟣 Escolher Fornecedor</button>'
-        :'<button class="btn bs aprov-btn-aprovar" onclick="aprovarDireto('+i+')" style="padding:5px 14px;font-size:12px;font-weight:700;border-radius:6px">✅ Aprovar</button>'
-        +'<button class="btn" style="background:#FF6F00;color:#fff;padding:5px 12px;font-size:12px;border-radius:6px" onclick="ajusteDireto('+i+')">⚠️ Alteração</button>'
-        +'<button class="btn bd" onclick="reprovarDireto('+i+')" style="padding:5px 12px;font-size:12px;border-radius:6px">✕ Reprovar</button>')
-      +'<button class="btn bl" onclick="verDetalhesDireto('+i+')" style="padding:5px 12px;font-size:11px;border-radius:6px;margin-left:auto">🔍 Detalhes</button>'
+        ?'<span style="font-size:12px;color:#6A1B9A;font-weight:600">🟣 Escolha o fornecedor na tabela acima</span>'
+        :'<button class="btn bs aprov-btn-aprovar" onclick="aprovarDireto('+i+')" style="padding:8px 20px;font-size:13px;font-weight:700;border-radius:8px;min-width:120px">✅ Aprovar</button>'
+        +'<button class="btn" style="background:#FF6F00;color:#fff;padding:8px 14px;font-size:12px;font-weight:600;border-radius:8px" onclick="ajusteDireto('+i+')">⚠️ Ajuste</button>'
+        +'<button class="btn bd" onclick="reprovarDireto('+i+')" style="padding:8px 14px;font-size:12px;font-weight:600;border-radius:8px">✕ Reprovar</button>')
+      +'<button class="btn bl" onclick="verDetalhesDireto('+i+')" style="padding:7px 12px;font-size:11px;border-radius:8px;margin-left:auto;opacity:0.7">🔍 Detalhes</button>'
       +'</div>'
       +'</div>';
   });
