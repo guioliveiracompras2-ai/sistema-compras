@@ -3435,37 +3435,36 @@ function pgAprovacoes(){
   });
 
   if(!_aprovPendentes.length){
-    return '<div style="text-align:center;padding:60px 20px">'
-      +'<div style="font-size:56px;margin-bottom:12px">✅</div>'
-      +'<div style="font-size:18px;font-weight:700;color:#0F2236;margin-bottom:6px">Tudo em dia!</div>'
-      +'<div style="font-size:13px;color:#9E9E9E">Nenhuma aprovação pendente para você.</div>'
-      +'</div>';
+    return '<div style="text-align:center;padding:60px 20px">'+
+      '<div style="font-size:56px;margin-bottom:12px">✅</div>'+
+      '<div style="font-size:18px;font-weight:700;color:#0F2236;margin-bottom:6px">Tudo em dia!</div>'+
+      '<div style="font-size:13px;color:#9E9E9E">Nenhuma aprovação pendente.</div>'+
+      '</div>';
   }
 
-  let html='<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">'
-    +'<div style="font-size:16px;font-weight:700;color:#0F2236">Minhas Aprovações <span style="background:#E65100;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px">'+_aprovPendentes.length+'</span></div>'
-    +'</div>';
+  let html='';
 
   _aprovPendentes.forEach((s,i)=>{
+    const grupo=s.grupo||'DHG';
     const isCot=['Aguardando Gerente Cotação','Aguardando Evandro Cotação',
       'Aguardando Aprovação Comite','Aguardando Aprovação Diretoria'].includes(s.status);
     const stLabel=statusLabel(s.status);
-    const grupo=s.grupo||'DHG';
-    const proxMap={
-      'Aguardando Gerente':grupo==='BMMOT'?'Aguardando Evandro':'Aguardando Diretoria',
-      'Aguardando Evandro':'Aguardando Comite',
-      'Aguardando Comite':'Aguardando Orçamento',
-      'Aguardando Diretoria':'Aguardando Orçamento',
-      'Aguardando Gerente Cotação':'Aguardando Evandro Cotação',
-      'Aguardando Evandro Cotação':'Aguardando Aprovação Comite',
-      'Aguardando Aprovação Comite':'Aprovada',
-      'Aguardando Aprovação Diretoria':grupo==='BMMOT'?'Aprovada':'Aguardando Aprovação Gerente',
-      'Aguardando Aprovação Gerente':'Aprovada',
-    };
-    const prox=proxMap[s.status]||'';
     const pc=s.urgencia==='Alta'?'#C62828':s.urgencia==='Media'||s.urgencia==='Média'?'#E65100':'#2E7D32';
 
-    // Fluxo compacto horizontal
+    // proxMap
+    const proxMap={
+      'Aguardando Gerente':          grupo==='BMMOT'?'Aguardando Evandro':'Aguardando Diretoria',
+      'Aguardando Evandro':          'Aguardando Comite',
+      'Aguardando Comite':           'Aguardando Orçamento',
+      'Aguardando Diretoria':        'Aguardando Orçamento',
+      'Aguardando Gerente Cotação':  'Aguardando Evandro Cotação',
+      'Aguardando Evandro Cotação':  'Aguardando Aprovação Comite',
+      'Aguardando Aprovação Comite': 'Aprovada',
+      'Aguardando Aprovação Diretoria': grupo==='BMMOT'?'Aprovada':'Aguardando Aprovação Gerente',
+      'Aguardando Aprovação Gerente':'Aprovada',
+    };
+
+    // Fluxo horizontal
     const ORDER_S=['Aguardando Gerente','Aguardando Evandro','Aguardando Comite','Aguardando Diretoria',
       'Aguardando Orçamento','Aguardando Gerente Cotação','Aguardando Evandro Cotação',
       'Aguardando Aprovação Comite','Aguardando Aprovação Diretoria','Aguardando Aprovação Gerente',
@@ -3473,161 +3472,176 @@ function pgAprovacoes(){
     const fsteps=grupo==='BMMOT'
       ?[{n:1,lbl:'Gerente',st:'Aguardando Gerente'},{n:2,lbl:'Diretoria',st:'Aguardando Evandro'},
         {n:3,lbl:'Comitê',st:'Aguardando Comite'},{n:4,lbl:'Compras',st:'Aguardando Orçamento'},
-        ...(isCot?[{n:5,lbl:'Ger.Cot',st:'Aguardando Gerente Cotação'},{n:6,lbl:'Dir.Cot',st:'Aguardando Evandro Cotação'},{n:7,lbl:'Comitê',st:'Aguardando Aprovação Comite'}]:[]),
+        ...(isCot?[{n:5,lbl:'Ger.Cot',st:'Aguardando Gerente Cotação'},{n:6,lbl:'Dir.Cot',st:'Aguardando Evandro Cotação'},{n:7,lbl:'Comitê Escolhe',st:'Aguardando Aprovação Comite'}]:[]),
         {n:isCot?8:5,lbl:'Aprovada',st:'Aprovada'}]
       :[{n:1,lbl:'Diretoria',st:'Aguardando Diretoria'},{n:2,lbl:'Compras',st:'Aguardando Orçamento'},
         {n:3,lbl:'Dir.Final',st:'Aguardando Aprovação Diretoria'},{n:4,lbl:'Gerente',st:'Aguardando Aprovação Gerente'},
         {n:5,lbl:'Aprovada',st:'Aprovada'}];
     const curIdx=ORDER_S.indexOf(s.status);
-    const fluxoHtml='<div style="display:flex;align-items:center;gap:0;overflow-x:auto;padding:8px 0">'
+    const fluxoHtml='<div style="display:flex;align-items:center;overflow-x:auto;padding:6px 0">'
       +fsteps.map((step,si)=>{
         const ei=ORDER_S.indexOf(step.st);
-        const done=curIdx>ei, cur=s.status===step.st;
-        const bg=done?'#2E7D32':cur?'#1565C0':'#E0E0E0';
-        const fg=done||cur?'#fff':'#9E9E9E';
-        const tc=done?'#2E7D32':cur?'#1565C0':'#9E9E9E';
-        return (si>0?'<div style="flex:1;height:2px;background:'+(done||cur?'#1565C0':'#E0E0E0')+';min-width:8px;margin-top:-12px"></div>':'')
-          +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'
-          +'<div style="width:22px;height:22px;border-radius:50%;background:'+bg+';color:'+fg+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">'+(done?'✓':step.n)+'</div>'
-          +'<div style="font-size:9px;color:'+tc+';text-align:center;white-space:nowrap;font-weight:'+(cur?700:400)+';max-width:50px;overflow:hidden;text-overflow:ellipsis">'+step.lbl+'</div>'
-          +'</div>';
-      }).join('')
-      +'</div>';
+        const done=curIdx>ei,cur=s.status===step.st;
+        const clr=done?'#2E7D32':cur?'#1565C0':'#E0E0E0';
+        return (si>0?'<div style="flex:1;height:2px;background:'+clr+';margin-top:-12px;min-width:6px"></div>':'')+
+          '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+
+          '<div style="width:22px;height:22px;border-radius:50%;background:'+(done?'#2E7D32':cur?'#1565C0':'#E0E0E0')+';color:'+(done||cur?'#fff':'#9E9E9E')+';display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">'+
+          (done?'✓':step.n)+'</div>'+
+          '<div style="font-size:9px;color:'+(cur?'#1565C0':done?'#2E7D32':'#9E9E9E')+';font-weight:'+(cur?700:400)+';text-align:center;max-width:48px">'+ step.lbl+(cur?'◀':'')+'</div></div>';
+      }).join('')+'</div>';
 
-    // Itens e cotações
+    // Parse itens
     let itens=[];
     try{const raw=s.itens_requisicao;if(Array.isArray(raw))itens=raw;else if(typeof raw==='string'&&raw.trim().startsWith('['))itens=JSON.parse(raw);}catch(e){}
     itens=itens.map(it=>({desc:it.desc||it.descricao||'—',qtd:parseFloat(it.qtd||1),val:parseFloat(it.val||it.valor||0),und:it.und||'UN'}));
     const totalItens=itens.reduce((a,it)=>a+it.qtd*it.val,0);
+
+    // Parse cotação
     const cot=S.cot&&S.cot.find?S.cot.find(c=>c.solicitacao_id===s.id):null;
     let fornEntries=[];
     if(isCot&&cot){
       try{
         const arr=Array.isArray(cot.itens)?cot.itens:(typeof cot.itens==='string'?JSON.parse(cot.itens||'[]'):[]);
         fornEntries=arr.filter(f=>f.forn||f.fornecedor).map(f=>({
-          forn:f.forn||f.fornecedor,total:parseFloat(f.val||0),pgto:f.pgto||'',
-          itens:(f.itens||[]).map(it=>({desc:it.desc||'—',qtd:parseFloat(it.qtd||1),vunit:parseFloat(it.vunit||0),total:parseFloat(it.total||0)}))
+          forn:f.forn||f.fornecedor,total:parseFloat(f.val||f.valor||0),pgto:f.pgto||'',
+          itens:(f.itens||[]).map(it=>({desc:it.desc||it.descricao||'—',qtd:parseFloat(it.qtd||1),vunit:parseFloat(it.vunit||it.val||0),total:parseFloat(it.total||0)}))
         }));
       }catch(e){}
     }
     const melhor=fornEntries.length?fornEntries.reduce((a,b)=>a.total<b.total?a:b,fornEntries[0]):null;
 
-    // Tabela itens + cotações
+    // Tabela itens + cotação (sem return antecipado)
     let tabelaHtml='';
     if(itens.length||fornEntries.length){
-      tabelaHtml='<div style="border:1px solid #E0E0E0;border-radius:8px;overflow:hidden;margin-top:10px">'
-        +'<div style="background:#0F2236;padding:6px 12px;display:flex;justify-content:space-between;align-items:center">'
-        +'<span style="color:#fff;font-size:11px;font-weight:700">📦 Itens'+(fornEntries.length?' + Orçamentos':'')+'</span>'
-        +'<span style="color:rgba(255,255,255,.6);font-size:10px">'+itens.length+' item(s)</span>'
-        +'</div>'
-        +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'
-        +'<thead><tr style="background:#F8F9FA">'
-        +'<th style="padding:6px 8px;text-align:left;color:#555;font-weight:600">Item</th>'
-        +'<th style="padding:6px 8px;text-align:center;color:#555;font-weight:600;width:40px">Qtd</th>';
-      if(fornEntries.length){
+      const temCot=fornEntries.length>0;
+      tabelaHtml+='<div style="border:1px solid #E0E0E0;border-radius:8px;overflow:hidden;margin-top:8px">'+
+        '<div style="background:#0F2236;padding:6px 12px;display:flex;justify-content:space-between;align-items:center">'+
+        '<span style="color:#fff;font-size:11px;font-weight:700">📦 Itens'+(temCot?' + Orçamentos':'')+'</span>'+
+        '<span style="color:rgba(255,255,255,.6);font-size:10px">'+itens.length+' item(s)</span></div>'+
+        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'+
+        '<thead><tr style="background:#F8F9FA">'+
+        '<th style="padding:6px 8px;text-align:left;color:#555;font-weight:600">Descrição</th>'+
+        '<th style="padding:6px 8px;text-align:center;color:#555;font-weight:600;width:40px">Qtd</th>';
+      if(temCot){
         fornEntries.forEach(f=>{
           const isBest=f===melhor;
           tabelaHtml+='<th style="padding:6px 8px;text-align:right;color:'+(isBest?'#2E7D32':'#555')+';font-weight:'+(isBest?700:600)+';min-width:90px">'+(isBest?'⭐ ':'')+f.forn.split(' ')[0]+'</th>';
         });
-      } else {
-        tabelaHtml+='<th style="padding:6px 8px;text-align:right;color:#555;font-weight:600;width:80px">V.Unit</th>'
-          +'<th style="padding:6px 8px;text-align:right;color:#555;font-weight:600;width:80px">Total</th>';
+      }else{
+        tabelaHtml+='<th style="padding:6px 8px;text-align:right;color:#555;font-weight:600;width:80px">V.Unit</th>'+
+          '<th style="padding:6px 8px;text-align:right;color:#555;font-weight:600;width:80px">Total</th>';
       }
       tabelaHtml+='</tr></thead><tbody>';
       itens.forEach((it,ii)=>{
-        tabelaHtml+='<tr style="border-top:1px solid #F0F2F5;background:'+(ii%2?'#FAFAFA':'#fff')+'">'
-          +'<td style="padding:6px 8px;color:#333">'+it.desc+'</td>'
-          +'<td style="padding:6px 8px;text-align:center;font-weight:600">'+it.qtd+'</td>';
-        if(fornEntries.length){
+        tabelaHtml+='<tr style="border-top:1px solid #F0F2F5;background:'+(ii%2?'#FAFAFA':'#fff')+'">'+
+          '<td style="padding:6px 8px;color:#333">'+it.desc+'</td>'+
+          '<td style="padding:6px 8px;text-align:center;font-weight:600">'+it.qtd+'</td>';
+        if(temCot){
           fornEntries.forEach(f=>{
             const isBest=f===melhor;
             const ci=f.itens[ii];
-            tabelaHtml+='<td style="padding:6px 8px;text-align:right;background:'+(isBest?'rgba(46,125,50,.05)':'inherit')+';font-weight:700;color:'+(isBest?'#2E7D32':'#1565C0')+'">'
-              +(ci&&ci.total?'R$ '+ci.total.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>';
+            tabelaHtml+='<td style="padding:6px 8px;text-align:right;font-weight:700;color:'+(isBest?'#2E7D32':'#1565C0')+';background:'+(isBest?'rgba(46,125,50,.05)':'inherit')+'">'+
+              (ci&&ci.total?'R$ '+ci.total.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>';
           });
-        } else {
+        }else{
           const tot=it.qtd*it.val;
-          tabelaHtml+='<td style="padding:6px 8px;text-align:right;color:#555">'+(it.val?'R$ '+it.val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'
-            +'<td style="padding:6px 8px;text-align:right;font-weight:700;color:#1565C0">'+(tot?'R$ '+tot.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>';
+          tabelaHtml+='<td style="padding:6px 8px;text-align:right;color:#555">'+(it.val?'R$ '+it.val.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>'+
+            '<td style="padding:6px 8px;text-align:right;font-weight:700;color:#1565C0">'+(tot?'R$ '+tot.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—')+'</td>';
         }
         tabelaHtml+='</tr>';
       });
-      tabelaHtml+='</tbody><tfoot><tr style="background:#EFF6FF;border-top:2px solid #0F2236">'
-        +'<td colspan="2" style="padding:6px 8px;font-weight:700;color:#0F2236;font-size:11px">TOTAL</td>';
-      if(fornEntries.length){
+      // Linha total
+      tabelaHtml+='</tbody><tfoot><tr style="background:#EFF6FF;border-top:2px solid #0F2236">'+
+        '<td colspan="2" style="padding:6px 8px;font-weight:700;color:#0F2236">TOTAL</td>';
+      if(temCot){
         fornEntries.forEach(f=>{
           const isBest=f===melhor;
           tabelaHtml+='<td style="padding:6px 8px;text-align:right;background:'+(isBest?'#E8F5E9':'#EFF6FF')+';font-size:13px;font-weight:700;color:'+(isBest?'#2E7D32':'#1565C0')+'">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+(isBest?' ✓':'')+'</td>';
         });
-      }
-      // Botão ESCOLHER por fornecedor dentro da tabela
-      if(s.status==='Aguardando Aprovação Comite'&&cot&&fornEntries.length){
-        tabelaHtml+='</tr></tfoot></table></div>';
-        tabelaHtml+='<div style="display:grid;grid-template-columns:repeat('+fornEntries.length+',1fr);gap:8px;padding:10px 0 4px">';
-        fornEntries.forEach(f=>{
-          const isBest=f===melhor;
-          tabelaHtml+='<button class="btn escolher-forn-btn" data-cotid="'+(cot?cot.id:'')+'" data-solid="'+s.id+'" data-forn="'+f.forn.replace(/"/g,'&quot;')+'" data-val="'+f.total
-            +'" style="padding:10px;font-size:12px;font-weight:700;border-radius:8px;background:'+(isBest?'#2E7D32':'#1565C0')+';color:#fff;border:none;cursor:pointer;position:relative">'
-            +(isBest?'⭐ Escolher (Menor Preço)<br>':'Escolher<br>')
-            +'<span style="font-size:14px">'+f.forn.split(' ').slice(0,2).join(' ')+'</span><br>'
-            +'<span style="font-size:13px;font-weight:800">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>'
-            +'</button>';
-        });
-        tabelaHtml+='</div>';
-        return '<div>'+tabelaHtml+'</div>';
-      }
-      if(!fornEntries.length){
+      }else{
         tabelaHtml+='<td colspan="2" style="padding:6px 8px;text-align:right;font-size:13px;font-weight:700;color:#1565C0">R$ '+totalItens.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>';
       }
       tabelaHtml+='</tr></tfoot></table></div></div>';
-      // Botões escolher fornecedor
+
+      // Botões escolher fornecedor (APENAS para Aguardando Aprovação Comite)
       if(s.status==='Aguardando Aprovação Comite'&&cot&&fornEntries.length){
-        tabelaHtml+='<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">';
+        tabelaHtml+='<div style="display:grid;grid-template-columns:repeat('+fornEntries.length+',1fr);gap:8px;margin-top:8px">';
         fornEntries.forEach(f=>{
           const isBest=f===melhor;
-          tabelaHtml+='<button class="btn '+(isBest?'bs':'bl')+' escolher-forn-btn" data-cotid="'+cot.id+'" data-solid="'+s.id+'" data-forn="'+f.forn.replace(/"/g,'&quot;')+'" data-val="'+f.total+'" style="padding:5px 12px;font-size:11px;border-radius:6px">'+(isBest?'⭐ ':'')+'Escolher '+f.forn.split(' ').slice(0,2).join(' ')+'</button>';
+          const cotIdSafe=cot.id||''
+          tabelaHtml+='<button class="escolher-forn-btn" '+
+            'data-cotid="'+cotIdSafe+'" '+
+            'data-solid="'+s.id+'" '+
+            'data-forn="'+f.forn.replace(/"/g,'&quot;')+ '" '+
+            'data-val="'+f.total+'" '+
+            'style="padding:12px 8px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;background:'+(isBest?'#2E7D32':'#1565C0')+';color:#fff">'+
+            (isBest?'⭐ Escolher (Menor Preço)<br>':'Escolher<br>')+
+            '<span style="font-size:13px">'+f.forn.split(' ').slice(0,2).join(' ')+'</span><br>'+
+            '<b>R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</b>'+
+            '</button>';
         });
         tabelaHtml+='</div>';
       }
     }
 
-    html+='<div style="border:1px solid #D0D5DD;border-radius:10px;overflow:hidden;margin-bottom:12px">'
-      // ── HEADER ──
-      +'<div style="background:#0F2236;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">'
-      +'<div style="display:flex;align-items:center;gap:8px;min-width:0">'
-      +'<span style="background:rgba(255,255,255,.25);color:#fff;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700;white-space:nowrap">'+s.numero+'</span>'
-      +'<span style="color:rgba(255,255,255,.8);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">'+(s.descricao||'').substring(0,50)+'</span>'
-      +'</div>'
-      +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
-      +'<span style="background:'+pc+';color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">'+(s.urgencia||'Normal')+'</span>'
-      +(s.valor_estimado?'<span style="color:rgba(255,255,255,.8);font-size:11px;font-weight:600">R$ '+parseFloat(s.valor_estimado).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>':'')
-      +'</div>'
-      +'</div>'
-      // ── STATUS + FLUXO ──
-      +'<div style="padding:8px 14px;background:#F8F9FA;border-bottom:1px solid #E0E0E0">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
-      +'<span style="background:#FFF3E0;color:#E65100;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">⏳ '+stLabel+'</span>'
-      +'<span style="font-size:11px;color:#777">🏢 '+(s.loja_nome||'—')+'</span>'
-      +(s.area?'<span style="font-size:11px;color:#777">🏷️ '+s.area+'</span>':'')
-      +'</div>'
-      +fluxoHtml
-      +'</div>'
-      // ── CORPO: info + itens ──
-      +'<div style="padding:10px 14px">'
-      +(s.justificativa?'<div style="background:#FFFDE7;border-left:3px solid #FDD835;padding:5px 10px;border-radius:4px;font-size:11px;color:#555;margin-bottom:8px">📋 '+s.justificativa+'</div>':'')
-      +tabelaHtml
-      +'</div>'
-      // ── BOTÕES COMPACTOS ──
-      +'<div style="padding:8px 14px;background:#F8F9FA;border-top:2px solid #E0E0E0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-      +(s.status==='Aguardando Aprovação Comite'
-        ?'<span style="font-size:12px;color:#6A1B9A;font-weight:600">🟣 Escolha o fornecedor na tabela acima</span>'
-        :'<button class="btn bs aprov-btn-aprovar" onclick="aprovarDireto('+i+')" style="padding:8px 20px;font-size:13px;font-weight:700;border-radius:8px;min-width:120px">✅ Aprovar</button>'
-        +'<button class="btn" style="background:#FF6F00;color:#fff;padding:8px 14px;font-size:12px;font-weight:600;border-radius:8px" onclick="ajusteDireto('+i+')">⚠️ Ajuste</button>'
-        +'<button class="btn bd" onclick="reprovarDireto('+i+')" style="padding:8px 14px;font-size:12px;font-weight:600;border-radius:8px">✕ Reprovar</button>')
-      +'<button class="btn bl" onclick="verDetalhesDireto('+i+')" style="padding:7px 12px;font-size:11px;border-radius:8px;margin-left:auto;opacity:0.7">🔍 Detalhes</button>'
-      +'</div>'
-      +'</div>';
+    // Histórico compacto
+    const hist=[
+      {ico:'👤',bg:'#E3F2FD',cor:'#1565C0',txt:'Solicitado: '+(s.solicitante_nome||'—'),dt:fmtDT(s.data_criacao)},
+      s.aprovado_ger_nome?{ico:'👔',bg:'#E8F5E9',cor:'#2E7D32',txt:'Gerente: '+s.aprovado_ger_nome,dt:fmtDT(s.aprovado_ger_data)}:null,
+      s.aprovado_dir_nome?{ico:'🏛️',bg:'#E3F2FD',cor:'#1565C0',txt:'Diretoria: '+s.aprovado_dir_nome,dt:fmtDT(s.aprovado_dir_data)}:null,
+    ].filter(Boolean);
+
+    // Monta o card completo
+    html+=
+      '<div style="border:1px solid #D0D5DD;border-radius:10px;overflow:hidden;margin-bottom:14px">'+
+      // Header
+      '<div style="background:#0F2236;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">'+
+        '<div style="display:flex;align-items:center;gap:8px;min-width:0">'+
+          '<span style="background:rgba(255,255,255,.25);color:#fff;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700;white-space:nowrap">'+s.numero+'</span>'+
+          '<span style="color:rgba(255,255,255,.8);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">'+(s.descricao||'Sem descrição').substring(0,55)+'</span>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'+
+          '<span style="background:'+pc+';color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">'+(s.urgencia||'Normal')+'</span>'+
+          (s.valor_estimado?'<span style="color:rgba(255,255,255,.8);font-size:11px;font-weight:600">R$ '+parseFloat(s.valor_estimado).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>':'')+
+        '</div>'+
+      '</div>'+
+      // Status + Fluxo
+      '<div style="padding:8px 14px;background:#F8F9FA;border-bottom:1px solid #E0E0E0">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'+
+          '<span style="background:#FFF3E0;color:#E65100;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">⏳ '+stLabel+'</span>'+
+          '<span style="font-size:11px;color:#777">🏢 '+(s.loja_nome||'—')+'</span>'+
+          (s.area?'<span style="font-size:11px;color:#777">🏷️ '+s.area+'</span>':'')+
+        '</div>'+
+        fluxoHtml+
+      '</div>'+
+      // Corpo
+      '<div style="padding:10px 14px">'+
+        (s.justificativa?'<div style="background:#FFFDE7;border-left:3px solid #FDD835;padding:5px 10px;border-radius:4px;font-size:11px;color:#555;margin-bottom:8px">📋 '+s.justificativa+'</div>':'')+
+        tabelaHtml+
+      '</div>'+
+      // Histórico
+      (hist.length?
+        '<div style="padding:8px 14px;background:#FAFAFA;border-top:1px solid #E0E0E0">'+
+          '<div style="font-size:10px;font-weight:700;color:#9E9E9E;margin-bottom:6px;text-transform:uppercase">Histórico</div>'+
+          hist.map(h=>
+            '<div style="display:flex;gap:5px;margin-bottom:5px;align-items:center">'+
+            '<span style="width:18px;height:18px;border-radius:50%;background:'+h.bg+';display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0">'+h.ico+'</span>'+
+            '<span style="font-size:10px;color:'+h.cor+';font-weight:600">'+h.txt+'</span>'+
+            '<span style="font-size:9px;color:#9E9E9E;margin-left:auto;white-space:nowrap">'+h.dt+'</span></div>'
+          ).join('')+
+        '</div>':'')+
+      // Botões
+      '<div style="padding:8px 14px;background:#fff;border-top:1px solid #E0E0E0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+        (s.status==='Aguardando Aprovação Comite'
+          ?'<span style="font-size:12px;color:#6A1B9A;font-weight:600">🟣 Escolha o fornecedor acima</span>'
+          :'<button class="btn bs aprov-btn-aprovar" onclick="aprovarDireto('+i+')" style="padding:8px 20px;font-size:13px;font-weight:700;border-radius:8px">✅ Aprovar</button>'+
+            '<button class="btn" style="background:#FF6F00;color:#fff;padding:8px 14px;font-size:12px;font-weight:600;border-radius:8px" onclick="ajusteDireto('+i+')">⚠️ Ajuste</button>'+
+            '<button class="btn bd" onclick="reprovarDireto('+i+')" style="padding:8px 14px;font-size:12px;font-weight:600;border-radius:8px">✕ Reprovar</button>')+
+        '<button class="btn bl" onclick="verDetalhesDireto('+i+')" style="padding:7px 12px;font-size:11px;border-radius:8px;margin-left:auto">🔍 Detalhes</button>'+
+      '</div>'+
+      '</div>';
   });
+
   return html;
 };
 
