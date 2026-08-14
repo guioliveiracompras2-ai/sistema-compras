@@ -505,14 +505,20 @@ async function loadLojas(){
 async function loadSol(){
   let q=sb.from('solicitacoes').select('*').order('data_criacao',{ascending:false});
   if(S.user?.perfil==='requisitante'){
-    const nome=`${S.user.nome} ${S.user.sobrenome}`;
+    const nome=((S.user.nome||'')+' '+(S.user.sobrenome||'')).trim();
     q=q.eq('solicitante_nome',nome);
-  } else if(S.user?.grupo&&S.user.grupo!=='TODOS'){
-    q=q.eq('grupo',S.user.grupo);
+  } else {
+    // Comitê, Diretoria, Gestor veem todos os grupos que têm acesso
+    const grp=S.user?.grupo||'';
+    if(grp&&grp!=='TODOS'&&grp!=='todos'){
+      q=q.eq('grupo',grp);
+    }
+    // Se lojas_acesso específico (não TODOS), filtra por grupo do usuário
   }
   const {data,error}=await q;
   if(error)console.error('loadSol error:',error);
   S.sol=data||[];
+  console.log('[loadSol] perfil='+S.user?.perfil+' grupo='+S.user?.grupo+' total='+S.sol.length+' pendentes_aprovacao='+S.sol.filter(s=>['Aguardando Gerente','Aguardando Evandro','Aguardando Comite','Aguardando Aprovação Comite'].includes(s.status)).length);
 }
 async function loadItens(){
   try{
