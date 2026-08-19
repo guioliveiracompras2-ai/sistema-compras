@@ -2971,37 +2971,43 @@ async function salvarEdicaoAjuste(solId,numItens){
 async function hSt(id,status){
   document.querySelectorAll('.aprov-btn-aprovar').forEach(b=>{b.disabled=true;b.textContent='Aprovando...';});
   try{
-    // Nome com fallback robusto
     const nomeBase=((S.user?.nome||'').trim()+' '+(S.user?.sobrenome||'').trim()).trim();
     const nome=nomeBase||S.user?.login||'Sistema';
     const agora=new Date().toISOString();
+    console.log('[hSt] INICIANDO → id='+id+' status='+status+' perfil='+S.user?.perfil+' nome='+nome);
 
-    // Atualiza status (operação principal)
-    const upd={status};
-    if(status==='Aprovada')upd.data_aprovacao=agora;
-    if(status==='Reprovada')upd.data_aprovacao=agora;
-
-    // Salva aprovador (ignora erro se coluna não aceitar)
-    const etapasGerente=['Aguardando Evandro','Aguardando Evandro Cotação','Aguardando Diretoria','Reprovada'];
-    const etapasDir=['Aguardando Comite','Aguardando Orçamento','Aguardando Aprovação Comite','Aprovada'];
-    if(etapasGerente.includes(status)&&nome){upd.aprovado_ger_nome=nome;upd.aprovado_ger_data=agora;}
-    if(etapasDir.includes(status)&&nome){upd.aprovado_dir_nome=nome;upd.aprovado_dir_data=agora;}
-
-    console.log('[hSt] id='+id+' status='+status+' nome='+nome);
-
-    const res=await sb.from('solicitacoes').update(upd).eq('id',id);
-    if(res.error){
-      console.error('[hSt] Erro:', res.error);
-      alert('❌ Erro ao aprovar:\n'+res.error.message+'\nCódigo: '+res.error.code+'\n\nVerifique o RLS no Supabase.');
+    // ── PASSO 1: Atualiza apenas o status (operação crítica) ──
+    const updStatus={status};
+    if(['Aprovada','Reprovada'].includes(status))updStatus.data_aprovacao=agora;
+    const r1=await sb.from('solicitacoes').update(updStatus).eq('id',id);
+    if(r1.error){
+      console.error('[hSt] Erro no status:',r1.error);
+      alert('❌ Erro ao salvar status:\n'+r1.error.message+'\n\nSQL: Verifique RLS da tabela solicitacoes.');
       document.querySelectorAll('.aprov-btn-aprovar').forEach(b=>{b.disabled=false;b.textContent='✅ Aprovar';});
       return;
     }
-    console.log('[hSt] Sucesso!');
+    console.log('[hSt] Status salvo ✅ →', status);
+
+    // ── PASSO 2: Salva nome do aprovador (não crítico, não bloqueia) ──
+    try{
+      const etapasGer=['Aguardando Evandro','Aguardando Evandro Cotação','Aguardando Diretoria','Reprovada'];
+      const etapasDir=['Aguardando Comite','Aguardando Orçamento','Aguardando Aprovação Comite','Aprovada'];
+      const updAudit={};
+      if(etapasGer.includes(status)&&nome){updAudit.aprovado_ger_nome=nome;updAudit.aprovado_ger_data=agora;}
+      if(etapasDir.includes(status)&&nome){updAudit.aprovado_dir_nome=nome;updAudit.aprovado_dir_data=agora;}
+      if(Object.keys(updAudit).length){
+        await sb.from('solicitacoes').update(updAudit).eq('id',id);
+        console.log('[hSt] Audit salvo ✅');
+      }
+    }catch(e2){console.warn('[hSt] Audit falhou (não crítico):',e2.message);}
+
+    // ── PASSO 3: Recarrega e renderiza ──
     closeModal();
     await loadSol();
     render();
+    console.log('[hSt] CONCLUÍDO ✅');
   }catch(e){
-    console.error('[hSt] Exception:', e);
+    console.error('[hSt] Exception:',e);
     alert('❌ Erro inesperado: '+e.message);
     document.querySelectorAll('.aprov-btn-aprovar').forEach(b=>{b.disabled=false;b.textContent='✅ Aprovar';});
   }
@@ -3440,11 +3446,21 @@ function pgAprovacoes(){
     return false;
   });
 
+  // Debug info panel
+  const debugInfo='Perfil: '+( S.user?.perfil||'?')+' | Nome: '+(S.user?.nome||'?')+' | Total sol: '+mySol.length+' | Pendentes: '+_aprovPendentes.length;
+  console.log('[pgAprovacoes]',debugInfo);
+
   if(!_aprovPendentes.length){
-    return '<div style="text-align:center;padding:60px 20px">'+
-      '<div style="font-size:56px;margin-bottom:12px">✅</div>'+
+    const todosPendentes=mySol.filter(s=>['Aguardando Gerente','Aguardando Evandro','Aguardando Comite',
+      'Aguardando Diretoria','Aguardando Gerente Cotação','Aguardando Evandro Cotação',
+      'Aguardando Aprovação Comite','Aguardando Aprovação Diretoria'].includes(s.status));
+    return '<div style="text-align:center;padding:40px 20px">'+
+      '<div style="font-size:48px;margin-bottom:12px">✅</div>'+
       '<div style="font-size:18px;font-weight:700;color:#0F2236;margin-bottom:6px">Tudo em dia!</div>'+
-      '<div style="font-size:13px;color:#9E9E9E">Nenhuma aprovação pendente.</div>'+
+      '<div style="font-size:13px;color:#9E9E9E;margin-bottom:16px">Nenhuma aprovação pendente para seu perfil.</div>'+
+      '<div style="background:#F0F4FF;border:1px solid #1565C0;border-radius:8px;padding:10px 16px;font-size:12px;color:#1565C0;max-width:400px;margin:0 auto;text-align:left">'+
+      '<b>🔍 Debug:</b> '+debugInfo+'</div>'+
+      (todosPendentes.length?'<div style="margin-top:12px;font-size:12px;color:#E65100">⚠️ Há '+todosPendentes.length+' sol. pendentes no sistema mas nenhuma aparece para seu perfil. Verifique o campo <b>perfil</b> no Supabase.</div>':'')+
       '</div>';
   }
 
