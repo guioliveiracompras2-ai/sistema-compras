@@ -1202,7 +1202,7 @@ ${!lista.length?`<div class="card" style="text-align:center;padding:48px;color:#
         ${s.status==='Aprovada'&&isCompras()?`<span style="background:#2E7D32;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">✅ Aprovada — Gerar OC</span>`:''}
       </div>
       <div style="display:flex;gap:8px">
-        ${isCompras()&&s.status==='Aprovada'?`<button class="sm or" onclick="vSOL('${s.id}')">🛒 Gerar Ordem de Compra</button>`:''}
+        ${isCompras()&&s.status==='Aprovada'?`<button class="sm or" onclick="mdGerarOC('${s.id}')">🛒 Gerar Ordem de Compra</button>`:''}
         ${isCompras()&&s.status==='Comprada'?`<button class="sm ok" onclick="mdEntSol('${s.id}')">📦 Confirmar Entrega</button>`:''}
         <button class="sm bl" onclick="vSOL('${s.id}')">🔍 Ver Detalhes</button>
       </div>
