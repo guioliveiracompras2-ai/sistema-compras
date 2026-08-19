@@ -2086,7 +2086,9 @@ async function mdEntSol(solId){
       <div class="f"><label>Nota Fiscal *</label><input class="inp" id="ent-nf" placeholder="NF-000000"></div>
       <div class="f"><label>Data de Recebimento</label><input class="inp" type="date" id="ent-dt" value="${new Date().toISOString().slice(0,10)}"></div>
     </div>
-    <div class="f"><label>Recebido por *</label><input class="inp" id="ent-rec" value="${S.user.nome} ${S.user.sobrenome}"></div>
+    <div class="fg2">
+      <div class="f"><label>Nº Lançado na Nuvem *</label><input class="inp" id="ent-nuvem" placeholder="Ex: NUV-00001" style="border-color:#1565C0"></div>
+      <div class="f"><label>Recebido por *</label><input class="inp" id="ent-rec" value="${S.user.nome} ${S.user.sobrenome}"></div>
     <div class="f">
       <label>Condição do item</label>
       <select class="inp" id="ent-cond">
@@ -2105,26 +2107,39 @@ async function mdEntSol(solId){
 
 async function hEntSol(solId,pedId){
   const nf=document.getElementById('ent-nf')?.value?.trim();
+  const nuvem=document.getElementById('ent-nuvem')?.value?.trim();
   const dt=document.getElementById('ent-dt')?.value;
   const rec=document.getElementById('ent-rec')?.value?.trim();
   const cond=document.getElementById('ent-cond')?.value||'';
-  if(!nf)return alert('Informe o número da Nota Fiscal.');
-  if(!rec)return alert('Informe quem recebeu o item.');
+  if(!nf)return alert('⚠️ Informe o número da Nota Fiscal.');
+  if(!nuvem)return alert('⚠️ Informe o Nº Lançado na Nuvem. Este campo é obrigatório.');
+  if(!rec)return alert('⚠️ Informe quem recebeu o item.');
   const agora=new Date().toISOString();
-  const nome=`${S.user.nome} ${S.user.sobrenome}`;
+  const nome=((S.user?.nome||'').trim()+' '+(S.user?.sobrenome||'').trim()).trim()||S.user?.login;
+  const obsEntrega=`NF: ${nf} | Nuvem: ${nuvem} | Recebido por: ${rec} | ${cond}`;
   try{
     // Atualiza solicitação
-    await sb.from('solicitacoes').update({status:'Entregue'}).eq('id',solId);
-    await sb.from('solicitacoes').update({entregue_por:nome,entregue_em:agora}).eq('id',solId).then(()=>{}).catch(()=>{});
+    const r=await sb.from('solicitacoes').update({
+      status:'Entregue',
+      entregue_por:nome,
+      entregue_em:agora,
+      observacoes:obsEntrega,
+    }).eq('id',solId);
+    if(r.error)return alert('❌ Erro: '+r.error.message);
     // Atualiza pedido se existir
     if(pedId){
-      await sb.from('pedidos').update({status:'Entregue',data_entrega:dt||agora.slice(0,10),nf}).eq('id',pedId);
-      await sb.from('pedidos').update({recebido_por:rec,condicao_entrega:cond}).eq('id',pedId).then(()=>{}).catch(()=>{});
+      await sb.from('pedidos').update({
+        status:'Entregue',
+        data_entrega:dt||agora.slice(0,10),
+        nf,
+        recebido_por:rec,
+        condicao_entrega:cond,
+      }).eq('id',pedId).then(()=>{}).catch(()=>{});
     }
     closeModal();
     await loadSol();await loadPed();render();
-    alert('✅ Entrega confirmada!\nNF: '+nf+'\nRecebido por: '+rec+'\n\nSolicitação finalizada com sucesso!');
-  }catch(e){alert('Erro: '+e.message);}
+    alert('✅ Entrega confirmada!\n\n📄 NF: '+nf+'\n☁️ Nuvem: '+nuvem+'\n👤 Recebido por: '+rec+'\n\nSolicitação finalizada!');
+  }catch(e){alert('❌ Erro: '+e.message);}
 }
 
 async function hExecutarCompra(solId,cotId,forn,val){
