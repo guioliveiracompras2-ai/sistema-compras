@@ -723,14 +723,18 @@ function buildApp(){
     }
     return n||0;
   })();
-  const tot=(isDiretoria()?pD+pAD:0)+(isGerente()?pG:0)+(isCompras()?pO:0);
+  const badgeCompras=(isCompras()||isGestor())
+    ?filtrarPorAcesso(S.sol).filter(s=>s.status==='Aguardando Orçamento').length:0;
+  const badgeSolCompras=(isCompras()||isGestor())
+    ?filtrarPorAcesso(S.sol).filter(s=>s.status==='Aprovada').length:0;
+  const tot=(isDiretoria()?pD+pAD:0)+(isGerente()?pG:0)+(isCompras()?(pO+badgeSolCompras):0);
 
   const nav=[
     {id:'dashboard',icon:'📊',label:'Dashboard'},
-    {id:'solicitacoes',icon:'🛒',label:'Solicitações',badge:tot},
+    {id:'solicitacoes',icon:'🛒',label:'Solicitações',badge:(isCompras()||isGestor())?badgeSolCompras:tot},
     ...(isCompras()?[
       {id:'fornecedores',icon:'🏢',label:'Fornecedores'},
-      {id:'cotacoes',icon:'📋',label:'Cotações',badge:pO},
+      {id:'cotacoes',icon:'📋',label:'Cotações',badge:pO+badgeCompras},
       {id:'pedidos',icon:'🚚',label:'Pedidos'},
     ]:[]),
     ...(isGestor()||isCompras()?[{id:'itens',icon:'🏷️',label:'Banco de Itens'}]:[]),
@@ -1937,6 +1941,124 @@ function imprimirLista(){
   </body></html>`;
   const w=window.open('','_blank');w.document.write(html);w.document.close();
   setTimeout(()=>w.print(),500);
+}
+
+async function mdGerarOC(solId){
+  const sol=S.sol.find(s=>s.id===solId);
+  if(!sol)return alert('Solicitação não encontrada.');
+  const valorEst=parseFloat(sol.valor_estimado||0);
+  const valorFinal=parseFloat(sol.valor_final||valorEst);
+  const forn=sol.fornecedor||'';
+  openModal(`<div class="modal" style="max-width:520px">
+  <div class="mh"><span>🛒 Gerar Ordem de Compra</span><button class="xb" onclick="closeModal()">✕</button></div>
+  <div class="mb">
+    <div style="background:#E3F2FD;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+      <div style="font-size:12px;color:#1565C0;font-weight:700">${sol.numero} — ${sol.descricao||''}</div>
+      <div style="font-size:11px;color:#555;margin-top:4px">🏢 ${sol.loja_nome||''} · 📂 ${sol.categoria||''}</div>
+      <div style="font-size:11px;color:#555">👤 Solicitante: ${sol.solicitante_nome||''}</div>
+    </div>
+    <div class="fg2">
+      <div class="f">
+        <label>Fornecedor Aprovado</label>
+        <input class="inp" id="oc-forn" value="${forn}" placeholder="Nome do fornecedor">
+      </div>
+      <div class="f">
+        <label>Nº da OC / Pedido</label>
+        <input class="inp" id="oc-num" placeholder="OC-000001">
+      </div>
+    </div>
+    <div class="fg2">
+      <div class="f">
+        <label>Valor Estimado (orçamento)</label>
+        <input class="inp" id="oc-est" type="number" step="0.01" value="${valorEst.toFixed(2)}" readonly style="background:#F5F5F5;color:#9E9E9E">
+      </div>
+      <div class="f">
+        <label><b>Valor Final Negociado ✏️</b></label>
+        <input class="inp" id="oc-val" type="number" step="0.01" value="${valorFinal.toFixed(2)}" placeholder="0.00" oninput="calcOCSaving()">
+      </div>
+    </div>
+    <div id="oc-saving-box" style="background:#E8F5E9;border:1px solid #2E7D32;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:none">
+      <div style="font-size:12px;color:#2E7D32;font-weight:700">💰 Saving Gerado</div>
+      <div id="oc-saving-val" style="font-size:20px;font-weight:800;color:#2E7D32"></div>
+      <div id="oc-saving-pct" style="font-size:11px;color:#555"></div>
+    </div>
+    <div class="f">
+      <label>Data de Entrega Prevista</label>
+      <input class="inp" type="date" id="oc-dt" value="${new Date(Date.now()+7*86400000).toISOString().slice(0,10)}">
+    </div>
+    <div class="f">
+      <label>Observações</label>
+      <textarea class="inp" id="oc-obs" rows="2" placeholder="Condições de pagamento, prazo..."></textarea>
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn bsc" onclick="closeModal()">Cancelar</button>
+    <button class="btn bs" onclick="hGerarOC('${solId}')">🛒 Confirmar Ordem de Compra</button>
+  </div>
+  </div>`);
+  setTimeout(()=>calcOCSaving(),100);
+}
+
+function calcOCSaving(){
+  const est=parseFloat(document.getElementById('oc-est')?.value||0);
+  const val=parseFloat(document.getElementById('oc-val')?.value||0);
+  const box=document.getElementById('oc-saving-box');
+  const valEl=document.getElementById('oc-saving-val');
+  const pctEl=document.getElementById('oc-saving-pct');
+  if(!box||!valEl)return;
+  const saving=est-val;
+  if(saving>0&&est>0){
+    box.style.display='block'; box.style.background='#E8F5E9'; box.style.borderColor='#2E7D32';
+    valEl.style.color='#2E7D32';
+    valEl.textContent='R$ '+saving.toLocaleString('pt-BR',{minimumFractionDigits:2});
+    pctEl.textContent='Economia de '+((saving/est)*100).toFixed(1)+'% sobre o valor estimado';
+  }else if(saving<0){
+    box.style.background='#FFF3E0'; box.style.borderColor='#E65100';
+    box.style.display='block';
+    valEl.style.color='#E65100';
+    valEl.textContent='R$ '+Math.abs(saving).toLocaleString('pt-BR',{minimumFractionDigits:2})+' acima do estimado';
+    pctEl.textContent='Acréscimo de '+((Math.abs(saving)/est)*100).toFixed(1)+'%';
+  }else{
+    box.style.display='none';
+  }
+}
+
+async function hGerarOC(solId){
+  const forn=document.getElementById('oc-forn')?.value?.trim();
+  const num=document.getElementById('oc-num')?.value?.trim();
+  const val=parseFloat(document.getElementById('oc-val')?.value||0);
+  const est=parseFloat(document.getElementById('oc-est')?.value||0);
+  const dt=document.getElementById('oc-dt')?.value;
+  const obs=document.getElementById('oc-obs')?.value?.trim();
+  if(!forn)return alert('Informe o fornecedor.');
+  if(!val)return alert('Informe o valor final.');
+  const nome=((S.user?.nome||'').trim()+' '+(S.user?.sobrenome||'').trim()).trim()||S.user?.login;
+  const agora=new Date().toISOString();
+  const saving=parseFloat((est-val).toFixed(2));
+  try{
+    // Atualiza solicitação
+    const upd={
+      status:'Comprada',
+      fornecedor:forn,
+      valor_final:val,
+      comprado_por:nome,
+      comprado_em:agora,
+    };
+    if(obs)upd.observacoes=obs;
+    const r=await sb.from('solicitacoes').update(upd).eq('id',solId);
+    if(r.error)return alert('❌ Erro: '+r.error.message);
+    // Salva saving em observacoes se positivo
+    if(saving>0){
+      await sb.from('solicitacoes').update({
+        observacoes:(obs?obs+'\n':'')+'💰 Saving: R$ '+saving.toLocaleString('pt-BR',{minimumFractionDigits:2})
+      }).eq('id',solId);
+    }
+    console.log('[hGerarOC] OC gerada → '+forn+' R$ '+val+' saving='+saving);
+    closeModal();
+    await loadSol();
+    render();
+    alert('✅ Ordem de Compra gerada!\n\n🏢 Fornecedor: '+forn+'\n💰 Valor: R$ '+val.toLocaleString('pt-BR',{minimumFractionDigits:2})+(saving>0?'\n💚 Saving: R$ '+saving.toLocaleString('pt-BR',{minimumFractionDigits:2}):''));
+  }catch(e){alert('❌ Erro: '+e.message);}
 }
 
 async function mdEntSol(solId){
