@@ -1426,6 +1426,19 @@ document.addEventListener('click',function(e){
   document.querySelectorAll('[id^="item-sug-"]').forEach(el=>{
     if(!el.contains(e.target)&&!e.target.classList.contains('item-desc'))el.style.display='none';
   });
+  // ── Escolher fornecedor (delegação) ──────────────────────────────
+  const fBtn=e.target.closest('.escolher-forn-btn');
+  if(fBtn){
+    e.preventDefault();
+    e.stopPropagation();
+    const cotId=fBtn.dataset.cotid||'';
+    const solId=fBtn.dataset.solid||'';
+    const forn=fBtn.dataset.forn||'';
+    const val=parseFloat(fBtn.dataset.val||0);
+    console.log('[escolher-forn-btn] cotId='+cotId+' solId='+solId+' forn='+forn+' val='+val);
+    if(!solId){alert('Erro: ID da solicitação não encontrado.');return;}
+    hEscolherForn(cotId,solId,forn,val);
+  }
 });
 
 function calcTotal(){
@@ -3594,12 +3607,13 @@ function pgAprovacoes(){
           tabelaHtml+='<button class="escolher-forn-btn" '+
             'data-cotid="'+cotIdSafe+'" '+
             'data-solid="'+s.id+'" '+
-            'data-forn="'+f.forn.replace(/"/g,'&quot;')+ '" '+
+            'data-forn="'+f.forn.replace(/"/g,'&quot;')+'" '+
             'data-val="'+f.total+'" '+
-            'style="padding:12px 8px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;background:'+(isBest?'#2E7D32':'#1565C0')+';color:#fff">'+
-            (isBest?'⭐ Escolher (Menor Preço)<br>':'Escolher<br>')+
-            '<span style="font-size:13px">'+f.forn.split(' ').slice(0,2).join(' ')+'</span><br>'+
-            '<b>R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</b>'+
+            'style="padding:8px 10px;font-size:11px;font-weight:700;border-radius:8px;border:2px solid '+(isBest?'#2E7D32':'#1565C0')+';cursor:pointer;background:'+(isBest?'#2E7D32':'#1565C0')+';color:#fff;width:100%;text-align:center">'+
+            (isBest?'⭐ MENOR PREÇO<br>':'')+
+            '<span style="font-size:12px;font-weight:600">'+f.forn+'</span><br>'+
+            '<span style="font-size:13px;font-weight:800">R$ '+f.total.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span><br>'+
+            '<span style="font-size:10px;opacity:.85">Clique para escolher</span>'+
             '</button>';
         });
         tabelaHtml+='</div>';
